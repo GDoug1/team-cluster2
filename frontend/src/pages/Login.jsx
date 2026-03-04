@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apiFetch } from "../api/api";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -10,19 +11,10 @@ export default function Login() {
     setError("");
 
     try {
-      const res = await fetch(
-        "http://localhost/team-cluster/backend/auth/login.php",
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password })
-        }
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) throw data;
+      const data = await apiFetch("auth/login.php", {
+        method: "POST",
+        body: JSON.stringify({ email, password })
+      });
 
       const normalizedRole = String(data.role || "").toLowerCase();
       if (data.fullname) {
