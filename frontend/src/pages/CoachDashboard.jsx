@@ -3,10 +3,8 @@ import { apiFetch } from "../api/api";
 import DashboardSidebar from "../components/DashboardSidebar";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
-import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 
 export default function CoachDashboard() {
-  const statusTags = ["On Time", "Late", "Scheduled", "Off Scheduled", "Not scheduled"];
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const defaultDaySchedule = {
     startTime: "9:00",
@@ -54,7 +52,6 @@ export default function CoachDashboard() {
   const [activeMembers, setActiveMembers] = useState([]);
   const [activeMembersLoading, setActiveMembersLoading] = useState(false);
   const [activeMembersError, setActiveMembersError] = useState("");
-  const [activeMemberTagFilter, setActiveMemberTagFilter] = useState("all");
   const [confirmState, setConfirmState] = useState(null);
   const [scheduleForm, setScheduleForm] = useState({
     days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
@@ -347,36 +344,7 @@ export default function CoachDashboard() {
     return { label: "Available", className: "status-available" };
   };
 
-  const getMemberStatusTag = (statusLabel, isScheduledToday) => {
-    if (statusLabel === "On lunch break") return "Lunch Time";
-    if (statusLabel === "On break time") return "Break Time";
-    if (statusLabel === "Not available") {
-      return isScheduledToday ? "Scheduled" : "Not scheduled";
-    }
-    if (statusLabel === "Available") return "On Time";
-    return null;
-  };
-
-  const getActiveStatusTag = member => {
-    const status = getMemberCurrentStatus(member);
-    const normalizedSchedule = normalizeSchedule(member?.schedule);
-    const assignedDays = Array.isArray(normalizedSchedule?.days)
-      ? normalizedSchedule.days
-      : [];
-    const isScheduledToday = assignedDays.includes(getCurrentDayLabel());
-
-    return resolveAttendanceMainTag({
-      attendanceTag: member.attendance_tag,
-      schedule: member.schedule,
-      timeInAt: member.time_in_at,
-      fallbackTag: getMemberStatusTag(status?.label, isScheduledToday)
-    });
-  };
-
-  const filteredActiveMembers = activeMembers.filter(member => {
-    if (activeMemberTagFilter === "all") return true;
-    return getActiveStatusTag(member) === activeMemberTagFilter;
-  });
+  const displayedActiveMembers = activeMembers;
 
   const filteredAvailableEmployees = availableEmployees.filter(employee =>
     employee.fullname
@@ -1153,20 +1121,6 @@ useEffect(() => {
             <div className="active-team-panel">
               <div className="active-team-header">
                 <div className="section-title">Active Team Members</div>
-                <label className="active-team-filter" htmlFor="active-member-tag-filter">
-                  <span>Filter by Tag</span>
-                  <select
-                    id="active-member-tag-filter"
-                    className="member-select"
-                    value={activeMemberTagFilter}
-                    onChange={event => setActiveMemberTagFilter(event.target.value)}
-                  >
-                    <option value="all">All Tags</option>
-                    {statusTags.map(tag => (
-                      <option key={tag} value={tag}>{tag}</option>
-                    ))}
-                  </select>
-                </label>
               </div>
               {activeMembersLoading && (
                 <div className="modal-text">Loading members...</div>
@@ -1177,10 +1131,7 @@ useEffect(() => {
               {!activeMembersLoading && !activeMembersError && activeMembers.length === 0 && (
                 <div className="empty-state">No employees added to the active cluster yet.</div>
               )}
-              {!activeMembersLoading && !activeMembersError && activeMembers.length > 0 && filteredActiveMembers.length === 0 && (
-                <div className="empty-state">No employees match the selected tag.</div>
-              )}
-              {!activeMembersLoading && !activeMembersError && filteredActiveMembers.length > 0 && (
+              {!activeMembersLoading && !activeMembersError && displayedActiveMembers.length > 0 && (
                 <div className="active-members-schedule-table" role="table" aria-label="Active team schedule">
                   <div className="active-members-schedule-header" role="row">
                     <span role="columnheader">Members</span>
@@ -1191,15 +1142,14 @@ useEffect(() => {
                     <span role="columnheader">Fri</span>
                     <span role="columnheader">Sat</span>
                     <span role="columnheader">Sun</span>
-                    <span role="columnheader">Status and Tags</span>
+                    <span role="columnheader">Status</span>
                   </div>
-                  {filteredActiveMembers.map(member => {
+                  {displayedActiveMembers.map(member => {
                     const status = getMemberCurrentStatus(member);
                     const displayStatus = status ?? {
                       label: "Not available",
                       className: "status-not-available"
                     };
-                    const activeStatusTag = getActiveStatusTag(member);
                     return (
                       <div key={member.id} className="active-members-schedule-row" role="row">
                         <div className="active-members-owner" role="cell">{member.fullname}</div>
@@ -1228,13 +1178,6 @@ useEffect(() => {
                           <span className={`member-status-pill ${displayStatus.className}`}>
                             {displayStatus.label}
                           </span>
-                          {activeStatusTag && (
-                            <div className="member-status-tag-list" aria-label="Status tags">
-                              <span key={`${member.id}-${activeStatusTag}`} className="member-status-tag is-active">
-                                {activeStatusTag}
-                              </span>
-                            </div>
-                          )}
                         </div>
                       </div>
                     );
