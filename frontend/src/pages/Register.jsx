@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "../api/api";
 
 export default function Register() {
@@ -6,11 +6,37 @@ export default function Register() {
     fullname: "",
     email: "",
     password: "",
-    role: ""
+    role_id: ""
   });
 
+  const [roles, setRoles] = useState([]);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadRoles() {
+      try {
+        const response = await apiFetch("auth/roles.php");
+        if (!isMounted) {
+          return;
+        }
+        setRoles(Array.isArray(response.roles) ? response.roles : []);
+      } catch (err) {
+        if (!isMounted) {
+          return;
+        }
+        setError(err.error || "Unable to load roles");
+      }
+    }
+
+    loadRoles();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -24,7 +50,10 @@ export default function Register() {
     try {
       await apiFetch("auth/register.php", {
         method: "POST",
-        body: JSON.stringify(form)
+        body: JSON.stringify({
+          ...form,
+          role_id: Number(form.role_id)
+        })
       });
 
       window.location.href = "/login";
@@ -105,15 +134,17 @@ export default function Register() {
             Select role
             <select
               className="auth-select"
-              name="role"
-              value={form.role}
+              name="role_id"
+              value={form.role_id}
               onChange={handleChange}
               required
             >
               <option value="" disabled>Select Role</option>
-              <option value="admin">Admin</option>
-              <option value="employee">User Employee</option>
-              <option value="coach">Team Coach</option>
+              {roles.map((role) => (
+                <option key={role.role_id} value={role.role_id}>
+                  {role.role_name}
+                </option>
+              ))}
             </select>
           </label>
 

@@ -12,27 +12,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 include "../config/database.php";
 
-function resolveRoleId(mysqli $conn, string $role): ?int {
-    $stmt = $conn->prepare(
-        "SELECT role_id, role_name
-         FROM roles"
-    );
-    if (!$stmt || !$stmt->execute()) {
-        return null;
+function roleExists(mysqli $conn, int $roleId): bool {
+    $stmt = $conn->prepare("SELECT role_id FROM roles WHERE role_id = ? LIMIT 1");
+    if (!$stmt) {
+        return false;
     }
 
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $dbRole = strtolower((string)($row['role_name'] ?? ''));
-        if ($dbRole === $role || str_contains($dbRole, $role)) {
-            return (int)$row['role_id'];
-        }
-        if ($role === 'admin' && str_contains($dbRole, 'administrator')) {
-            return (int)$row['role_id'];
-        }
+    $stmt->bind_param("i", $roleId);
+    if (!$stmt->execute()) {
+        return false;
     }
 
-    return null;
+    return (bool)$stmt->get_result()->fetch_assoc();
 }
 
 $data = json_decode(file_get_contents("php://input"), true);
@@ -40,21 +31,21 @@ $data = json_decode(file_get_contents("php://input"), true);
 $fullname = trim($data['fullname'] ?? '');
 $email = strtolower(trim($data['email'] ?? ''));
 $password = $data['password'] ?? '';
-$role = strtolower(trim($data['role'] ?? ''));
+$roleId = isset($data['role_id']) ? (int)$data['role_id'] : 0;
 
-if (!$fullname || !$email || !$password || !$role) {
+if (!$fullname || !$email || !$password || $roleId <= 0) {
     http_response_code(400);
     echo json_encode(["error" => "All fields required"]);
     exit;
 }
 
-if (!in_array($role, ["coach", "employee", "admin"], true)) {
+if (!roleExists($conn, $roleId)) {
     http_response_code(400);
     echo json_encode(["error" => "Invalid role"]);
     exit;
 }
 
-$check = $conn->prepare("SELECT user_id FROM users WHERE email=?");
+$check = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
 $check->bind_param("s", $email);
 if (!$check->execute()) {
     http_response_code(500);
@@ -66,13 +57,6 @@ $check->store_result();
 if ($check->num_rows > 0) {
     http_response_code(409);
     echo json_encode(["error" => "Email already exists"]);
-    exit;
-}
-
-$roleId = resolveRoleId($conn, $role);
-if ($roleId === null) {
-    http_response_code(500);
-    echo json_encode(["error" => "Role configuration not found in database"]);
     exit;
 }
 
