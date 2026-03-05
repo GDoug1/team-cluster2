@@ -3,18 +3,56 @@ include "../config/database.php";
 include "../config/auth.php";
 requireRole("coach");
 
+function getColumns(mysqli $conn, string $table): array {
+    $columns = [];
+    $result = $conn->query("SHOW COLUMNS FROM $table");
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $columns[] = $row['Field'];
+        }
+    }
+    return $columns;
+}
+
+$userColumns = getColumns($conn, 'users');
+$employeeColumns = getColumns($conn, 'employees');
+
+$userIdColumn = in_array('id', $userColumns, true) ? 'id' : 'user_id';
+$roleColumn = in_array('role', $userColumns, true) ? 'role' : null;
+$nameExpr = in_array('fullname', $userColumns, true)
+    ? 'u.fullname'
+    : "TRIM(CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name))";
+
+$employeeJoin = in_array('user_id', $employeeColumns, true)
+    ? "LEFT JOIN employees e ON e.user_id = u.$userIdColumn"
+    : '';
+
+$whereRole = $roleColumn ? "AND u.$roleColumn='employee'" : '';
+
 $res = $conn->query(
-    "SELECT users.id, users.fullname
-     FROM users
-     LEFT JOIN cluster_members
-       ON users.id = cluster_members.employee_id
-     WHERE users.role='employee'
-       AND cluster_members.employee_id IS NULL
-     ORDER BY users.fullname ASC"
+    "SELECT u.$userIdColumn AS id,
+            $nameExpr AS fullname
+     FROM users u
+     LEFT JOIN cluster_members cm
+       ON u.$userIdColumn = cm.employee_id
+     $employeeJoin
+     WHERE cm.employee_id IS NULL
+       $whereRole
+     ORDER BY fullname ASC"
 );
+
+if (!$res) {
+    http_response_code(500);
+    exit(json_encode(["error" => "Unable to load employees."]));
+}
 
 $employees = [];
 while ($row = $res->fetch_assoc()) {
+    $row['id'] = (int)$row['id'];
+    $row['fullname'] = trim((string)$row['fullname']);
+    if ($row['fullname'] === '') {
+        $row['fullname'] = "Employee #{$row['id']}";
+    }
     $employees[] = $row;
 }
 
