@@ -602,6 +602,7 @@ useEffect(() => {
     setScheduleForm(prev => {
       const baseDaySchedule = prev.daySchedules?.[day] ?? { ...defaultDaySchedule };
       const currentDaySchedule = { ...baseDaySchedule };
+      const [time, period] = String(value).split("|");
 
       if (["endTime", "breakStart", "breakEnd"].includes(field)) {
 
