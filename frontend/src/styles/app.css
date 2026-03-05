@@ -1348,7 +1348,7 @@ body {
 
 .schedule-time-grid {
   display: grid;
-  grid-template-columns: minmax(140px, 1.1fr) repeat(5, minmax(160px, 1fr));
+  grid-template-columns: minmax(140px, 1.1fr) repeat(7, minmax(150px, 1fr));
   gap: 25px;
   align-items: end;
 }

@@ -6,11 +6,15 @@ import useCurrentUser from "../hooks/useCurrentUser";
 
 export default function CoachDashboard() {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const shiftTypeOptions = ["Morning Shift", "Mid Shift", "Night Shift"];
+  const workSetupOptions = ["Onsite", "Work From Home (WFH)"];
   const defaultDaySchedule = {
+    shiftType: "Morning Shift",
     startTime: "9:00",
     startPeriod: "AM",
     endTime: "5:00",
     endPeriod: "PM",
+    workSetup: "Onsite",
     lunchBreakStartTime: "12:00",
     lunchBreakStartPeriod: "PM",
     lunchBreakEndTime: "12:30",
@@ -88,10 +92,12 @@ export default function CoachDashboard() {
     const daySchedules = {};
     dayOptions.forEach(day => {
       daySchedules[day] = {
+        shiftType: baseSchedule.shiftType ?? baseSchedule.shift_type ?? "Morning Shift",
         startTime: baseSchedule.startTime ?? "9:00",
         startPeriod: baseSchedule.startPeriod ?? "AM",
         endTime: baseSchedule.endTime ?? "6:00",
         endPeriod: baseSchedule.endPeriod ?? "PM",
+        workSetup: baseSchedule.workSetup ?? baseSchedule.work_setup ?? "Onsite",
         lunchBreakStartTime: baseSchedule.lunchBreakStartTime ?? baseSchedule.lunchBreakTime ?? "12:00",
         lunchBreakStartPeriod: baseSchedule.lunchBreakStartPeriod ?? baseSchedule.lunchBreakPeriod ?? "PM",
         lunchBreakEndTime: baseSchedule.lunchBreakEndTime ?? "1:00",
@@ -112,10 +118,12 @@ export default function CoachDashboard() {
       Object.entries(source).forEach(([day, value]) => {
         if (!dayOptions.includes(day) || !value || typeof value !== "object") return;
         daySchedules[day] = {
+          shiftType: value.shiftType ?? value.shift_type ?? daySchedules[day].shiftType,
           startTime: value.startTime ?? daySchedules[day].startTime,
           startPeriod: value.startPeriod ?? daySchedules[day].startPeriod,
           endTime: value.endTime ?? daySchedules[day].endTime,
           endPeriod: value.endPeriod ?? daySchedules[day].endPeriod,
+          workSetup: value.workSetup ?? value.work_setup ?? daySchedules[day].workSetup,
           lunchBreakStartTime:
             value.lunchBreakStartTime ?? value.lunchBreakTime ?? daySchedules[day].lunchBreakStartTime,
           lunchBreakStartPeriod:
@@ -1443,6 +1451,8 @@ useEffect(() => {
                             <div className="schedule-time-grid">
                               <div className="schedule-time-label">Start time</div>
                               <div className="schedule-time-label">End time</div>
+                              <div className="schedule-time-label">Shift type</div>
+                              <div className="schedule-time-label">Work setup</div>
                               <div className="schedule-time-label-g1">Lunch break start</div>
                               <div className="schedule-time-label">Lunch break end</div>
                               <div className="schedule-time-label-g2">Break time start</div>
@@ -1490,6 +1500,36 @@ useEffect(() => {
                                 </select>
                               </div>
 
+                              <div className="schedule-time-row">
+                                <select
+                                  value={daySchedule.shiftType}
+                                  onChange={event =>
+                                    handleChangeDayTime(day, "shiftType", event.target.value)
+                                  }
+                                >
+                                  {shiftTypeOptions.map(option => (
+                                    <option key={`${day}-shift-type-${option}`} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="schedule-time-row">
+                                <select
+                                  value={daySchedule.workSetup}
+                                  onChange={event =>
+                                    handleChangeDayTime(day, "workSetup", event.target.value)
+                                  }
+                                >
+                                  {workSetupOptions.map(option => (
+                                    <option key={`${day}-work-setup-${option}`} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              
                               <div className="schedule-time-row-g1">
                                 <select
                                   className="schedule-break-select"
