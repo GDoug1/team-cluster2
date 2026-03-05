@@ -353,7 +353,11 @@ export default function CoachDashboard() {
   );
 
   useEffect(() => {
-    apiFetch("api/coach_clusters.php").then(setClusters);
+    apiFetch("api/coach_clusters.php")
+      .then(setClusters)
+      .catch(err => {
+        setError(err?.error ?? "Unable to load team clusters.");
+      });
   }, []);
 
 useEffect(() => {
