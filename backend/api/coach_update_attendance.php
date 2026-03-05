@@ -54,6 +54,12 @@ function normalizeToAllowedEnum(?string $value, array $allowedValues): ?string {
     return $allowedMap[$lookup] ?? null;
 }
 
+function pickColumn(array $columns, string $primary, ?string $fallback = null): ?string {
+    if (in_array($primary, $columns, true)) return $primary;
+    if ($fallback !== null && in_array($fallback, $columns, true)) return $fallback;
+    return null;
+}
+
 $data = json_decode(file_get_contents("php://input"), true);
 
 $cluster_id = isset($data["cluster_id"]) ? (int)$data["cluster_id"] : 0;
@@ -70,9 +76,23 @@ if ($cluster_id <= 0 || $employee_id <= 0 || $attendanceId <= 0) {
     exit;
 }
 
-$coach_id = (int)$_SESSION["user"]["id"];
+$clusterColumns = getColumns($conn, 'clusters');
+$clusterIdColumn = pickColumn($clusterColumns, 'id', 'cluster_id');
+$clusterOwnerColumn = pickColumn($clusterColumns, 'coach_id', 'user_id');
+
+if ($clusterIdColumn === null || $clusterOwnerColumn === null) {
+    http_response_code(500);
+    echo json_encode(["error" => "Cluster schema is not supported."]);
+    exit;
+}
+
+$coach_id = (int)($_SESSION["user"]["id"] ?? 0);
 $ownershipCheck = $conn->query(
-    "SELECT id FROM clusters WHERE id=$cluster_id AND coach_id=$coach_id LIMIT 1"
+    "SELECT $clusterIdColumn
+     FROM clusters
+     WHERE $clusterIdColumn=$cluster_id
+       AND $clusterOwnerColumn=$coach_id
+     LIMIT 1"
 );
 
 if (!$ownershipCheck || $ownershipCheck->num_rows === 0) {
@@ -82,7 +102,11 @@ if (!$ownershipCheck || $ownershipCheck->num_rows === 0) {
 }
 
 $memberCheck = $conn->query(
-    "SELECT id FROM cluster_members WHERE cluster_id=$cluster_id AND employee_id=$employee_id LIMIT 1"
+    "SELECT 1
+     FROM cluster_members
+     WHERE cluster_id=$cluster_id
+       AND employee_id=$employee_id
+     LIMIT 1"
 );
 
 if (!$memberCheck || $memberCheck->num_rows === 0) {
@@ -102,6 +126,8 @@ $hasLegacyAttendance = in_array('id', $attendanceColumns, true)
 $hasNewAttendance = in_array('attendance_id', $attendanceColumns, true)
     && in_array('attendance_status', $attendanceColumns, true)
     && in_array('attendance_date', $attendanceColumns, true);
+
+$hasAttendanceUpdatedAt = in_array('updated_at', $attendanceColumns, true);
 
 $timeLogPrimaryKey = in_array('time_log_id', $timeLogColumns, true)
     ? 'time_log_id'
@@ -160,13 +186,19 @@ if ($hasLegacyAttendance) {
         exit;
     }
 
+    $legacyUpdateFields = [
+        "time_in_at=$timeInValue",
+        "time_out_at=$timeOutValue",
+        "tag=$tagValue",
+        "note=$noteValue"
+    ];
+    if ($hasAttendanceUpdatedAt) {
+        $legacyUpdateFields[] = "updated_at=CURRENT_TIMESTAMP";
+    }
+
     $updateResult = $conn->query(
         "UPDATE attendance_logs
-         SET time_in_at=$timeInValue,
-             time_out_at=$timeOutValue,
-             tag=$tagValue,
-             note=$noteValue,
-             updated_at=CURRENT_TIMESTAMP
+         SET " . implode(', ', $legacyUpdateFields) . "
          WHERE id=$attendanceId"
     );
 
@@ -182,7 +214,7 @@ if ($hasLegacyAttendance) {
                 time_out_at,
                 tag,
                 note,
-                updated_at
+                " . ($hasAttendanceUpdatedAt ? "updated_at" : "NULL") . " AS updated_at
          FROM attendance_logs
          WHERE id=$attendanceId
          LIMIT 1"
@@ -222,14 +254,25 @@ if ($hasNewAttendance) {
 
     $attendanceStatusEnum = getEnumValues($conn, 'attendance_logs', 'attendance_status');
     $mappedAttendanceStatus = mapTagToAttendanceStatus($tag);
-    $normalizedAttendanceStatus = normalizeToAllowedEnum($mappedAttendanceStatus, $attendanceStatusEnum) ?? 'Present';
+    $normalizedAttendanceStatus = normalizeToAllowedEnum($mappedAttendanceStatus, $attendanceStatusEnum);
+
+    if ($normalizedAttendanceStatus === null) {
+        $normalizedAttendanceStatus = count($attendanceStatusEnum) > 0 ? $attendanceStatusEnum[0] : 'Present';
+    }
+
     $attendanceStatusEscaped = "'" . $conn->real_escape_string($normalizedAttendanceStatus) . "'";
+
+    $newUpdateFields = [
+        "attendance_status=$attendanceStatusEscaped",
+        "note=$noteValue"
+    ];
+    if ($hasAttendanceUpdatedAt) {
+        $newUpdateFields[] = "updated_at=CURRENT_TIMESTAMP";
+    }
 
     $updateAttendanceResult = $conn->query(
         "UPDATE attendance_logs
-         SET attendance_status=$attendanceStatusEscaped,
-             note=$noteValue,
-             updated_at=CURRENT_TIMESTAMP
+         SET " . implode(', ', $newUpdateFields) . "
          WHERE attendance_id=$attendanceId"
     );
 
@@ -264,6 +307,8 @@ if ($hasNewAttendance) {
 
                 if ($normalizedTimeLogTag !== null) {
                     $timeLogUpdates[] = "tag='" . $conn->real_escape_string($normalizedTimeLogTag) . "'";
+                } elseif (count($timeLogTagEnum) === 0) {
+                    $timeLogUpdates[] = "tag=$tagValue";
                 } else {
                     $timeLogUpdates[] = "tag=NULL";
                 }
@@ -286,7 +331,7 @@ if ($hasNewAttendance) {
     $updatedAttendanceRes = $conn->query(
         "SELECT al.attendance_id,
                 al.note,
-                al.updated_at,
+                " . ($hasAttendanceUpdatedAt ? "al.updated_at" : "NULL") . " AS updated_at,
                 " . ($hasTimeLogs ? "tl.time_in" : "NULL") . " AS time_in_at,
                 " . (($hasTimeLogs && $hasTimeLogTimeOut) ? "tl.time_out" : "NULL") . " AS time_out_at,
                 " . ($hasTimeLogs && $hasTimeLogTag ? "COALESCE(tl.tag, al.attendance_status)" : "al.attendance_status") . " AS tag
