@@ -1,28 +1,22 @@
 import { useState } from "react";
+import { apiFetch } from "../api/api";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    setIsSubmitting(true);
 
     try {
-      const res = await fetch(
-        "http://localhost/team-cluster/backend/auth/login.php",
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password })
-        }
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) throw data;
+      const data = await apiFetch("auth/login.php", {
+        method: "POST",
+        body: JSON.stringify({ email, password })
+      });
 
       const normalizedRole = String(data.role || "").toLowerCase();
       if (data.fullname) {
@@ -41,6 +35,8 @@ export default function Login() {
       window.location.href = redirectPath;
     } catch (err) {
       setError(err.error || "Login failed");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -103,8 +99,8 @@ export default function Login() {
               required
             />
           </label>
-        <button type="submit" className="btn primary auth-submit">
-            Login
+        <button type="submit" className="btn primary auth-submit" disabled={isSubmitting}>
+            {isSubmitting ? "Signing in..." : "Login"}
           </button>
 
         <p className="auth-footer">

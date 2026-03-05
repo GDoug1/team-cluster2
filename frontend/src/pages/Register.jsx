@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apiFetch } from "../api/api";
 
 export default function Register() {
   const [form, setForm] = useState({
@@ -9,6 +10,7 @@ export default function Register() {
   });
 
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -17,24 +19,19 @@ export default function Register() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    setIsSubmitting(true);
 
     try {
-      const res = await fetch(
-        "http://localhost/team-cluster/backend/auth/register.php",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form)
-        }
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) throw data;
+      await apiFetch("auth/register.php", {
+        method: "POST",
+        body: JSON.stringify(form)
+      });
 
       window.location.href = "/login";
     } catch (err) {
       setError(err.error || "Registration failed");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -120,8 +117,8 @@ export default function Register() {
             </select>
           </label>
 
-          <button type="submit" className="btn primary auth-submit">
-            Create Account
+          <button type="submit" className="btn primary auth-submit" disabled={isSubmitting}>
+            {isSubmitting ? "Creating account..." : "Create Account"}
           </button>
 
           <p className="auth-footer">
