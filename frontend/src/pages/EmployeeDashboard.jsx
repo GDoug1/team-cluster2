@@ -6,7 +6,6 @@ import useCurrentUser from "../hooks/useCurrentUser";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 
 export default function EmployeeDashboard() {
-  const statusTags = ["On Time", "Late", "Scheduled", "Off Scheduled", "Not scheduled"];
   const navItems = ["Dashboard", "Team", "Attendance", "Schedule"];
   const [data, setData] = useState([]);
   const [activeNav, setActiveNav] = useState("Team");
@@ -73,19 +72,12 @@ export default function EmployeeDashboard() {
     if (!daySchedule || typeof daySchedule !== "object") {
       return {
         shift: formatScheduleTime(schedule),
-        lunchBreak: "—",
         breakTime: "—"
       };
     }
 
     return {
       shift: formatScheduleTime(daySchedule),
-      lunchBreak: formatBreakTimeRange(
-        daySchedule.lunchBreakStartTime,
-        daySchedule.lunchBreakStartPeriod,
-        daySchedule.lunchBreakEndTime,
-        daySchedule.lunchBreakEndPeriod
-      ),
       breakTime: formatBreakTimeRange(
         daySchedule.breakStartTime,
         daySchedule.breakStartPeriod,
@@ -161,18 +153,6 @@ export default function EmployeeDashboard() {
       )
     ) {
       return { label: "Not available", className: "status-not-available" };
-    }
-
-    if (
-      isTimeWithinRange(
-        nowMinutes,
-        daySchedule.lunchBreakStartTime,
-        daySchedule.lunchBreakStartPeriod,
-        daySchedule.lunchBreakEndTime,
-        daySchedule.lunchBreakEndPeriod
-      )
-    ) {
-      return { label: "On lunch break", className: "status-lunch" };
     }
 
     if (
@@ -332,7 +312,6 @@ export default function EmployeeDashboard() {
   };
 
   const getStatusTag = (statusLabel, isScheduledToday) => {
-    if (statusLabel === "On lunch break") return "Lunch Time";
     if (statusLabel === "On break time") return "Break Time";
     if (statusLabel === "Not available") {
       return isScheduledToday ? "Scheduled" : "Not scheduled";
@@ -620,9 +599,6 @@ export default function EmployeeDashboard() {
                         return (
                           <div key={`${day}-value`} role="cell" className="active-day-cell">
                             <div>{dayInfo.shift}</div>
-                            <span className="active-day-tag lunch-tag">
-                              Lunch break: {dayInfo.lunchBreak}
-                            </span>
                             <span className="active-day-tag break-tag">
                               Break time: {dayInfo.breakTime}
                             </span>
@@ -634,14 +610,9 @@ export default function EmployeeDashboard() {
                           {currentStatus.label}
                         </span>
                         <div className="member-status-tag-list" aria-label="Status tags">
-                          {statusTags.map(tag => (
-                            <span
-                              key={`employee-${tag}`}
-                              className={`member-status-tag ${activeAttendanceTag === tag ? "is-active" : ""}`}
-                            >
-                              {tag}
-                            </span>
-                          ))}
+                          <span className="member-status-tag is-active">
+                            {activeAttendanceTag ?? "Pending"}
+                          </span>
                         </div>
                       </div>
                     </div>
