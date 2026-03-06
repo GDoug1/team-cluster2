@@ -159,10 +159,10 @@ function MemberStatusCard() {
       <div className="member-title">Member Status</div>
       <div className="member-empty" aria-label="No member status updates yet" />
       <div className="request-list member-placeholder">
-        <div className="request-row muted-row">
-          <span> </span>
-          <span> </span>
-          <span> </span>
+        <div className="request-row">
+          <span>Kim Santos</span>
+          <span className="requesting">Requesting OT</span>
+          <button type="button" className="view-btn">View</button>
         </div>
       </div>
     </div>
