@@ -51,24 +51,14 @@ function TimeCard({
   );
 }
 
-function AnnouncementCard({ announcements }) {
+function AnnouncementCard() {
   return (
     <div className="card announcement-card">
       <div className="card-top">
         <span>Announcement</span>
         <button type="button" className="pill-btn">+ Announcement</button>
       </div>
-      <ul className="list-items announcement-list">
-        {announcements.map(item => (
-          <li key={item.title} className="announcement-item">
-            <span className={`announcement-tag ${item.type.toLowerCase()}`}>{item.type}</span>
-            <div className="announcement-copy">
-              <div className="announcement-title">{item.title}</div>
-              <div className="announcement-meta">{item.meta}</div>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <div className="empty-panel" aria-label="No announcements yet" />
       <div className="mini-actions">✎&nbsp;&nbsp;◷</div>
     </div>
   );
@@ -130,22 +120,14 @@ function CalendarCard({ calendarData }) {
   );
 }
 
-function HolidayCard({ holidayBirthdayItems }) {
+function HolidayCard() {
   return (
     <div className="card holiday-card">
       <div className="card-top">
         <span>Holidays/Birthday</span>
         <span className="plus">+</span>
       </div>
-      <ul className="list-items holiday-list">
-        {holidayBirthdayItems.map(item => (
-          <li key={`${item.kind}-${item.label}`} className="holiday-item">
-            <span className={`holiday-kind ${item.kind.toLowerCase()}`}>{item.kind}</span>
-            <span className="holiday-label">{item.label}</span>
-            <span className="holiday-date">{item.date}</span>
-          </li>
-        ))}
-      </ul>
+      <div className="empty-panel" aria-label="No holidays or birthdays yet" />
       <div className="mini-actions">✎&nbsp;&nbsp;◷</div>
     </div>
   );
@@ -171,26 +153,17 @@ function SummaryCard({ timeInStart, totalHours }) {
   );
 }
 
-function MemberStatusCard({ memberStatuses, memberRequests, getStatusDotClass }) {
+function MemberStatusCard() {
   return (
     <div className="card member-card">
       <div className="member-title">Member Status</div>
-      {memberStatuses.map(member => (
-        <div key={member.name} className="member-line">
-          <span>{member.name}</span>
-          <span className="member-status-text">{member.status}</span>
-          <span className={getStatusDotClass(member.status)} />
+      <div className="member-empty" aria-label="No member status updates yet" />
+      <div className="request-list member-placeholder">
+        <div className="request-row muted-row">
+          <span> </span>
+          <span> </span>
+          <span> </span>
         </div>
-      ))}
-
-      <div className="request-list">
-        {memberRequests.map(member => (
-          <div key={member.name} className="request-row">
-            <span>{member.name}</span>
-            <span className="requesting">{member.request}</span>
-            <button type="button" className="view-btn">View</button>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -257,23 +230,6 @@ export default function MainDashboard({ attendanceControls = null }) {
     };
   }, []);
 
-  const announcements = [
-    { type: "Info", title: "Weekly sync moved to 3 PM", meta: "Today • 10:00 AM" },
-    { type: "Alert", title: "Submit attendance before EOD", meta: "Today • 9:00 AM" },
-  ];
-  const holidayBirthdayItems = [
-    { kind: "Holiday", label: "Company Foundation Day", date: "Mar 20" },
-    { kind: "Birthday", label: "Alex Jordan", date: "Mar 26" },
-  ];
-  const memberStatuses = [
-    { name: "D. Cruz", status: "Available" },
-    { name: "M. Reyes", status: "On break" },
-  ];
-  const memberRequests = [{ name: "A. Santos", request: "Shift change" }];
-
-  const getStatusDotClass = status =>
-    `member-status-dot ${status.toLowerCase().replace(/\s+/g, "-")}`;
-
   const onToggleTimeIn = () => {
     if (attendanceControls) {
       if (attendanceControls.canClickTimeOut) {
@@ -306,17 +262,13 @@ export default function MainDashboard({ attendanceControls = null }) {
           onToggleTimeIn={onToggleTimeIn}
           canToggleTimeIn={canToggleTimeIn}
         />
-        <AnnouncementCard announcements={announcements} />
+        <AnnouncementCard />
         <BreakCard />
         <ShiftCard />
         <CalendarCard calendarData={calendarData} />
-        <HolidayCard holidayBirthdayItems={holidayBirthdayItems} />
+        <HolidayCard />
         <SummaryCard timeInStart={activeTimeIn} totalHours={totalHours} />
-        <MemberStatusCard
-          memberStatuses={memberStatuses}
-          memberRequests={memberRequests}
-          getStatusDotClass={getStatusDotClass}
-        />
+        <MemberStatusCard />
       </div>
     </>
   );

@@ -2146,6 +2146,12 @@ body {
   list-style: none;
 }
 
+
+.empty-panel {
+  margin-top: 10px;
+  min-height: 130px;
+}
+
 .announcement-list {
   padding-right: 12px;
   margin-bottom: 0;
@@ -2469,6 +2475,20 @@ body {
   font-size: 13px;
   margin-bottom: 6px;
   font-weight: 500;
+}
+
+
+.member-empty {
+  flex: 1;
+  min-height: 0;
+}
+
+.member-placeholder {
+  min-height: 26px;
+}
+
+.muted-row {
+  color: transparent;
 }
 
 .member-line {
