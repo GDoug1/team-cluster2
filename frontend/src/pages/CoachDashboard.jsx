@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../api/api";
 import DashboardSidebar from "../components/DashboardSidebar";
+import MainDashboard from "./MainDashboard";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 
@@ -53,6 +54,7 @@ export default function CoachDashboard() {
   const [activeMembersLoading, setActiveMembersLoading] = useState(false);
   const [activeMembersError, setActiveMembersError] = useState("");
   const [confirmState, setConfirmState] = useState(null);
+  const [activeNav, setActiveNav] = useState("Team");
   const [scheduleForm, setScheduleForm] = useState({
     days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
     daySchedules: {
@@ -66,8 +68,8 @@ export default function CoachDashboard() {
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
   const navItems = [
-    { label: "Dashboard" },
-    { label: "Team", active: true },
+    { label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") },
+    { label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") },
     { label: "Attendance", onClick: () => (window.location.href = "/coach/attendance") },
     { label: "Schedule" }
   ];
@@ -906,6 +908,12 @@ useEffect(() => {
       />
 
       <main className="main">
+        {activeNav === "Dashboard" ? (
+          <section className="content">
+            <MainDashboard />
+          </section>
+        ) : (
+          <>
         <header className="topbar">
           <div>
             <h2>DASHBOARD</h2>
@@ -1548,6 +1556,8 @@ useEffect(() => {
               </div>
             </div>
           </div>
+        )}
+          </>
         )}
       </main>
     </div>
