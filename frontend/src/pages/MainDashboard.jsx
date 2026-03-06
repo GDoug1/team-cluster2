@@ -12,9 +12,6 @@ function DashboardHeader({ headerTime, headerDate }) {
 }
 
 function TimeCard({
-  autoTimeOut,
-  setAutoTimeOut,
-  timeInputDisplay,
   counterDisplay,
   hasActiveTimeIn,
   onToggleTimeIn,
@@ -23,19 +20,6 @@ function TimeCard({
   return (
     <div className="card time-card">
       <div className="time-panel">
-        <div className="time-panel-row">
-          <span className="time-auto-label">AUTO-TIME OUT</span>
-          <button
-            type="button"
-            className={`time-switch ${autoTimeOut ? "on" : ""}`}
-            aria-label="Auto time out"
-            onClick={() => setAutoTimeOut(prev => !prev)}
-          >
-            <span className="time-switch-knob" />
-          </button>
-        </div>
-
-        <div className="time-input">{timeInputDisplay}</div>
         <div className="time-counter">{counterDisplay}</div>
 
         <button
@@ -157,7 +141,6 @@ function MemberStatusCard() {
 }
 
 export default function MainDashboard({ attendanceControls = null }) {
-  const [autoTimeOut, setAutoTimeOut] = useState(false);
   const [timeInStart, setTimeInStart] = useState(null);
   const [now, setNow] = useState(new Date());
 
@@ -241,9 +224,6 @@ export default function MainDashboard({ attendanceControls = null }) {
 
       <div className="dashboard-grid">
         <TimeCard
-          autoTimeOut={autoTimeOut}
-          setAutoTimeOut={setAutoTimeOut}
-          timeInputDisplay={now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
           counterDisplay={counterDisplay}
           hasActiveTimeIn={hasActiveTimeIn}
           onToggleTimeIn={onToggleTimeIn}

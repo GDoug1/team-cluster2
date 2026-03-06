@@ -2741,57 +2741,6 @@ body {
   padding: 12px 14px;
 }
 
-.time-panel-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.time-auto-label {
-  font-size: 12px;
-  letter-spacing: 0.3px;
-  font-weight: 700;
-  color: #6f7f98;
-}
-
-.time-switch {
-  width: 46px;
-  height: 24px;
-  border: none;
-  border-radius: 999px;
-  background: #c9d0d8;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  cursor: pointer;
-}
-
-.time-switch.on {
-  justify-content: flex-end;
-  background: #98b2d8;
-}
-
-.time-switch-knob {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #efefef;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
-}
-
-.time-input {
-  height: 28px;
-  border-radius: 6px;
-  background: #bdbdbd;
-  color: #a8adb3;
-  font-size: 12px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-}
-
 .time-counter {
   text-align: center;
   font-size: 42px;
