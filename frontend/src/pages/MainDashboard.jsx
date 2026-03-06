@@ -58,7 +58,7 @@ function AnnouncementCard() {
         <span>Announcement</span>
         <button type="button" className="pill-btn">+ Announcement</button>
       </div>
-      <div className="empty-panel" aria-label="No announcements yet" />
+      <ul className="list-items announcement-list" aria-label="No announcements yet" />
       <div className="mini-actions">✎&nbsp;&nbsp;◷</div>
     </div>
   );
@@ -127,7 +127,7 @@ function HolidayCard() {
         <span>Holidays/Birthday</span>
         <span className="plus">+</span>
       </div>
-      <div className="empty-panel" aria-label="No holidays or birthdays yet" />
+      <ul className="list-items holiday-list" aria-label="No holidays or birthdays yet" />
       <div className="mini-actions">✎&nbsp;&nbsp;◷</div>
     </div>
   );
@@ -157,8 +157,7 @@ function MemberStatusCard() {
   return (
     <div className="card member-card">
       <div className="member-title">Member Status</div>
-      <div className="member-empty" aria-label="No member status updates yet" />
-      <div className="request-list member-placeholder">
+      <div className="request-list" aria-label="No member status updates yet">
         <div className="request-row">
           <span>Kim Santos</span>
           <span className="requesting">Requesting OT</span>
