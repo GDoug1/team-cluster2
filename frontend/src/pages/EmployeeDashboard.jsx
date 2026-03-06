@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
 import DashboardSidebar from "../components/DashboardSidebar";
+import MainDashboard from "./MainDashboard";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
@@ -8,7 +9,7 @@ import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 export default function EmployeeDashboard() {
   const navItems = ["Dashboard", "Team", "Attendance", "Schedule"];
   const [data, setData] = useState([]);
-  const [activeNav, setActiveNav] = useState("Team");
+  const [activeNav, setActiveNav] = useState("Dashboard");
   const sidebarNavItems = navItems.map(item => ({
     label: item,
     active: activeNav === item,
@@ -423,46 +424,7 @@ export default function EmployeeDashboard() {
         </header>
 
         <section className="content content-muted">
-            {activeNav === "Dashboard" && (
-            <div className="employee-card employee-attendance-card">
-              <div className="employee-card-header">
-                <div className="employee-card-title">Time In / Time Out</div>
-              </div>
-              <div className="employee-card-body employee-attendance-body">
-                <p className="employee-attendance-copy">
-                  This control marks your status as <strong>On Time</strong> when you time in on schedule or within 15 minutes after start time.
-                </p>
-                {!hasTeamCluster && (
-                  <p className="employee-attendance-copy">
-                    You need to be assigned to a team cluster before you can time in or time out.
-                  </p>
-                )}
-                {hasTeamCluster && !hasScheduleToday && (
-                  <p className="employee-attendance-copy">
-                    You can only time in and time out on days when you have an assigned schedule.
-                  </p>
-                )}
-                <div className="employee-attendance-actions">
-                  <button type="button" className="btn primary" onClick={handleTimeIn} disabled={!canClickTimeIn}>
-                    Time In
-                  </button>
-                  <button type="button" className="btn secondary" onClick={handleTimeOut} disabled={!canClickTimeOut}>
-                    Time Out
-                  </button>
-                </div>
-                <div className="employee-attendance-log">
-                  <div><strong>Time In:</strong> {formatClockTime(attendanceLog.timeInAt)}</div>
-                  <div><strong>Time Out:</strong> {formatClockTime(attendanceLog.timeOutAt)}</div>
-                  <div>
-                    <strong>Status Tag:</strong>{" "}
-                    <span className={`member-status-tag ${attendanceLog.tag ? "is-active" : ""}`}>
-                      {attendanceLog.tag ?? (hasScheduleToday ? "Scheduled" : "Not scheduled")}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            )}
+            {activeNav === "Dashboard" && <MainDashboard />}
 
           {data.length === 0 && activeNav !== "Attendance" && (
             <div className="empty-state">No team cluster details available.</div>

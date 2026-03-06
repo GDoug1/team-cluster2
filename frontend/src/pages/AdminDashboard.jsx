@@ -1,20 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "../api/api";
 import DashboardSidebar from "../components/DashboardSidebar";
+import MainDashboard from "./MainDashboard";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 
 export default function AdminDashboard() {
   const [clusters, setClusters] = useState([]);
   const [rejectingCluster, setRejectingCluster] = useState(null);
+  const [activeNav, setActiveNav] = useState("Team");
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectError, setRejectError] = useState("");
   const [isSubmittingReject, setIsSubmittingReject] = useState(false);
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
   const navItems = [
-    { label: "Dashboard" },
-    { label: "Team", active: true },
+    { label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") },
+    { label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") },
     { label: "Attendance" },
     { label: "Schedule" }
   ];
@@ -110,66 +112,74 @@ const handleOpenRejectModal = cluster => {
       />
 
       <main className="main">
-        <header className="topbar">
-          <div>
-            <h2>TEAM</h2>
-            <div className="section-title">Admin Dashboard</div>
-          </div>
-          <span className="datetime">{dateTimeLabel}</span>
-        </header>
-
-        <section className="content">
-          <div className="section-title">Team clusters</div>
-            {clusters.length === 0 ? (
-            <div className="empty-state">No team clusters available.</div>
-          ) : (
-            <div className="table-card">
-              <div className="table-header">
-                <div>Cluster Name</div>
-                <div>Description</div>
-                <div>Members</div>
-                <div>Created</div>
-                <div>Status</div>
-                <div>Rejection Reason</div>
-                <div>Action</div>
+        {activeNav === "Dashboard" ? (
+          <section className="content">
+            <MainDashboard />
+          </section>
+        ) : (
+          <>
+            <header className="topbar">
+              <div>
+                <h2>TEAM</h2>
+                <div className="section-title">Admin Dashboard</div>
               </div>
-             {clusters.map(c => (
-                <div key={c.id} className="table-row">
-                  <div className="table-cell">{c.name}</div>
-                  <div className="table-cell muted">{c.description}</div>
-                  <div className="table-cell">{c.members ?? 0}</div>
-                  <div className="table-cell">{formatDate(c.created_at)}</div>
-                  <div className="table-cell">
-                    <span className={`badge ${c.status}`}>{c.status}</span>
+              <span className="datetime">{dateTimeLabel}</span>
+            </header>
+
+            <section className="content">
+              <div className="section-title">Team clusters</div>
+            {clusters.length === 0 ? (
+                <div className="empty-state">No team clusters available.</div>
+              ) : (
+                <div className="table-card">
+                  <div className="table-header">
+                    <div>Cluster Name</div>
+                    <div>Description</div>
+                    <div>Members</div>
+                    <div>Created</div>
+                    <div>Status</div>
+                    <div>Rejection Reason</div>
+                    <div>Action</div>
                   </div>
-                  <div className="table-cell muted">
-                    {c.rejection_reason || "—"}
-                  </div>
-                  <div className="table-cell">
-                    {c.status === "pending" ? (
-                      <div className="card-actions">
-                        <button
-                          className="btn primary"
-                          onClick={() => updateStatus(c.id, "active")}
-                        >
-                          Accept
-                        </button>
-                        <button
-                          className="btn secondary"
-                          onClick={() => handleOpenRejectModal(c)}
-                        >
-                          Reject
-                        </button>
+                  {clusters.map(c => (
+                    <div key={c.id} className="table-row">
+                      <div className="table-cell">{c.name}</div>
+                      <div className="table-cell muted">{c.description}</div>
+                      <div className="table-cell">{c.members ?? 0}</div>
+                      <div className="table-cell">{formatDate(c.created_at)}</div>
+                      <div className="table-cell">
+                        <span className={`badge ${c.status}`}>{c.status}</span>
                       </div>
-                    ) : (
-                      <span className="table-cell muted">—</span>
-                    )}
-                  </div>
+                      <div className="table-cell muted">
+                        {c.rejection_reason || "—"}
+                      </div>
+                      <div className="table-cell">
+                        {c.status === "pending" ? (
+                          <div className="card-actions">
+                            <button
+                              className="btn primary"
+                              onClick={() => updateStatus(c.id, "active")}
+                            >
+                              Accept
+                            </button>
+                            <button
+                              className="btn secondary"
+                              onClick={() => handleOpenRejectModal(c)}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="table-cell muted">—</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+              )}
+          </section>
+          </>
+        )}
       </main>
 
       {rejectingCluster && (
