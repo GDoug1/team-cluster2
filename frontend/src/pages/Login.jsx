@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiFetch } from "../api/api";
+import AuthLayout from "../components/AuthLayout";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -41,73 +42,51 @@ export default function Login() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-shell">
-        <div className="auth-panel">
-          <span className="auth-pill">Team Cluster</span>
-          <h1>Welcome back</h1>
-          <p>
-            coach@mail.com
-          </p>
-          <p>
-            employee@mail.com
-          </p>
-          <p>
-            admin@mail.com
-          </p>
-          <div className="auth-highlights">
-            <div>
-              <strong>Centralized access</strong>
-              <span>Keep schedules, roles, and updates in sync.</span>
-            </div>
-            <div>
-              <strong>Live reporting</strong>
-              <span>Monitor team activity as it happens.</span>
-            </div>
-          </div>
+    <AuthLayout
+      showPanel={false}
+      title="Welcome back"
+      description="Access your dashboard and keep your team aligned in real time."
+      highlights={[]}
+    >
+      <form className="auth-card" onSubmit={handleSubmit}>
+        <div>
+          <h2 className="auth-heading">Sign in</h2>
+          <p className="auth-subtitle">Use your registered email and password.</p>
         </div>
-        <form className="auth-card" onSubmit={handleSubmit}>
-          <div>
-            <h2 className="auth-heading">Sign in</h2>
-            <p className="auth-subtitle">
-              Use your registered email and password.
-            </p>
-          </div>
 
         {error && <p className="auth-error">{error}</p>}
 
-         <label className="auth-field">
-            Email address
-            <input
-              className="auth-input"
-              type="email"
-              placeholder="you@company.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-            />
-          </label>
+        <label className="auth-field">
+          Email address
+          <input
+            className="auth-input"
+            type="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+          />
+        </label>
 
         <label className="auth-field">
-            Password
-            <input
-              className="auth-input"
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-            />
-          </label>
+          Password
+          <input
+            className="auth-input"
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            required
+          />
+        </label>
         <button type="submit" className="btn primary auth-submit" disabled={isSubmitting}>
-            {isSubmitting ? "Signing in..." : "Login"}
-          </button>
+          {isSubmitting ? "Signing in..." : "Login"}
+        </button>
 
         <p className="auth-footer">
-            No account? <a href="/register">Register</a>
-          </p>
-        </form>
-      </div>
-    </div>
+          No account? <a href="/register">Register</a>
+        </p>
+      </form>
+    </AuthLayout>
   );
 }

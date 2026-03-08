@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../api/api";
+import AuthLayout from "../components/AuthLayout";
+import { registerHighlights } from "../utils/authContent";
 
 export default function Register() {
   const [form, setForm] = useState({
@@ -65,98 +67,80 @@ export default function Register() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-shell">
-        <div className="auth-panel">
-          <span className="auth-pill">Team Cluster</span>
-          <h1>Create your workspace</h1>
-          <p>
-            Invite leaders, set roles, and collaborate on team goals in minutes.
-            Fill out the details below to get started.
-          </p>
-          <div className="auth-highlights">
-            <div>
-              <strong>Role-based access</strong>
-              <span>Give every member the right permissions.</span>
-            </div>
-            <div>
-              <strong>Quick onboarding</strong>
-              <span>Bring your organization online instantly.</span>
-            </div>
-          </div>
+    <AuthLayout
+      title="Create your workspace"
+      description="Invite leaders, assign permissions, and launch a polished team hub in minutes."
+      highlights={registerHighlights}
+    >
+      <form className="auth-card" onSubmit={handleSubmit}>
+        <div>
+          <h2 className="auth-heading">Register</h2>
+          <p className="auth-subtitle">Create an account to access the cluster tools.</p>
         </div>
-        <form className="auth-card" onSubmit={handleSubmit}>
-          <div>
-            <h2 className="auth-heading">Register</h2>
-            <p className="auth-subtitle">
-              Create an account to access the cluster tools.
-            </p>
-          </div>
 
-          {error && <p className="auth-error">{error}</p>}
+        {error && <p className="auth-error">{error}</p>}
 
-          <label className="auth-field">
-            Full name
-            <input
-              className="auth-input"
-              name="fullname"
-              placeholder="Jane Cooper"
-              onChange={handleChange}
-              required
-            />
-          </label>
+        <label className="auth-field">
+          Full name
+          <input
+            className="auth-input"
+            name="fullname"
+            placeholder="Jane Cooper"
+            onChange={handleChange}
+            required
+          />
+        </label>
 
-          <label className="auth-field">
-            Work email
-            <input
-              className="auth-input"
-              type="email"
-              name="email"
-              placeholder="name@company.com"
-              onChange={handleChange}
-              required
-            />
-          </label>
+        <label className="auth-field">
+          Work email
+          <input
+            className="auth-input"
+            type="email"
+            name="email"
+            placeholder="name@company.com"
+            onChange={handleChange}
+            required
+          />
+        </label>
 
-          <label className="auth-field">
-            Password
-            <input
-              className="auth-input"
-              type="password"
-              name="password"
-              placeholder="Create a secure password"
-              onChange={handleChange}
-              required
-            />
-          </label>
+        <label className="auth-field">
+          Password
+          <input
+            className="auth-input"
+            type="password"
+            name="password"
+            placeholder="Create a secure password"
+            onChange={handleChange}
+            required
+          />
+        </label>
 
-          <label className="auth-field">
-            Select role
-            <select
-              className="auth-select"
-              name="role_id"
-              value={form.role_id}
-              onChange={handleChange}
-              required
-            >
-              <option value="" disabled>Select Role</option>
-              {roles.map((role) => (
-                <option key={role.role_id} value={role.role_id}>
-                  {role.role_name}
-                </option>
-              ))}
-            </select>
-          </label>
+        <label className="auth-field">
+          Select role
+          <select
+            className="auth-select"
+            name="role_id"
+            value={form.role_id}
+            onChange={handleChange}
+            required
+          >
+            <option value="" disabled>Select Role</option>
+            {roles.map((role) => (
+              <option key={role.role_id} value={role.role_id}>
+                {role.role_name}
+              </option>
+            ))}
+          </select>
+        </label>
 
-          <button type="submit" className="btn primary auth-submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creating account..." : "Create Account"}
-          </button>
+        <button type="submit" className="btn primary auth-submit" disabled={isSubmitting}>
+          {isSubmitting ? "Creating account..." : "Create Account"}
+        </button>
 
-          <p className="auth-footer">
-            Already have access? <a href="/login">Sign in</a>
-          </p>
-        </form>
-      </div>
-    </div>
+        <p className="auth-footer">
+          Already have access? <a href="/login">Sign in</a>
+        </p>
+      </form>
+    </AuthLayout>
   );
 }
