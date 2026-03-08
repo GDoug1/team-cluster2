@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import "../styles/MainDashboard.css";
 
 function DashboardHeader({ headerTime, headerDate }) {
   return (
     <section className="dashboard-header">
+      <div className="datetime">{headerTime}&nbsp;&nbsp;&nbsp;{headerDate}</div>
     </section>
   );
 }
@@ -72,7 +74,7 @@ function ShiftCard({ schedule = null }) {
   const shiftSchedule = getTodayShiftSchedule(schedule);
   const startTime = formatShiftTime(shiftSchedule?.startTime, shiftSchedule?.startPeriod);
   const endTime = formatShiftTime(shiftSchedule?.endTime, shiftSchedule?.endPeriod);
-  
+
   return (
     <div className="card shift-card">
       <div className="shift-columns">
@@ -124,6 +126,27 @@ function HolidayCard() {
       </div>
       <ul className="list-items holiday-list" aria-label="No holidays or birthdays yet" />
       <div className="mini-actions">✎&nbsp;&nbsp;◷</div>
+    </div>
+  );
+}
+
+
+function SummaryCard({ timeInStart, totalHours }) {
+  return (
+    <div className="card summary-card">
+      <div>
+        <div className="label">Today Status</div>
+        <div className="small-info">Time In: {timeInStart ? timeInStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '--:--'}</div>
+        <div className="small-info">Break: Inactive</div>
+      </div>
+      <div>
+        <div className="label">Total Hours</div>
+        <div className="big-value">{totalHours}h</div>
+      </div>
+      <div>
+        <div className="label">Attendance</div>
+        <div className="big-value">{timeInStart ? 'Present' : 'Absent'}</div>
+      </div>
     </div>
   );
 }
@@ -201,6 +224,14 @@ export default function MainDashboard({
     };
   }, []);
 
+
+  const totalHours = useMemo(() => {
+    if (!activeTimeIn) return 0;
+    const counterEndTime = activeTimeOut ?? now;
+    const diffInSeconds = Math.max(0, Math.floor((counterEndTime.getTime() - activeTimeIn.getTime()) / 1000));
+    return (diffInSeconds / 3600).toFixed(1);
+  }, [activeTimeIn, activeTimeOut, now]);
+
   const onToggleTimeIn = () => {
     if (attendanceControls) {
       if (attendanceControls.canClickTimeOut) {
@@ -234,18 +265,9 @@ export default function MainDashboard({
         <ShiftCard schedule={schedule} />
         <CalendarCard calendarData={calendarData} />
         <HolidayCard />
+        <SummaryCard timeInStart={activeTimeIn} totalHours={totalHours} />
         {showMemberStatusCard ? <MemberStatusCard /> : null}
       </div>
     </>
   );
 }
-
-export {
-  AnnouncementCard,
-  CalendarCard,
-  DashboardHeader,
-  HolidayCard,
-  MemberStatusCard,
-  ShiftCard,
-  TimeCard,
-};
