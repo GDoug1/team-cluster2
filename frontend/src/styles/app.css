@@ -273,7 +273,7 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-right: 50pxgi;
+  margin-right: 50px;
 }
 
 .card-details {
@@ -1930,7 +1930,7 @@ body {
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
 }
 
-.content {
+.app-shell > .content {
   flex: 1;
   align-self: stretch;
   width: 100%;
@@ -1997,7 +1997,7 @@ body {
 }
 
 @media (min-width: 1400px) {
-  .content {
+  .app-shell > .content {
     padding: 22px;
   }
 
@@ -2022,7 +2022,7 @@ body {
 }
 
 @media (min-width: 1700px) {
-  .content {
+  .app-shell > .content {
     padding: 24px;
   }
 
@@ -2047,7 +2047,7 @@ body {
 }
 
 @media (max-width: 1200px) {
-  .content {
+  .app-shell > .content {
     padding: 14px;
   }
 
@@ -2076,7 +2076,7 @@ body {
     flex-direction: column;
   }
 
-  .content {
+  .app-shell > .content {
     align-self: stretch;
     padding: 10px;
   }
@@ -2140,9 +2140,9 @@ body {
 .list-items {
   margin: 10px 0 0;
   padding-left: 0;
+  list-style: none;
   font-size: 12px;
   line-height: 1.35;
-  list-style: none;
 }
 
 
@@ -2210,14 +2210,6 @@ body {
   grid-area: calendar;
   height: 200px;
   align-self: start;
-}
-
-.card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 500;
-  font-size: 13px;
 }
 
 .calendar-month {
@@ -2309,24 +2301,11 @@ body {
   padding-bottom: 28px;
 }
 
-.card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 500;
-  font-size: 13px;
-}
-
 .plus {
   font-size: 16px;
   font-weight: 700;
 }
 
-.list-items {
-  margin: 10px 0 0;
-  padding-left: 0;
-  list-style: none;
-}
 
 .holiday-list {
   display: flex;
@@ -2379,13 +2358,6 @@ body {
   white-space: nowrap;
 }
 
-.mini-actions {
-  position: absolute;
-  right: 10px;
-  bottom: 8px;
-  font-size: 12px;
-  color: #2f2f2f;
-}
 
 @media (max-width: 980px) {
   .holiday-card {
@@ -2588,11 +2560,6 @@ body {
   justify-content: flex-start;
   align-items: flex-start;
   text-align: left;
-}
-
-.label {
-  font-size: 12px;
-  margin-bottom: 4px;
 }
 
 .small-info {
