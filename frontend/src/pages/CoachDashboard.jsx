@@ -7,8 +7,11 @@ import useCurrentUser from "../hooks/useCurrentUser";
 
 export default function CoachDashboard() {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const shiftTypeOptions = ["Morning Shift", "Mid Shift", "Night Shift"];
   const workSetupOptions = ["Onsite", "Work From Home (WFH)"];
+  const SHIFT_WINDOWS = {
+    morning: { start: 6 * 60, end: 11 * 60 + 30 },
+    mid: { start: 12 * 60, end: 19 * 60 + 30 }
+  };
   const defaultDaySchedule = {
     shiftType: "Morning Shift",
     startTime: "9:00",
@@ -241,6 +244,26 @@ export default function CoachDashboard() {
   const formatBreakTimeRange = (startTime, startPeriod, endTime, endPeriod) => {
     if (!startTime || !startPeriod || !endTime || !endPeriod) return "—";
     return `${startTime} ${startPeriod} - ${endTime} ${endPeriod}`;
+  };
+
+  const getAutomaticShiftType = (startTime, startPeriod) => {
+    const startMinutes = toMinutes(startTime, startPeriod);
+    if (startMinutes === null) {
+      return "Morning Shift";
+    }
+
+    if (
+      startMinutes >= SHIFT_WINDOWS.morning.start &&
+      startMinutes <= SHIFT_WINDOWS.morning.end
+    ) {
+      return "Morning Shift";
+    }
+
+    if (startMinutes >= SHIFT_WINDOWS.mid.start && startMinutes <= SHIFT_WINDOWS.mid.end) {
+      return "Mid Shift";
+    }
+
+    return "Night Shift";
   };
 
   const isTimeWithinRange = (
@@ -674,6 +697,11 @@ useEffect(() => {
         currentDaySchedule.breakEndTime = breakEndOptions[0].time;
         currentDaySchedule.breakEndPeriod = breakEndOptions[0].period;
       }
+
+      currentDaySchedule.shiftType = getAutomaticShiftType(
+        currentDaySchedule.startTime,
+        currentDaySchedule.startPeriod
+      );
 
 
       return {
@@ -1428,18 +1456,7 @@ useEffect(() => {
 
                               <div className="schedule-time-row schedule-field">
                                 <div className="schedule-time-label">Shift type</div>
-                                <select
-                                  value={daySchedule.shiftType}
-                                  onChange={event =>
-                                    handleChangeDayTime(day, "shiftType", event.target.value)
-                                  }
-                                >
-                                  {shiftTypeOptions.map(option => (
-                                    <option key={`${day}-shift-type-${option}`} value={option}>
-                                      {option}
-                                    </option>
-                                  ))}
-                                </select>
+                                <input type="text" value={daySchedule.shiftType} readOnly />
                               </div>
 
                               <div className="schedule-time-row schedule-field">
