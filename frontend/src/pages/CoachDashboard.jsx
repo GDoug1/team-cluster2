@@ -717,14 +717,27 @@ useEffect(() => {
   const getScheduleSummary = member => {
     const normalizedSchedule = normalizeSchedule(member?.schedule);
     if (!normalizedSchedule || Array.isArray(normalizedSchedule)) {
-      return "Not scheduled";
+      return {
+        status: "Not scheduled",
+        detail: "No shift hours have been assigned yet."
+      };
     }
 
     const days = Array.isArray(normalizedSchedule.days) ? normalizedSchedule.days : [];
-    if (days.length === 0) return "Not scheduled";
+    if (days.length === 0) {
+      return {
+        status: "Not scheduled",
+        detail: "No assigned days yet."
+      };
+    }
 
     const firstDaySchedule = normalizedSchedule.daySchedules?.[days[0]];
-    if (!firstDaySchedule) return "Schedule set";
+    if (!firstDaySchedule) {
+      return {
+        status: "Schedule set",
+        detail: "Hours are saved but not available for preview."
+      };
+    }
 
     const firstRange = formatTimeRange(firstDaySchedule);
     const hasMixedRanges = days.some(day => {
@@ -733,7 +746,17 @@ useEffect(() => {
       return formatTimeRange(daySchedule) !== firstRange;
     });
 
-    return hasMixedRanges ? "Variable shifts" : firstRange;
+    if (hasMixedRanges) {
+      return {
+        status: "Variable shifts",
+        detail: "Members have different shift hours depending on the day."
+      };
+    }
+
+    return {
+      status: "Consistent shift",
+      detail: firstRange
+    };
   };
 
   const getAssignedDays = member => {
@@ -1220,11 +1243,19 @@ useEffect(() => {
                         <span className="member-action-col">Actions</span>
                       </div>
                     )}
-                    {members.map(member => (
+                    {members.map(member => {
+                      const scheduleSummary = getScheduleSummary(member);
+
+                      return (
                       <div key={member.id} className="member-item">
                         <div className="member-name">{member.fullname}</div>
                         <div className="member-schedule-summary">
-                          {getScheduleSummary(member)}
+                          <div className="member-schedule-status">
+                            {scheduleSummary.status}
+                          </div>
+                          <div className="member-schedule-detail">
+                            {scheduleSummary.detail}
+                          </div>
                         </div>
                         <div className="member-days">
                           {getAssignedDays(member).length > 0 ? (
@@ -1257,7 +1288,7 @@ useEffect(() => {
                           </button>
                         </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )}
                 {memberError && <div className="error">{memberError}</div>}

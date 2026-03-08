@@ -961,9 +961,23 @@ body {
 }
 
 .member-schedule-summary {
+  display: grid;
+  gap: 3px;
   color: #334155;
   font-size: 14px;
   font-weight: 600;
+}
+
+.member-schedule-status {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.member-schedule-detail {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
 }
 
 
