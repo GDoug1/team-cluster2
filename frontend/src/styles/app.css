@@ -1468,6 +1468,73 @@ body {
   color: #6b7280;
 }
 
+.schedule-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.24fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.schedule-side-panel {
+  border: 1px solid #d6d9e0;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.schedule-group-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 10px;
+}
+
+.schedule-day-list {
+  display: grid;
+  gap: 8px;
+}
+
+.schedule-day-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.schedule-day-item input {
+  accent-color: #2563eb;
+}
+
+.schedule-days-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-day-card {
+  border: 1px solid #d6d9e0;
+  border-radius: 12px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.schedule-shift-tag {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4338ca;
+  background: #e0e7ff;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.success-message {
+  margin-top: 12px;
+  color: #166534;
+  font-weight: 600;
+}
+
 @media (max-width: 760px) {
   .schedule-day-row {
     grid-template-columns: 1fr;
@@ -1476,6 +1543,10 @@ body {
   }
 
   .schedule-time-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-grid {
     grid-template-columns: 1fr;
   }
 
