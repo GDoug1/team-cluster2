@@ -1,7 +1,11 @@
 <?php
 include "../config/database.php";
 include "../config/auth.php";
-requireRole("employee");
+if (!in_array($_SESSION["user"]["role"] ?? "", ["employee", "coach"], true)) {
+    http_response_code(403);
+    echo json_encode(["error" => "Forbidden"]);
+    exit;
+}
 
 function getColumns(mysqli $conn, string $table): array {
     $columns = [];
@@ -65,6 +69,14 @@ function getMemberEmployeeId(mysqli $conn): int {
     return $memberEmployeeId;
 }
 
+
+
+function pickColumn(array $columns, string $primary, ?string $fallback = null): ?string {
+    if (in_array($primary, $columns, true)) return $primary;
+    if ($fallback !== null && in_array($fallback, $columns, true)) return $fallback;
+    return null;
+}
+
 function mapTagToAttendanceStatus(?string $tag): string {
     $normalizedTag = strtolower(trim((string)$tag));
     if ($normalizedTag === 'late') return 'Late';
@@ -75,7 +87,9 @@ function mapTagToAttendanceStatus(?string $tag): string {
 $data = json_decode(file_get_contents("php://input"), true);
 
 $cluster_id = isset($data["cluster_id"]) ? (int)$data["cluster_id"] : 0;
-$employee_id = getMemberEmployeeId($conn);
+$sessionRole = $_SESSION["user"]["role"] ?? "";
+$sessionUserId = (int)($_SESSION['user']['id'] ?? 0);
+$employee_id = $sessionRole === 'coach' ? $sessionUserId : getMemberEmployeeId($conn);
 $timeInAt = isset($data["timeInAt"]) ? $data["timeInAt"] : null;
 $timeOutAt = isset($data["timeOutAt"]) ? $data["timeOutAt"] : null;
 $tag = isset($data["tag"]) ? $data["tag"] : null;
@@ -87,20 +101,42 @@ if ($cluster_id <= 0) {
     exit;
 }
 
-$membershipStmt = $conn->prepare(
-    "SELECT 1
-     FROM cluster_members
-     WHERE cluster_id = ?
-       AND employee_id = ?
-     LIMIT 1"
-);
-$membershipStmt->bind_param('ii', $cluster_id, $employee_id);
-$membershipStmt->execute();
-$membershipRes = $membershipStmt->get_result();
-if (!$membershipRes || $membershipRes->num_rows === 0) {
-    http_response_code(403);
-    echo json_encode(["error" => "Employee is not assigned to this cluster"]);
-    exit;
+if ($sessionRole === 'coach') {
+    $clusterColumns = getColumns($conn, 'clusters');
+    $clusterIdColumn = pickColumn($clusterColumns, 'id', 'cluster_id');
+    $clusterOwnerColumn = pickColumn($clusterColumns, 'coach_id', 'user_id');
+
+    if ($clusterIdColumn === null || $clusterOwnerColumn === null) {
+        http_response_code(500);
+        echo json_encode(["error" => "Cluster schema is not supported."]);
+        exit;
+    }
+
+    $ownershipCheck = $conn->query(
+        "SELECT 1 FROM clusters WHERE $clusterIdColumn=$cluster_id AND $clusterOwnerColumn=$sessionUserId LIMIT 1"
+    );
+
+    if (!$ownershipCheck || $ownershipCheck->num_rows === 0) {
+        http_response_code(403);
+        echo json_encode(["error" => "You can only log attendance for your cluster."]);
+        exit;
+    }
+} else {
+    $membershipStmt = $conn->prepare(
+        "SELECT 1
+         FROM cluster_members
+         WHERE cluster_id = ?
+           AND employee_id = ?
+         LIMIT 1"
+    );
+    $membershipStmt->bind_param('ii', $cluster_id, $employee_id);
+    $membershipStmt->execute();
+    $membershipRes = $membershipStmt->get_result();
+    if (!$membershipRes || $membershipRes->num_rows === 0) {
+        http_response_code(403);
+        echo json_encode(["error" => "Employee is not assigned to this cluster"]);
+        exit;
+    }
 }
 
 $attendanceColumns = getColumns($conn, 'attendance_logs');

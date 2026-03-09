@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
+import { saveDashboardAttendance } from "../api/attendance";
 import DashboardSidebar from "../components/DashboardSidebar";
 import MainDashboard from "./MainDashboard";
 import useLiveDateTime from "../hooks/useLiveDateTime";
@@ -194,16 +195,6 @@ export default function EmployeeDashboard() {
     return `${year}-${month}-${day}`;
   };
 
-  const toLocalSqlDateTime = date => {
-    const year = date.getFullYear();
-    const month = `${date.getMonth() + 1}`.padStart(2, "0");
-    const day = `${date.getDate()}`.padStart(2, "0");
-    const hours = `${date.getHours()}`.padStart(2, "0");
-    const minutes = `${date.getMinutes()}`.padStart(2, "0");
-    const seconds = `${date.getSeconds()}`.padStart(2, "0");
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-  };
-
   const parseSqlDateTime = value => {
     if (!value || typeof value !== "string") return null;
     const trimmedValue = value.trim();
@@ -246,22 +237,12 @@ export default function EmployeeDashboard() {
       return;
     }
 
-    const response = await apiFetch("api/save_attendance.php", {
-      method: "POST",
-      body: JSON.stringify({
-        cluster_id: activeCluster.cluster_id,
-        ...nextAttendance,
-        timeInAt: nextAttendance.timeInAt ? toLocalSqlDateTime(nextAttendance.timeInAt) : null,
-        timeOutAt: nextAttendance.timeOutAt ? toLocalSqlDateTime(nextAttendance.timeOutAt) : null
-      })
+    const savedAttendance = await saveDashboardAttendance({
+      clusterId: activeCluster.cluster_id,
+      nextAttendance
     });
 
-    const savedAttendance = response.attendance ?? {};
-    setAttendanceLog({
-      timeInAt: parseSqlDateTime(savedAttendance.timeInAt),
-      timeOutAt: parseSqlDateTime(savedAttendance.timeOutAt),
-      tag: savedAttendance.tag ?? null
-    });
+    setAttendanceLog(savedAttendance);
 
     const history = await apiFetch("api/employee_attendance_history.php");
     setAttendanceHistory(history);

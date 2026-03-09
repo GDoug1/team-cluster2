@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
+import { parseSqlDateTime, saveDashboardAttendance } from "../api/attendance";
 import DashboardSidebar from "../components/DashboardSidebar";
 import MainDashboard from "./MainDashboard";
 import useLiveDateTime from "../hooks/useLiveDateTime";
@@ -78,26 +79,6 @@ export default function CoachDashboard() {
     { label: "Attendance", onClick: () => (window.location.href = "/coach/attendance") },
     { label: "Schedule" }
   ];
-
-  const parseSqlDateTime = value => {
-    if (!value || typeof value !== "string") return null;
-    const [datePart, timePart] = value.trim().split(" ");
-    if (!datePart || !timePart) return null;
-    const [year, month, day] = datePart.split("-").map(Number);
-    const [hours, minutes, seconds] = timePart.split(":").map(Number);
-    if ([year, month, day, hours, minutes].some(Number.isNaN)) return null;
-    return new Date(year, month - 1, day, hours, minutes, Number.isNaN(seconds) ? 0 : seconds);
-  };
-
-  const toLocalSqlDateTime = date => {
-    const year = date.getFullYear();
-    const month = `${date.getMonth() + 1}`.padStart(2, "0");
-    const day = `${date.getDate()}`.padStart(2, "0");
-    const hours = `${date.getHours()}`.padStart(2, "0");
-    const minutes = `${date.getMinutes()}`.padStart(2, "0");
-    const seconds = `${date.getSeconds()}`.padStart(2, "0");
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-  };
 
   const normalizeSchedule = schedule => {
     if (!schedule) return schedule;
@@ -502,21 +483,12 @@ useEffect(() => {
   const persistAttendance = async nextAttendance => {
     if (!dashboardCluster?.id) return;
 
-    const response = await apiFetch("api/save_coach_attendance.php", {
-      method: "POST",
-      body: JSON.stringify({
-        cluster_id: dashboardCluster.id,
-        ...nextAttendance,
-        timeInAt: nextAttendance.timeInAt ? toLocalSqlDateTime(nextAttendance.timeInAt) : null,
-        timeOutAt: nextAttendance.timeOutAt ? toLocalSqlDateTime(nextAttendance.timeOutAt) : null,
-      })
+    const savedAttendance = await saveDashboardAttendance({
+      clusterId: dashboardCluster.id,
+      nextAttendance
     });
 
-    setAttendanceLog({
-      timeInAt: parseSqlDateTime(response?.attendance?.timeInAt ?? null),
-      timeOutAt: parseSqlDateTime(response?.attendance?.timeOutAt ?? null),
-      tag: response?.attendance?.tag ?? null,
-    });
+    setAttendanceLog(savedAttendance);
   };
 
   const handleCoachTimeIn = async () => {
