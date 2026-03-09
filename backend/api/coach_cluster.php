@@ -39,11 +39,18 @@ $res = $stmt->get_result();
 function sqlTimeToUi(?string $value): array {
     if (!$value) return ['9:00', 'AM'];
 
-    $parts = explode(':', $value);
-    if (count($parts) < 2) return ['9:00', 'AM'];
+    $timestamp = strtotime($value);
+    if ($timestamp === false) {
+        $parts = explode(':', $value);
+        if (count($parts) < 2) return ['9:00', 'AM'];
 
-    $hour24 = (int)$parts[0];
-    $minute = (int)$parts[1];
+        $hour24 = (int)$parts[0];
+        $minute = (int)$parts[1];
+    } else {
+        $hour24 = (int)date('G', $timestamp);
+        $minute = (int)date('i', $timestamp);
+    }
+
     $period = $hour24 >= 12 ? 'PM' : 'AM';
     $hour12 = $hour24 % 12;
     if ($hour12 === 0) $hour12 = 12;
