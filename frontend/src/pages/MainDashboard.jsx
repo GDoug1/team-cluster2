@@ -15,7 +15,6 @@ function TimeCard({
   onToggleTimeIn,
   canToggleTimeIn,
   hasCompletedShift = false,
-  statusTags = [],
 }) {
   return (
     <div className="card time-card">
@@ -34,14 +33,6 @@ function TimeCard({
             {hasActiveTimeIn ? "Time Out" : "Time In"}
           </button>
         )}
-
-        <div className="time-tag-list" aria-label="Today status tags">
-          {statusTags.map(tag => (
-            <span key={tag} className="time-tag-pill">
-              {tag}
-            </span>
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -219,9 +210,6 @@ export default function MainDashboard({
     ? Boolean(attendanceControls.canClickTimeIn || attendanceControls.canClickTimeOut)
     : true;
 
-  const statusTags = [dashboardMeta?.attendanceTag, dashboardMeta?.scheduleTag, dashboardMeta?.breakTag]
-    .filter(Boolean);
-
   const counterDisplay = useMemo(() => {
     if (!activeTimeIn) return "00:00:00";
     const counterEndTime = activeTimeOut ?? now;
@@ -316,7 +304,6 @@ export default function MainDashboard({
           onToggleTimeIn={onToggleTimeIn}
           canToggleTimeIn={canToggleTimeIn}
           hasCompletedShift={hasCompletedShift}
-          statusTags={statusTags}
         />
         <AnnouncementCard canEdit={canEditCards} />
         <ShiftCard schedule={schedule} dashboardMeta={dashboardMeta} />
