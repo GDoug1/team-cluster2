@@ -33,15 +33,15 @@ function TimeCard({
   );
 }
 
-function AnnouncementCard() {
+function AnnouncementCard({ canEdit = true }) {
   return (
     <div className="card announcement-card">
       <div className="card-top">
         <span>Announcement</span>
-        <button type="button" className="pill-btn">+ Announcement</button>
+        {canEdit ? <button type="button" className="pill-btn">+ Announcement</button> : null}
       </div>
       <ul className="list-items announcement-list" aria-label="No announcements yet" />
-      <div className="mini-actions">✎&nbsp;&nbsp;◷</div>
+      <div className="mini-actions">{canEdit ? "✎\u00A0\u00A0" : null}◷</div>
     </div>
   );
 }
@@ -117,15 +117,15 @@ function CalendarCard({ calendarData }) {
   );
 }
 
-function HolidayCard() {
+function HolidayCard({ canEdit = true }) {
   return (
     <div className="card holiday-card">
       <div className="card-top">
         <span>Holidays/Birthday</span>
-        <span className="plus">+</span>
+        {canEdit ? <span className="plus">+</span> : null}
       </div>
       <ul className="list-items holiday-list" aria-label="No holidays or birthdays yet" />
-      <div className="mini-actions">✎&nbsp;&nbsp;◷</div>
+      <div className="mini-actions">{canEdit ? "✎\u00A0\u00A0" : null}◷</div>
     </div>
   );
 }
@@ -170,6 +170,7 @@ export default function MainDashboard({
   attendanceControls = null,
   showMemberStatusCard = false,
   schedule = null,
+  canEditCards = true,
 }) {
   const [timeInStart, setTimeInStart] = useState(null);
   const [now, setNow] = useState(new Date());
@@ -281,10 +282,10 @@ export default function MainDashboard({
           onToggleTimeIn={onToggleTimeIn}
           canToggleTimeIn={canToggleTimeIn}
         />
-        <AnnouncementCard />
+        <AnnouncementCard canEdit={canEditCards} />
         <ShiftCard schedule={schedule} />
         <CalendarCard calendarData={calendarData} />
-        <HolidayCard />
+        <HolidayCard canEdit={canEditCards} />
         <SummaryCard timeInStart={activeTimeIn} totalHours={totalHours} />
         {showMemberStatusCard ? <MemberStatusCard /> : null}
       </div>
