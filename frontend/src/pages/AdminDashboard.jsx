@@ -58,6 +58,14 @@ export default function AdminDashboard() {
     { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") }
   ];
 
+  const formatTimeRange = daySchedule => {
+    if (!daySchedule || typeof daySchedule !== "object") return "—";
+    const start = `${daySchedule.startTime ?? ""} ${daySchedule.startPeriod ?? ""}`.trim();
+    const end = `${daySchedule.endTime ?? ""} ${daySchedule.endPeriod ?? ""}`.trim();
+    if (!start || !end) return "—";
+    return `${start} - ${end}`;
+  };
+
 
   const toMinutes = (time, period) => {
     const [hourPart, minutePart] = String(time).split(":");
@@ -550,9 +558,18 @@ const handleOpenRejectModal = cluster => {
                     .map(cluster => (
                       <div key={`coach-schedule-${cluster.id}`} className="active-members-schedule-row" role="row">
                         <div className="active-members-owner" role="cell">{cluster.coach || "—"}</div>
-                        {dayOptions.map(day => (
-                          <div key={`${cluster.id}-${day}`} role="cell">—</div>
-                        ))}
+                        {dayOptions.map(day => {
+                          const coachSchedule = cluster.coach_schedule;
+                          const assignedDays = Array.isArray(coachSchedule?.days) ? coachSchedule.days : [];
+                          const daySchedule = coachSchedule?.daySchedules?.[day];
+                          const hasSchedule = assignedDays.includes(day);
+
+                          return (
+                            <div key={`${cluster.id}-${day}`} role="cell">
+                              {hasSchedule ? formatTimeRange(daySchedule) : "—"}
+                            </div>
+                          );
+                        })}
                         <div role="cell" className="member-status-and-tags-cell">
                           <span className={`badge ${cluster.status}`}>{cluster.status}</span>
                         </div>
