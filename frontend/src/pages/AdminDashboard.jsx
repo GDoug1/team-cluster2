@@ -508,28 +508,28 @@ const handleOpenRejectModal = cluster => {
                 </div>
 
                 <div className="section-title">Team Coach Schedule by Coach</div>
-                <div className="table-card">
-                  <div className="table-header">
-                    <div>Coach</div>
-                    <div>Cluster Name</div>
-                    <div>Members</div>
-                    <div>Status</div>
-                    <div>Action</div>
+                <div className="active-members-schedule-table" role="table" aria-label="Team coach schedule by coach">
+                  <div className="active-members-schedule-header" role="row">
+                    <span role="columnheader">Members</span>
+                    <span role="columnheader">Mon</span>
+                    <span role="columnheader">Tue</span>
+                    <span role="columnheader">Wed</span>
+                    <span role="columnheader">Thu</span>
+                    <span role="columnheader">Fri</span>
+                    <span role="columnheader">Sat</span>
+                    <span role="columnheader">Sun</span>
+                    <span role="columnheader">Status</span>
                   </div>
                   {[...clusters]
                     .sort((a, b) => (a.coach ?? "").localeCompare(b.coach ?? ""))
                     .map(cluster => (
-                      <div key={`coach-${cluster.id}`} className="table-row">
-                        <div className="table-cell">{cluster.coach || "—"}</div>
-                        <div className="table-cell">{cluster.name}</div>
-                        <div className="table-cell">{cluster.members ?? 0}</div>
-                        <div className="table-cell">
+                      <div key={`coach-schedule-${cluster.id}`} className="active-members-schedule-row" role="row">
+                        <div className="active-members-owner" role="cell">{cluster.coach || "—"}</div>
+                        {dayOptions.map(day => (
+                          <div key={`${cluster.id}-${day}`} role="cell">—</div>
+                        ))}
+                        <div role="cell" className="member-status-and-tags-cell">
                           <span className={`badge ${cluster.status}`}>{cluster.status}</span>
-                        </div>
-                        <div className="table-cell">
-                          <button className="btn primary" type="button" onClick={() => handleOpenScheduleModal(cluster)}>
-                            Manage
-                          </button>
                         </div>
                       </div>
                     ))}
