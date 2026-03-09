@@ -89,6 +89,17 @@ export default function CoachDashboard() {
     return new Date(year, month - 1, day, hours, minutes, Number.isNaN(seconds) ? 0 : seconds);
   };
 
+  const isSameCalendarDay = (firstDate, secondDate) => {
+    if (!(firstDate instanceof Date) || Number.isNaN(firstDate.getTime())) return false;
+    if (!(secondDate instanceof Date) || Number.isNaN(secondDate.getTime())) return false;
+
+    return (
+      firstDate.getFullYear() === secondDate.getFullYear() &&
+      firstDate.getMonth() === secondDate.getMonth() &&
+      firstDate.getDate() === secondDate.getDate()
+    );
+  };
+
   const toLocalSqlDateTime = date => {
     const year = date.getFullYear();
     const month = `${date.getMonth() + 1}`.padStart(2, "0");
@@ -520,20 +531,27 @@ useEffect(() => {
   };
 
   const handleCoachTimeIn = async () => {
-    if (!dashboardCluster?.id || (attendanceLog.timeInAt && !attendanceLog.timeOutAt)) return;
+    if (!canUseAttendanceControls) return;
+    if (attendanceLog.timeInAt && !attendanceLog.timeOutAt) return;
     await persistAttendance({ timeInAt: new Date(), timeOutAt: null, tag: "On Time" });
   };
 
   const handleCoachTimeOut = async () => {
-    if (!dashboardCluster?.id || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
+    if (!canUseAttendanceControls) return;
+    if (!attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
     await persistAttendance({ ...attendanceLog, timeOutAt: new Date() });
   };
 
-  const hasActiveTimeIn = Boolean(attendanceLog.timeInAt && !attendanceLog.timeOutAt);
-  const hasCompletedShift = Boolean(attendanceLog.timeInAt && attendanceLog.timeOutAt);
-  const dashboardCluster = activeCluster ?? clusters.find(cluster => cluster.status === "active") ?? null;
+  const dashboardCluster = activeCluster ?? clusters[0] ?? null;
   const activeCoachSchedule = dashboardCluster?.coach_schedule ?? null;
   const todayCoachSchedule = getTodayCoachSchedule(activeCoachSchedule);
+  const hasTeamCluster = Boolean(dashboardCluster?.id);
+  const canUseAttendanceControls = hasTeamCluster && Boolean(todayCoachSchedule);
+  const hasActiveTimeIn = Boolean(attendanceLog.timeInAt && !attendanceLog.timeOutAt);
+  const hasTimedOutToday = isSameCalendarDay(attendanceLog.timeOutAt, new Date());
+  const hasCompletedShift = hasTimedOutToday && !hasActiveTimeIn;
+  const canClickTimeIn = canUseAttendanceControls && !hasActiveTimeIn && !hasTimedOutToday;
+  const canClickTimeOut = hasActiveTimeIn;
   const coachAttendanceTag = resolveAttendanceMainTag({
     attendanceTag: attendanceLog.tag,
     schedule: todayCoachSchedule,
@@ -1071,8 +1089,8 @@ useEffect(() => {
               attendanceControls={{
                 timeInAt: attendanceLog.timeInAt,
                 timeOutAt: attendanceLog.timeOutAt,
-                canClickTimeIn: Boolean(dashboardCluster?.id) && !hasActiveTimeIn,
-                canClickTimeOut: hasActiveTimeIn,
+                canClickTimeIn,
+                canClickTimeOut,
                 hasCompletedShift,
                 onTimeIn: handleCoachTimeIn,
                 onTimeOut: handleCoachTimeOut
