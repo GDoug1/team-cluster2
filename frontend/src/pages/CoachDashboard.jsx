@@ -520,7 +520,7 @@ useEffect(() => {
   };
 
   const handleCoachTimeIn = async () => {
-    if (!dashboardCluster?.id || (attendanceLog.timeInAt && !attendanceLog.timeOutAt)) return;
+    if (!canUseAttendanceControls || (attendanceLog.timeInAt && !attendanceLog.timeOutAt)) return;
     await persistAttendance({ timeInAt: new Date(), timeOutAt: null, tag: "On Time" });
   };
 
@@ -534,6 +534,9 @@ useEffect(() => {
   const dashboardCluster = activeCluster ?? clusters.find(cluster => cluster.status === "active") ?? null;
   const activeCoachSchedule = dashboardCluster?.coach_schedule ?? null;
   const todayCoachSchedule = getTodayCoachSchedule(activeCoachSchedule);
+  const canUseAttendanceControls = Boolean(dashboardCluster?.id && todayCoachSchedule);
+  const canClickTimeIn = canUseAttendanceControls && !hasActiveTimeIn && !hasCompletedShift;
+  const canClickTimeOut = hasActiveTimeIn;
   const coachAttendanceTag = resolveAttendanceMainTag({
     attendanceTag: attendanceLog.tag,
     schedule: todayCoachSchedule,
@@ -1071,8 +1074,8 @@ useEffect(() => {
               attendanceControls={{
                 timeInAt: attendanceLog.timeInAt,
                 timeOutAt: attendanceLog.timeOutAt,
-                canClickTimeIn: Boolean(dashboardCluster?.id) && !hasActiveTimeIn,
-                canClickTimeOut: hasActiveTimeIn,
+                canClickTimeIn,
+                canClickTimeOut,
                 hasCompletedShift,
                 onTimeIn: handleCoachTimeIn,
                 onTimeOut: handleCoachTimeOut

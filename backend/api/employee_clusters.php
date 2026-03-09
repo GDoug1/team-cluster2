@@ -1,7 +1,7 @@
 <?php
 include "../config/database.php";
 include "../config/auth.php";
-requireRole("employee");
+requireRole(["employee", "coach", "admin"]);
 
 function getColumns(mysqli $conn, string $table): array {
     $columns = [];

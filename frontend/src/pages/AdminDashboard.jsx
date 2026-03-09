@@ -33,6 +33,8 @@ export default function AdminDashboard() {
   const [rejectError, setRejectError] = useState("");
   const [isSubmittingReject, setIsSubmittingReject] = useState(false);
   const [coachAttendance, setCoachAttendance] = useState([]);
+  const [adminCluster, setAdminCluster] = useState(null);
+  const [adminAttendanceLog, setAdminAttendanceLog] = useState({ timeInAt: null, timeOutAt: null, tag: null });
   const [managingScheduleCluster, setManagingScheduleCluster] = useState(null);
   const [scheduleModalMessage, setScheduleModalMessage] = useState("");
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
@@ -168,6 +170,35 @@ export default function AdminDashboard() {
     return "Night Shift";
   };
 
+  const parseSqlDateTime = value => {
+    if (!value || typeof value !== "string") return null;
+    const [datePart, timePart] = value.trim().split(" ");
+    if (!datePart || !timePart) return new Date(value);
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hours, minutes, seconds] = timePart.split(":").map(Number);
+    if ([year, month, day, hours, minutes].some(Number.isNaN)) return new Date(value);
+    return new Date(year, month - 1, day, hours, minutes, Number.isNaN(seconds) ? 0 : seconds);
+  };
+
+  const toLocalSqlDateTime = value => {
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
+    const year = value.getFullYear();
+    const month = `${value.getMonth() + 1}`.padStart(2, "0");
+    const day = `${value.getDate()}`.padStart(2, "0");
+    const hours = `${value.getHours()}`.padStart(2, "0");
+    const minutes = `${value.getMinutes()}`.padStart(2, "0");
+    const seconds = `${value.getSeconds()}`.padStart(2, "0");
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  };
+
+  const getTodaySchedule = schedule => {
+    if (!schedule || typeof schedule !== "object" || Array.isArray(schedule)) return null;
+    const currentDay = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date().getDay()];
+    const assignedDays = Array.isArray(schedule.days) ? schedule.days : [];
+    if (!assignedDays.includes(currentDay)) return null;
+    return schedule.daySchedules?.[currentDay] ?? null;
+  };
+
   const fetchClusters = useCallback(async () => {
     try {
       const data = await apiFetch("api/admin_cluster.php");
@@ -189,6 +220,59 @@ export default function AdminDashboard() {
       .then(data => setCoachAttendance(Array.isArray(data) ? data : []))
       .catch(() => setCoachAttendance([]));
   }, [activeNav, attendanceDate]);
+
+  useEffect(() => {
+    apiFetch("api/employee_clusters.php")
+      .then(response => {
+        const active = Array.isArray(response) ? response[0] : null;
+        setAdminCluster(active ?? null);
+        setAdminAttendanceLog({
+          timeInAt: parseSqlDateTime(active?.time_in_at ?? null),
+          timeOutAt: parseSqlDateTime(active?.time_out_at ?? null),
+          tag: active?.attendance_tag ?? null
+        });
+      })
+      .catch(() => {
+        setAdminCluster(null);
+        setAdminAttendanceLog({ timeInAt: null, timeOutAt: null, tag: null });
+      });
+  }, []);
+
+  const persistAdminAttendance = async nextAttendance => {
+    if (!adminCluster?.cluster_id) return;
+    const response = await apiFetch("api/save_attendance.php", {
+      method: "POST",
+      body: JSON.stringify({
+        cluster_id: adminCluster.cluster_id,
+        ...nextAttendance,
+        timeInAt: nextAttendance.timeInAt ? toLocalSqlDateTime(nextAttendance.timeInAt) : null,
+        timeOutAt: nextAttendance.timeOutAt ? toLocalSqlDateTime(nextAttendance.timeOutAt) : null
+      })
+    });
+
+    setAdminAttendanceLog({
+      timeInAt: parseSqlDateTime(response?.attendance?.timeInAt ?? null),
+      timeOutAt: parseSqlDateTime(response?.attendance?.timeOutAt ?? null),
+      tag: response?.attendance?.tag ?? null
+    });
+  };
+
+  const handleAdminTimeIn = async () => {
+    if (!adminCanClickTimeIn) return;
+    await persistAdminAttendance({ timeInAt: new Date(), timeOutAt: null, tag: "On Time" });
+  };
+
+  const handleAdminTimeOut = async () => {
+    if (!adminCanClickTimeOut) return;
+    await persistAdminAttendance({ ...adminAttendanceLog, timeOutAt: new Date() });
+  };
+
+  const todayAdminSchedule = getTodaySchedule(adminCluster?.schedule);
+  const adminCanUseAttendanceControls = Boolean(adminCluster?.cluster_id && todayAdminSchedule);
+  const adminHasActiveTimeIn = Boolean(adminAttendanceLog.timeInAt && !adminAttendanceLog.timeOutAt);
+  const adminHasCompletedShift = Boolean(adminAttendanceLog.timeInAt && adminAttendanceLog.timeOutAt);
+  const adminCanClickTimeIn = adminCanUseAttendanceControls && !adminHasActiveTimeIn && !adminHasCompletedShift;
+  const adminCanClickTimeOut = adminHasActiveTimeIn;
 
 
   const toDateTimeLocalValue = value => {
@@ -438,7 +522,18 @@ const handleOpenRejectModal = cluster => {
       <main className="main">
         {activeNav === "Dashboard" ? (
           <section className="content">
-            <MainDashboard />
+            <MainDashboard
+              schedule={adminCluster?.schedule ?? null}
+              attendanceControls={{
+                timeInAt: adminAttendanceLog.timeInAt,
+                timeOutAt: adminAttendanceLog.timeOutAt,
+                canClickTimeIn: adminCanClickTimeIn,
+                canClickTimeOut: adminCanClickTimeOut,
+                hasCompletedShift: adminHasCompletedShift,
+                onTimeIn: handleAdminTimeIn,
+                onTimeOut: handleAdminTimeOut
+              }}
+            />
           </section>
         ) : activeNav === "Team" ? (
           <>
