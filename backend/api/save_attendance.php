@@ -167,6 +167,25 @@ if ($hasLegacyAttendance) {
             );
         }
     } else {
+        if ($timeInSql) {
+            $timeInDate = date('Y-m-d', strtotime($timeInSql));
+            $timeInDateEscaped = "'" . $conn->real_escape_string($timeInDate) . "'";
+            $existingTimeInToday = $conn->query(
+                "SELECT id FROM attendance_logs
+                 WHERE cluster_id=$cluster_id
+                   AND employee_id=$employee_id
+                   AND DATE(COALESCE(time_in_at, updated_at)) = $timeInDateEscaped
+                 ORDER BY COALESCE(time_in_at, updated_at) DESC, id DESC
+                 LIMIT 1"
+            );
+
+            if ($existingTimeInToday && $existingTimeInToday->num_rows > 0) {
+                http_response_code(409);
+                echo json_encode(["error" => "You can only time in once per schedule."]);
+                exit;
+            }
+        }
+
         $conn->query(
             "INSERT INTO attendance_logs (cluster_id, employee_id, time_in_at, time_out_at, tag, note)
              VALUES ($cluster_id, $employee_id, $timeInValue, NULL, $tagValue, $noteValue)"
@@ -280,6 +299,19 @@ if ($hasLegacyAttendance) {
                 );
             }
         } elseif ($timeInSql) {
+            $existingTimeInQuery = $conn->query(
+                "SELECT " . ($timeLogPrimaryKey ?? 'attendance_id') . "
+                 FROM time_logs
+                 WHERE attendance_id = $attendanceId
+                 LIMIT 1"
+            );
+
+            if ($existingTimeInQuery && $existingTimeInQuery->num_rows > 0) {
+                http_response_code(409);
+                echo json_encode(["error" => "You can only time in once per schedule."]);
+                exit;
+            }
+
             $insertColumns = ['attendance_id', 'time_in'];
             $insertValues = [$attendanceId, $timeInValue];
 

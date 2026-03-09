@@ -724,6 +724,69 @@
   cursor: pointer;
 }
 
+.time-in-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.time-out-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 16, 40, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.time-out-modal {
+  width: min(92vw, 360px);
+  border-radius: 12px;
+  background: #fff;
+  padding: 20px;
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.25);
+}
+
+.time-out-modal h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #0d1737;
+}
+
+.time-out-modal p {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: #39415f;
+}
+
+.time-out-modal-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.time-out-cancel-btn,
+.time-out-confirm-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.time-out-cancel-btn {
+  background: #eceff7;
+  color: #21305f;
+}
+
+.time-out-confirm-btn {
+  background: #3f7ff1;
+  color: #fff;
+}
+
 @media (max-width: 1200px) {
   .time-card {
     height: auto;

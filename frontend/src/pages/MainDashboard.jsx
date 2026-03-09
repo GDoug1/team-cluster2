@@ -173,6 +173,7 @@ export default function MainDashboard({
 }) {
   const [timeInStart, setTimeInStart] = useState(null);
   const [now, setNow] = useState(new Date());
+  const [isTimeOutConfirmOpen, setIsTimeOutConfirmOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -232,10 +233,24 @@ export default function MainDashboard({
     return (diffInSeconds / 3600).toFixed(1);
   }, [activeTimeIn, activeTimeOut, now]);
 
+  const executeTimeOut = () => {
+    if (attendanceControls) {
+      attendanceControls.onTimeOut();
+      return;
+    }
+
+    setTimeInStart(null);
+  };
+
+  const handleConfirmTimeOut = () => {
+    executeTimeOut();
+    setIsTimeOutConfirmOpen(false);
+  };
+
   const onToggleTimeIn = () => {
     if (attendanceControls) {
       if (attendanceControls.canClickTimeOut) {
-        attendanceControls.onTimeOut();
+        setIsTimeOutConfirmOpen(true);
         return;
       }
       if (attendanceControls.canClickTimeIn) {
@@ -244,7 +259,12 @@ export default function MainDashboard({
       return;
     }
 
-    setTimeInStart(prev => (prev ? null : new Date()));
+    if (hasActiveTimeIn) {
+      setIsTimeOutConfirmOpen(true);
+      return;
+    }
+
+    setTimeInStart(new Date());
   };
 
   return (
@@ -268,6 +288,28 @@ export default function MainDashboard({
         <SummaryCard timeInStart={activeTimeIn} totalHours={totalHours} />
         {showMemberStatusCard ? <MemberStatusCard /> : null}
       </div>
+
+      {isTimeOutConfirmOpen ? (
+        <div className="time-out-modal-backdrop" role="presentation">
+          <div
+            className="time-out-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="time-out-confirm-title"
+          >
+            <h3 id="time-out-confirm-title">Confirm Time Out</h3>
+            <p>Are you sure you want to time out now?</p>
+            <div className="time-out-modal-actions">
+              <button type="button" className="time-out-cancel-btn" onClick={() => setIsTimeOutConfirmOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" className="time-out-confirm-btn" onClick={handleConfirmTimeOut}>
+                Confirm Time Out
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
