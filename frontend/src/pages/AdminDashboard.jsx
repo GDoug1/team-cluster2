@@ -35,6 +35,7 @@ export default function AdminDashboard() {
   const [coachAttendance, setCoachAttendance] = useState([]);
   const [managingScheduleCluster, setManagingScheduleCluster] = useState(null);
   const [scheduleModalMessage, setScheduleModalMessage] = useState("");
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false);
   const [scheduleForm, setScheduleForm] = useState({
     days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
     daySchedules: {
@@ -309,9 +310,33 @@ export default function AdminDashboard() {
     setScheduleModalMessage("");
   };
 
-  const handleCreateSchedule = () => {
-    if (!managingScheduleCluster) return;
-    setScheduleModalMessage(`Schedule draft ready for ${managingScheduleCluster.coach} (${managingScheduleCluster.name}).`);
+  const handleCreateSchedule = async () => {
+    if (!managingScheduleCluster || isSavingSchedule) return;
+
+    const coachEmployeeId = Number(managingScheduleCluster.coach_employee_id);
+    if (!Number.isInteger(coachEmployeeId) || coachEmployeeId <= 0) {
+      setScheduleModalMessage("Unable to save schedule: coach employee profile is missing.");
+      return;
+    }
+
+    setIsSavingSchedule(true);
+    setScheduleModalMessage("");
+
+    try {
+      await apiFetch("api/save_schedule.php", {
+        method: "POST",
+        body: JSON.stringify({
+          cluster_id: managingScheduleCluster.id,
+          employee_id: coachEmployeeId,
+          schedule: scheduleForm
+        })
+      });
+      setScheduleModalMessage(`Schedule saved for ${managingScheduleCluster.coach} (${managingScheduleCluster.name}).`);
+    } catch (error) {
+      setScheduleModalMessage(error?.error ?? "Unable to save schedule.");
+    } finally {
+      setIsSavingSchedule(false);
+    }
   };
 
   async function updateStatus(id, status, reason = "") {
@@ -673,8 +698,8 @@ const handleOpenRejectModal = cluster => {
                 <button className="btn secondary" type="button" onClick={handleCloseScheduleModal}>
                   Cancel
                 </button>
-                <button className="btn primary" type="button" onClick={handleCreateSchedule}>
-                  Save Schedule
+                <button className="btn primary" type="button" onClick={handleCreateSchedule} disabled={isSavingSchedule}>
+                  {isSavingSchedule ? "Saving..." : "Save Schedule"}
                 </button>
               </div>
             </div>
