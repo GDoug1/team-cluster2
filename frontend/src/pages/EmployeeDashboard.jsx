@@ -171,14 +171,6 @@ export default function EmployeeDashboard() {
     return { label: "Available", className: "status-available" };
   };
 
-  const formatClockTime = date => {
-    if (!date) return "—";
-    return new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit"
-    }).format(date);
-  };
-
   const formatDateTimeLabel = value => {
     const parsedDate = value instanceof Date ? value : parseSqlDateTime(value);
     if (!parsedDate || Number.isNaN(parsedDate.getTime())) return "—";
@@ -335,7 +327,8 @@ export default function EmployeeDashboard() {
 
   const scheduleDays = getActiveDays(activeCluster?.schedule);
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const hasScheduleToday = Boolean(getTodaySchedule());
+  const todaySchedule = getTodaySchedule();
+  const hasScheduleToday = Boolean(todaySchedule);
   const currentStatus = getCurrentStatus();
   const activeAttendanceTag = resolveAttendanceMainTag({
     attendanceTag: attendanceLog.tag,
@@ -348,6 +341,14 @@ export default function EmployeeDashboard() {
   const canUseAttendanceControls = hasTeamCluster && hasScheduleToday;
   const canClickTimeIn = canUseAttendanceControls && !hasActiveTimeIn;
   const canClickTimeOut = canUseAttendanceControls && hasActiveTimeIn;
+  const breakTimeToday = todaySchedule
+    ? formatBreakTimeRange(
+        todaySchedule.breakStartTime,
+        todaySchedule.breakStartPeriod,
+        todaySchedule.breakEndTime,
+        todaySchedule.breakEndPeriod
+      )
+    : "—";
 
   useEffect(() => {
     apiFetch("api/employee_clusters.php").then(response => {
@@ -435,6 +436,13 @@ export default function EmployeeDashboard() {
                 onTimeOut: handleTimeOut
               }}
               schedule={activeCluster?.schedule ?? null}
+              dashboardMeta={{
+                attendanceTag: activeAttendanceTag,
+                scheduleTag: hasScheduleToday ? "Scheduled today" : "Not scheduled",
+                breakTag: currentStatus.label === "On break time" ? "Break time" : "Break inactive",
+                breakTime: breakTimeToday,
+                availabilityLabel: currentStatus.label
+              }}
               canEditCards={false}
             />
           )}

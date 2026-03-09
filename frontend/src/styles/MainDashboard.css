@@ -606,6 +606,28 @@
   font-size: 16px;
 }
 
+
+.shift-meta {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.shift-meta-pill {
+  border-radius: 999px;
+  background: #d9e5f9;
+  color: #1b407e;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+}
+
+.shift-meta-break {
+  font-size: 12px;
+}
+
 @media (max-width: 1200px) {
   .value {
     font-size: 30px;
@@ -655,6 +677,18 @@
   font-size: 34px;
   font-weight: 800;
   line-height: 1.05;
+}
+
+
+.summary-tag {
+  margin-top: 4px;
+  display: inline-flex;
+  border-radius: 999px;
+  background: #e7edf9;
+  color: #1b3d76;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
 }
 
 @media (max-width: 1200px) {
@@ -728,6 +762,26 @@
   opacity: 0.6;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+
+.time-tag-list {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.time-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #e7edf9;
+  color: #1b3d76;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
 }
 
 .time-out-modal-backdrop {

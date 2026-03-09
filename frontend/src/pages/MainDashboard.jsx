@@ -14,6 +14,7 @@ function TimeCard({
   hasActiveTimeIn,
   onToggleTimeIn,
   canToggleTimeIn,
+  statusTags = [],
 }) {
   return (
     <div className="card time-card">
@@ -28,6 +29,14 @@ function TimeCard({
         >
           {hasActiveTimeIn ? "Time Out" : "Time In"}
         </button>
+
+        <div className="time-tag-list" aria-label="Today status tags">
+          {statusTags.map(tag => (
+            <span key={tag} className="time-tag-pill">
+              {tag}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -45,6 +54,8 @@ function AnnouncementCard({ canEdit = true }) {
     </div>
   );
 }
+
+
 
 function formatShiftTime(time, period) {
   if (!time) return "--";
@@ -70,7 +81,7 @@ function getTodayShiftSchedule(schedule) {
   return schedule;
 }
 
-function ShiftCard({ schedule = null }) {
+function ShiftCard({ schedule = null, dashboardMeta = null }) {
   const shiftSchedule = getTodayShiftSchedule(schedule);
   const startTime = formatShiftTime(shiftSchedule?.startTime, shiftSchedule?.startPeriod);
   const endTime = formatShiftTime(shiftSchedule?.endTime, shiftSchedule?.endPeriod);
@@ -86,6 +97,10 @@ function ShiftCard({ schedule = null }) {
           <div className="label">Shift End Time</div>
           <div className="value">{endTime}</div>
         </div>
+      </div>
+      <div className="shift-meta">
+        <span className="shift-meta-pill">{dashboardMeta?.scheduleTag ?? "Not scheduled"}</span>
+        <span className="shift-meta-break">Break: {dashboardMeta?.breakTime ?? "—"}</span>
       </div>
     </div>
   );
@@ -131,13 +146,14 @@ function HolidayCard({ canEdit = true }) {
 }
 
 
-function SummaryCard({ timeInStart, totalHours }) {
+function SummaryCard({ timeInStart, totalHours, dashboardMeta = null }) {
   return (
     <div className="card summary-card">
       <div>
         <div className="label">Today Status</div>
         <div className="small-info">Time In: {timeInStart ? timeInStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '--:--'}</div>
-        <div className="small-info">Break: Inactive</div>
+        <div className="small-info">Break: {dashboardMeta?.breakTag ?? "Inactive"}</div>
+        <div className="small-info">Status: {dashboardMeta?.availabilityLabel ?? "Not available"}</div>
       </div>
       <div>
         <div className="label">Total Hours</div>
@@ -145,7 +161,8 @@ function SummaryCard({ timeInStart, totalHours }) {
       </div>
       <div>
         <div className="label">Attendance</div>
-        <div className="big-value">{timeInStart ? 'Present' : 'Absent'}</div>
+        <div className="big-value">{timeInStart ? "Present" : "Absent"}</div>
+        <div className="summary-tag">{dashboardMeta?.attendanceTag ?? "Pending"}</div>
       </div>
     </div>
   );
@@ -171,6 +188,7 @@ export default function MainDashboard({
   showMemberStatusCard = false,
   schedule = null,
   canEditCards = true,
+  dashboardMeta = null,
 }) {
   const [timeInStart, setTimeInStart] = useState(null);
   const [now, setNow] = useState(new Date());
@@ -187,6 +205,9 @@ export default function MainDashboard({
   const canToggleTimeIn = attendanceControls
     ? Boolean(attendanceControls.canClickTimeIn || attendanceControls.canClickTimeOut)
     : true;
+
+  const statusTags = [dashboardMeta?.attendanceTag, dashboardMeta?.scheduleTag, dashboardMeta?.breakTag]
+    .filter(Boolean);
 
   const counterDisplay = useMemo(() => {
     if (!activeTimeIn) return "00:00:00";
@@ -281,12 +302,13 @@ export default function MainDashboard({
           hasActiveTimeIn={hasActiveTimeIn}
           onToggleTimeIn={onToggleTimeIn}
           canToggleTimeIn={canToggleTimeIn}
+          statusTags={statusTags}
         />
         <AnnouncementCard canEdit={canEditCards} />
-        <ShiftCard schedule={schedule} />
+        <ShiftCard schedule={schedule} dashboardMeta={dashboardMeta} />
         <CalendarCard calendarData={calendarData} />
         <HolidayCard canEdit={canEditCards} />
-        <SummaryCard timeInStart={activeTimeIn} totalHours={totalHours} />
+        <SummaryCard timeInStart={activeTimeIn} totalHours={totalHours} dashboardMeta={dashboardMeta} />
         {showMemberStatusCard ? <MemberStatusCard /> : null}
       </div>
 
