@@ -25,6 +25,7 @@ export default function AdminDashboard() {
     const minute = (index % 2) * 30;
     return `${hour}:${minute.toString().padStart(2, "0")}`;
   });
+  const MAX_SHIFT_MINUTES = 9 * 60;
   const [clusters, setClusters] = useState([]);
   const [rejectingCluster, setRejectingCluster] = useState(null);
   const [activeNav, setActiveNav] = useState("Team");
@@ -89,6 +90,29 @@ export default function AdminDashboard() {
     }
 
     return options;
+  };
+
+  const getEndTimeOptions = (startTime, startPeriod) => {
+    const startMinutes = toMinutes(startTime, startPeriod);
+    if (startMinutes === null) {
+      return timeOptions.map(time => ({ time, period: "AM" }));
+    }
+
+    const validOptions = [];
+    for (let offset = 30; offset <= MAX_SHIFT_MINUTES; offset += 30) {
+      const totalMinutes = startMinutes + offset;
+      const normalizedMinutes = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
+      const hour24 = Math.floor(normalizedMinutes / 60);
+      const minute = normalizedMinutes % 60;
+      const period = hour24 >= 12 ? "PM" : "AM";
+      const hour12 = hour24 % 12 || 12;
+      validOptions.push({
+        time: `${hour12}:${String(minute).padStart(2, "0")}`,
+        period
+      });
+    }
+
+    return validOptions;
   };
 
   const getMinutesBetween = (startTime, startPeriod, endTime, endPeriod) => {
@@ -201,24 +225,66 @@ export default function AdminDashboard() {
     setScheduleForm(current => {
       const currentDay = current.daySchedules[day] ?? { ...defaultDaySchedule };
       const nextDay = { ...currentDay };
-      const [time, period] = value.split("|");
+      const [time, period] = String(value).split("|");
 
-      if (field === "startTime") {
-        nextDay.startTime = time;
-        nextDay.startPeriod = period;
-        nextDay.shiftType = getAutomaticShiftType(time, period);
-      } else if (field === "endTime") {
-        nextDay.endTime = time;
-        nextDay.endPeriod = period;
-      } else if (field === "breakStart") {
-        nextDay.breakStartTime = time;
-        nextDay.breakStartPeriod = period;
-      } else if (field === "breakEnd") {
-        nextDay.breakEndTime = time;
-        nextDay.breakEndPeriod = period;
+      if (["endTime", "breakStart", "breakEnd"].includes(field)) {
+        if (field === "endTime") {
+          nextDay.endTime = time ?? currentDay.endTime;
+          nextDay.endPeriod = period ?? currentDay.endPeriod;
+        }
+
+        if (field === "breakStart") {
+          nextDay.breakStartTime = time ?? currentDay.breakStartTime;
+          nextDay.breakStartPeriod = period ?? currentDay.breakStartPeriod;
+        }
+
+        if (field === "breakEnd") {
+          nextDay.breakEndTime = time ?? currentDay.breakEndTime;
+          nextDay.breakEndPeriod = period ?? currentDay.breakEndPeriod;
+        }
       } else {
         nextDay[field] = value;
       }
+
+      const endTimeOptions = getEndTimeOptions(nextDay.startTime, nextDay.startPeriod);
+      const hasSelectedEndTime = endTimeOptions.some(
+        option => option.time === nextDay.endTime && option.period === nextDay.endPeriod
+      );
+      if (!hasSelectedEndTime && endTimeOptions.length > 0) {
+        nextDay.endTime = endTimeOptions[0].time;
+        nextDay.endPeriod = endTimeOptions[0].period;
+      }
+
+      const shiftRangeOptions = getTimeOptionsWithinRange(
+        nextDay.startTime,
+        nextDay.startPeriod,
+        nextDay.endTime,
+        nextDay.endPeriod
+      );
+      const hasBreakStart = shiftRangeOptions.some(
+        option => option.time === nextDay.breakStartTime && option.period === nextDay.breakStartPeriod
+      );
+      if (!hasBreakStart && shiftRangeOptions.length > 0) {
+        const fallbackBreak = shiftRangeOptions[Math.min(1, shiftRangeOptions.length - 1)] ?? shiftRangeOptions[0];
+        nextDay.breakStartTime = fallbackBreak.time;
+        nextDay.breakStartPeriod = fallbackBreak.period;
+      }
+
+      const breakEndOptions = getTimeOptionsWithinRange(
+        nextDay.breakStartTime,
+        nextDay.breakStartPeriod,
+        nextDay.endTime,
+        nextDay.endPeriod
+      );
+      const hasBreakEnd = breakEndOptions.some(
+        option => option.time === nextDay.breakEndTime && option.period === nextDay.breakEndPeriod
+      );
+      if (!hasBreakEnd && breakEndOptions.length > 0) {
+        nextDay.breakEndTime = breakEndOptions[0].time;
+        nextDay.breakEndPeriod = breakEndOptions[0].period;
+      }
+
+      nextDay.shiftType = getAutomaticShiftType(nextDay.startTime, nextDay.startPeriod);
 
       return {
         ...current,
@@ -485,6 +551,7 @@ const handleOpenRejectModal = cluster => {
                   {dayOptions.map(day => {
                     const isWorkingDay = scheduleForm.days.includes(day);
                     const daySchedule = scheduleForm.daySchedules[day] ?? { ...defaultDaySchedule };
+                    const endTimeOptions = getEndTimeOptions(daySchedule.startTime, daySchedule.startPeriod);
                     const shiftRangeOptions = getTimeOptionsWithinRange(daySchedule.startTime, daySchedule.startPeriod, daySchedule.endTime, daySchedule.endPeriod);
                     const breakEndOptions = getTimeOptionsWithinRange(daySchedule.breakStartTime, daySchedule.breakStartPeriod, daySchedule.endTime, daySchedule.endPeriod);
                     const shiftHours = getMinutesBetween(daySchedule.startTime, daySchedule.startPeriod, daySchedule.endTime, daySchedule.endPeriod);
@@ -522,7 +589,7 @@ const handleOpenRejectModal = cluster => {
                               <div className="schedule-time-row schedule-field">
                                 <div className="schedule-time-label">End Time</div>
                                 <select value={`${daySchedule.endTime}|${daySchedule.endPeriod}`} onChange={event => handleChangeDayTime(day, "endTime", event.target.value)}>
-                                  {shiftRangeOptions.map(option => (<option key={`${day}-end-${option.time}-${option.period}`} value={`${option.time}|${option.period}`}>{option.time} {option.period}</option>))}
+                                  {endTimeOptions.map(option => (<option key={`${day}-end-${option.time}-${option.period}`} value={`${option.time}|${option.period}`}>{option.time} {option.period}</option>))}
                                 </select>
                               </div>
                               <div className="schedule-panel-total">Total: {shiftHoursLabel}</div>
