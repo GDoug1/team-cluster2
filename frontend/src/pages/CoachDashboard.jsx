@@ -329,6 +329,18 @@ export default function CoachDashboard() {
     return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dayIndex];
   };
 
+  const getTodayCoachSchedule = schedule => {
+    if (!schedule || typeof schedule !== "object" || Array.isArray(schedule)) {
+      return null;
+    }
+
+    const todayKey = getCurrentDayLabel();
+    const days = Array.isArray(schedule.days) ? schedule.days : [];
+    if (!days.includes(todayKey)) return null;
+
+    return schedule.daySchedules?.[todayKey] ?? null;
+  };
+
   const getMemberCurrentStatus = member => {
     const normalizedSchedule = normalizeSchedule(member?.schedule);
     if (
@@ -519,19 +531,28 @@ useEffect(() => {
 
   const hasActiveTimeIn = Boolean(attendanceLog.timeInAt && !attendanceLog.timeOutAt);
   const hasCompletedShift = Boolean(attendanceLog.timeInAt && attendanceLog.timeOutAt);
+  const activeCoachSchedule = activeCluster?.coach_schedule ?? null;
+  const todayCoachSchedule = getTodayCoachSchedule(activeCoachSchedule);
   const coachAttendanceTag = resolveAttendanceMainTag({
     attendanceTag: attendanceLog.tag,
-    schedule: null,
+    schedule: todayCoachSchedule,
     timeInAt: attendanceLog.timeInAt,
     fallbackTag: "Scheduled"
   });
   const coachDashboardMeta = useMemo(() => ({
     attendanceTag: coachAttendanceTag,
-    scheduleTag: activeCluster ? "Cluster active" : "No active cluster",
+    scheduleTag: todayCoachSchedule ? "Scheduled" : activeCluster ? "Cluster active" : "No active cluster",
     breakTag: "Break inactive",
-    breakTime: "—",
+    breakTime: todayCoachSchedule
+      ? formatBreakTimeRange(
+          todayCoachSchedule.breakStartTime,
+          todayCoachSchedule.breakStartPeriod,
+          todayCoachSchedule.breakEndTime,
+          todayCoachSchedule.breakEndPeriod
+        )
+      : "—",
     availabilityLabel: activeCluster ? "Available" : "Not available"
-  }), [activeCluster, coachAttendanceTag]);
+  }), [activeCluster, coachAttendanceTag, todayCoachSchedule]);
 
   const handleLogout = async () => {
     try {
@@ -1045,6 +1066,7 @@ useEffect(() => {
           <section className="content">
             <MainDashboard
               showMemberStatusCard
+              schedule={activeCoachSchedule}
               attendanceControls={{
                 timeInAt: attendanceLog.timeInAt,
                 timeOutAt: attendanceLog.timeOutAt,
