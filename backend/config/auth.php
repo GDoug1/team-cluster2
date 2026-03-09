@@ -29,7 +29,18 @@ if (!isset($_SESSION['user'])) {
 
 function requireRole($role) {
     $currentRole = strtolower($_SESSION['user']['role'] ?? '');
-    if ($currentRole !== strtolower($role)) {
+
+    if (is_array($role)) {
+        $allowedRoles = array_map(fn($entry) => strtolower((string)$entry), $role);
+        if (in_array($currentRole, $allowedRoles, true)) {
+            return;
+        }
+
+        http_response_code(403);
+        exit(json_encode(["error" => "Forbidden"]));
+    }
+
+    if ($currentRole !== strtolower((string)$role)) {
         http_response_code(403);
         exit(json_encode(["error" => "Forbidden"]));
     }

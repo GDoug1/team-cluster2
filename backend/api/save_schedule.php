@@ -1,7 +1,7 @@
 <?php
 include "../config/database.php";
 include "../config/auth.php";
-requireRole("coach");
+requireRole(["coach", "admin"]);
 
 $data = json_decode(file_get_contents("php://input"), true);
 
