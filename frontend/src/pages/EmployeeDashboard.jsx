@@ -487,6 +487,7 @@ export default function EmployeeDashboard() {
                     <div className="employee-card-title">My Attendance</div>
                   </div>
                   <div className="employee-card-body">
+                    <AttendanceHistoryHighlights />
                     <DataPanel type="attendance" />
                   </div>
                 </div>
@@ -498,6 +499,7 @@ export default function EmployeeDashboard() {
                     <div className="employee-card-title">My Requests</div>
                   </div>
                   <div className="employee-card-body">
+                    <AttendanceHistoryHighlights highlights={myRequestHighlights} />
                     <DataPanel type="requests" />
                   </div>
                 </div>

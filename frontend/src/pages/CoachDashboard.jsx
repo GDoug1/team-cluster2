@@ -1215,7 +1215,10 @@ useEffect(() => {
               </div>
               <div className="employee-card-body">
                 {isMyRequestsView ? (
-                  <DataPanel type="requests" />
+                  <>
+                    <AttendanceHistoryHighlights highlights={myRequestHighlights} />
+                    <DataPanel type="requests" />
+                  </>
                 ) : isTeamClusterAttendanceView ? (
                   <>
                     {activeMembers.length === 0 ? (
@@ -1283,7 +1286,10 @@ useEffect(() => {
                     )}
                   </>
                 ) : (
-                  <DataPanel type="attendance" />
+                  <>
+                    <AttendanceHistoryHighlights />
+                    <DataPanel type="attendance" />
+                  </>
                 )}
               </div>
             </div>

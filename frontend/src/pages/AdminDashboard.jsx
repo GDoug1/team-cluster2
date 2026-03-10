@@ -529,11 +529,13 @@ const handleOpenRejectModal = cluster => {
         ) : activeNav === "Attendance" ? (
           <section className="content">
             <div className="section-title">Coach Attendance</div>
+            <AttendanceHistoryHighlights />
             <DataPanel type="attendance" />
           </section>
         ) : activeNav === "My Requests" ? (
           <section className="content">
             <div className="section-title">My Requests</div>
+            <AttendanceHistoryHighlights highlights={myRequestHighlights} />
             <DataPanel type="requests" />
           </section>
         ) : activeNav === "My Filing Center" ? (
