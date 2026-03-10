@@ -3,6 +3,7 @@ import { apiFetch } from "../api/api";
 import { saveDashboardAttendance } from "../api/attendance";
 import DashboardSidebar from "../components/DashboardSidebar";
 import MainDashboard from "./MainDashboard";
+import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
@@ -477,6 +478,7 @@ export default function EmployeeDashboard() {
                     <div className="employee-card-title">Attendance History</div>
                   </div>
                   <div className="employee-card-body">
+                    <AttendanceHistoryHighlights />
                     {attendanceHistory.length === 0 ? (
                       <div className="empty-state">No attendance records yet.</div>
                     ) : (

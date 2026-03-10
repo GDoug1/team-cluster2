@@ -4,6 +4,7 @@ import DashboardSidebar from "../components/DashboardSidebar";
 import MainDashboard from "./MainDashboard";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
+import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
 
 export default function AdminDashboard() {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -519,6 +520,7 @@ const handleOpenRejectModal = cluster => {
         ) : activeNav === "Attendance" ? (
           <section className="content">
             <div className="section-title">Coach Attendance</div>
+            <AttendanceHistoryHighlights />
             <label className="attendance-date" htmlFor="admin-coach-attendance-date">
               <span>Date</span>
               <input id="admin-coach-attendance-date" type="date" value={attendanceDate} onChange={event => setAttendanceDate(event.target.value)} />
