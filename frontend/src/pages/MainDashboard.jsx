@@ -148,24 +148,31 @@ function HolidayCard({ canEdit = true }) {
 
 
 function SummaryCard({ timeInStart, totalHours, dashboardMeta = null }) {
+  const isPresent = Boolean(timeInStart);
   return (
     <div className="card summary-card">
-      <div className="summary-section">
-        <div className="label">Today Status</div>
+      <div className="summary-section summary-section-status">
+        <div className="summary-label">Today Status</div>
         <div className="summary-list">
           <div className="summary-row"><span>Time In</span><strong>{timeInStart ? timeInStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '--:--'}</strong></div>
-          <div className="summary-row"><span>Break</span><strong>{dashboardMeta?.breakTag ?? "Inactive"}</strong></div>
-          <div className="summary-row"><span>Status</span><strong>{dashboardMeta?.availabilityLabel ?? "Not available"}</strong></div>
+          <div className="summary-row"><span>Break</span><strong>{dashboardMeta?.breakTag ?? "Break inactive"}</strong></div>
+          <div className="summary-row">
+            <span>Status</span>
+            <strong className="summary-status-value">
+              <span className="summary-status-dot" aria-hidden="true" />
+              {dashboardMeta?.availabilityLabel ?? "Available"}
+            </strong>
+          </div>
         </div>
       </div>
       <div className="summary-section">
-        <div className="label">Total Hours</div>
+        <div className="summary-label">Total Hours</div>
         <div className="big-value">{totalHours}h</div>
       </div>
       <div className="summary-section">
-        <div className="label">Attendance</div>
-        <div className="big-value">{timeInStart ? "Present" : "Absent"}</div>
-        <div className="summary-tag">{dashboardMeta?.attendanceTag ?? "Pending"}</div>
+        <div className="summary-label">Attendance</div>
+        <div className="big-value">{isPresent ? "Present" : "Absent"}</div>
+        <div className="summary-tag">{dashboardMeta?.attendanceTag ?? (isPresent ? "On Time" : "Pending")}</div>
       </div>
     </div>
   );
