@@ -1837,6 +1837,60 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+.attendance-history-highlights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.attendance-history-highlight-card {
+  border: 1px solid #d9dee8;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+  padding: 18px 20px;
+}
+
+.attendance-history-highlight-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #0f172a;
+  font-size: 18px;
+  margin-bottom: 18px;
+}
+
+.attendance-history-highlight-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.attendance-history-highlight-icon.is-slate { background: #64748b; }
+.attendance-history-highlight-icon.is-green { background: #52c41a; }
+.attendance-history-highlight-icon.is-amber { background: #f59e0b; }
+.attendance-history-highlight-icon.is-blue { background: #1890ff; }
+
+.attendance-history-highlight-value {
+  color: #cbd5e1;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.attendance-history-highlight-subvalue {
+  margin-top: 10px;
+  color: #64748b;
+}
+
 .attendance-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

@@ -4,6 +4,7 @@ import DashboardSidebar from "../components/DashboardSidebar";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import { normalizeSchedule, parseDateValue, resolveAttendanceMainTag } from "../utils/attendanceTags";
+import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
 
 const parseDateTimeValue = value => {
   if (!value) return null;
@@ -630,6 +631,7 @@ export default function CoachAttendancePage() {
                     <div className="modal-body attendance-modal-grid">
                       <div className="attendance-detail-item attendance-detail-note">
                         <span className="attendance-detail-label">Attendance History</span>
+                        <AttendanceHistoryHighlights />
                         {Array.isArray(selectedMember.attendance_history) && selectedMember.attendance_history.length > 0 ? (
                           <>
                             <div className="attendance-history-range-filter" role="group" aria-label="Filter attendance history by date range">
