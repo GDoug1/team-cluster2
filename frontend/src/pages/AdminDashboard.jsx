@@ -38,6 +38,7 @@ export default function AdminDashboard() {
   const [rejectError, setRejectError] = useState("");
   const [isSubmittingReject, setIsSubmittingReject] = useState(false);
   const [coachAttendance, setCoachAttendance] = useState([]);
+  const [allAttendance, setAllAttendance] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
   const [managingScheduleCluster, setManagingScheduleCluster] = useState(null);
   const [scheduleModalMessage, setScheduleModalMessage] = useState("");
@@ -57,7 +58,7 @@ export default function AdminDashboard() {
   const [editForm, setEditForm] = useState({ timeInAt: "", timeOutAt: "", tag: "", note: "" });
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
-  const attendanceNavItems = ["My Attendance", "My Requests", "My Filing Center"];
+  const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
   const navItems = [
@@ -215,6 +216,12 @@ export default function AdminDashboard() {
       .catch(() => setCoachAttendance([]));
   }, [activeNav, attendanceDate]);
 
+  useEffect(() => {
+    if (activeNav !== "All Attendance") return;
+    apiFetch(`api/admin_all_attendance.php?attendance_date=${attendanceDate}`)
+      .then(data => setAllAttendance(Array.isArray(data) ? data : []))
+      .catch(() => setAllAttendance([]));
+  }, [activeNav, attendanceDate]);
 
   const toDateTimeLocalValue = value => {
     if (!value) return "";
@@ -539,6 +546,20 @@ const handleOpenRejectModal = cluster => {
               records={coachAttendance}
               personField="employee_name"
               personLabel="Coach"
+              onEditRow={openAttendanceEdit}
+              externalDateFilter={attendanceDate}
+              onExternalDateFilterChange={setAttendanceDate}
+            />
+          </section>
+          ) : activeNav === "All Attendance" ? (
+          <section className="content">
+            <div className="section-title">All Attendance</div>
+            <AttendanceHistoryHighlights />
+            <DataPanel
+              type="attendance"
+              records={allAttendance}
+              personField="employee_name"
+              personLabel="Employee"
               onEditRow={openAttendanceEdit}
               externalDateFilter={attendanceDate}
               onExternalDateFilterChange={setAttendanceDate}
