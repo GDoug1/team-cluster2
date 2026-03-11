@@ -670,37 +670,51 @@
 /* SummaryCard.css */
 .summary-card {
   grid-area: summary;
-  min-height: 112px;
-  height: auto;
+  min-height: 150px;
+  height: 100%;
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr;
-  gap: 14px;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 0;
   align-items: center;
+  background: #ffffff;
+  border: 1px solid #d9d9d9;
+  border-radius: 24px;
+  padding: 12px;
 }
 
 .summary-section {
   min-width: 0;
+  height: 100%;
+  padding: 8px 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.summary-section + .summary-section {
+  border-left: 1px solid #e5e5e5;
 }
 
 .summary-list {
   display: grid;
-  gap: 4px;
+  gap: 8px;
 }
 
 .summary-row {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
-  font-size: 13px;
+  gap: 20px;
+  font-size: 19px;
 }
 
 .summary-row strong {
   font-weight: 700;
 }
 
-.label {
-  font-size: 12px;
-  margin-bottom: 4px;
+.summary-label {
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: #6d727a;
 }
 
 .small-info {
@@ -709,35 +723,61 @@
 }
 
 .big-value {
-  font-size: 34px;
-  font-weight: 800;
+  font-size: 48px;
+  font-weight: 700;
   line-height: 1.05;
+}
+
+.summary-status-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.summary-status-value.is-available .summary-status-dot {
+  background: #44c779;
+  box-shadow: 0 0 0 3px rgba(68, 199, 121, 0.22);
+}
+
+.summary-status-value.is-unavailable .summary-status-dot {
+  background: #e04f5f;
+  box-shadow: 0 0 0 3px rgba(224, 79, 95, 0.22);
+}
+
+.summary-status-value.is-unavailable {
+  color: #141414;
 }
 
 
 .summary-tag {
-  margin-top: 4px;
+  margin-top: 14px;
   display: inline-flex;
   border-radius: 999px;
-  background: #e7edf9;
-  color: #1b3d76;
-  font-size: 11px;
+  background: #dff3e5;
+  color: #2d7d4f;
+  font-size: 15px;
   font-weight: 700;
-  padding: 3px 10px;
+  padding: 6px 14px;
+  align-self: flex-start;
 }
 
 @media (max-width: 1200px) {
   .big-value {
-    font-size: 30px;
+    font-size: 52px;
   }
 
   .summary-row {
-    font-size: 12px;
+    font-size: 16px;
   }
 
   .summary-card {
     min-height: 120px;
-    gap: 10px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
@@ -754,7 +794,12 @@
   }
 
   .big-value {
-    font-size: 34px;
+    font-size: 40px;
+  }
+
+  .summary-section + .summary-section {
+    border-left: 0;
+    border-top: 1px solid #e5e5e5;
   }
 }
 
