@@ -3,6 +3,8 @@ include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
 requireRole("admin");
 
+$adminId = (int)($_SESSION['user']['id'] ?? 0);
+
 function hasTable(mysqli $conn, string $table): bool {
     $safe = $conn->real_escape_string($table);
     $result = $conn->query("SHOW TABLES LIKE '{$safe}'");
@@ -47,6 +49,7 @@ $clusterOwnerColumn = in_array('coach_id', $clusterColumns, true) ? 'coach_id' :
 
 $usersIdColumn = in_array('id', $userColumns, true) ? 'id' : (in_array('user_id', $userColumns, true) ? 'user_id' : null);
 $userDisplayColumn = in_array('fullname', $userColumns, true) ? 'fullname' : (in_array('username', $userColumns, true) ? 'username' : null);
+$userRoleColumn = in_array('role', $userColumns, true) ? 'role' : null;
 $canJoinEmployees = in_array('user_id', $employeeColumns, true) && in_array('employee_id', $employeeColumns, true);
 
 $requestEmployeeExpr = 'req.employee_id';
@@ -58,19 +61,31 @@ if ($requestEmployeeReference === 'users' && $canJoinEmployees) {
 
 $employeeNameExpr = "CONCAT('Employee #', $requestEmployeeExpr)";
 $userJoinSql = '';
-if ($usersIdColumn !== null && $userDisplayColumn !== null) {
+if ($usersIdColumn !== null && ($userDisplayColumn !== null || $userRoleColumn !== null)) {
     if ($requestEmployeeReference === 'users') {
         $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = req.employee_id";
-        $employeeNameExpr = "COALESCE(requester.$userDisplayColumn, CONCAT('Employee #', $requestEmployeeExpr))";
     } else {
         $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = $requestEmployeeExpr";
+    }
+
+    if ($userDisplayColumn !== null) {
         $employeeNameExpr = "COALESCE(requester.$userDisplayColumn, CONCAT('Employee #', $requestEmployeeExpr))";
     }
 }
 
 $items = [];
 
-$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType) use ($conn, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, &$items) {
+$requesterUserExpr = $requestEmployeeExpr;
+if ($requestEmployeeReference === 'users' && $canJoinEmployees) {
+    $requesterUserExpr = "COALESCE(emp.user_id, $requestEmployeeExpr)";
+}
+
+$requesterRoleExpr = "''";
+if ($usersIdColumn !== null && $userRoleColumn !== null) {
+    $requesterRoleExpr = 'COALESCE(requester.' . $userRoleColumn . ', "")';
+}
+
+$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType) use ($conn, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, $requesterUserExpr, $requesterRoleExpr, $adminId, &$items) {
     $sql = "SELECT DISTINCT
                 req.$idColumn AS source_id,
                 req.created_at AS filed_at,
@@ -80,6 +95,8 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
                 req.status,
                 $requestEmployeeExpr AS employee_id,
                 $employeeNameExpr AS employee_name,
+                $requesterUserExpr AS requester_user_id,
+                $requesterRoleExpr AS requester_role,
                 c.$clusterIdColumn AS cluster_id,
                 c.name AS cluster_name
             FROM $table req
@@ -96,6 +113,13 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
     }
 
     while ($row = $res->fetch_assoc()) {
+        $requesterRole = strtolower((string)($row['requester_role'] ?? ''));
+        $requesterUserId = (int)($row['requester_user_id'] ?? 0);
+
+        if ($requesterRole === 'admin' && $requesterUserId > 0 && $requesterUserId === $adminId) {
+            continue;
+        }
+
         $items[] = [
             'id' => $alias . '-' . $row['source_id'],
             'source_id' => (int)$row['source_id'],

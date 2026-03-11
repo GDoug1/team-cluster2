@@ -3,6 +3,20 @@ include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
 requireRole("admin");
 
+
+function hasTable(mysqli $conn, string $table): bool {
+    $safe = $conn->real_escape_string($table);
+    $result = $conn->query("SHOW TABLES LIKE '{$safe}'");
+    return $result && $result->num_rows > 0;
+}
+
+function hasColumn(mysqli $conn, string $table, string $column): bool {
+    $safeTable = $conn->real_escape_string($table);
+    $safeColumn = $conn->real_escape_string($column);
+    $result = $conn->query("SHOW COLUMNS FROM `{$safeTable}` LIKE '{$safeColumn}'");
+    return $result && $result->num_rows > 0;
+}
+
 $body = json_decode(file_get_contents("php://input"), true);
 if (!is_array($body)) {
     http_response_code(400);
@@ -40,7 +54,22 @@ if ($columnsRes && $columnsRes->num_rows > 0) {
     $hasApprovedBy = true;
 }
 
-$checkStmt = $conn->prepare("SELECT status FROM $table WHERE $idColumn = ? LIMIT 1");
+$requestEmployeeExpr = 'req.employee_id';
+$requesterRoleExpr = "''";
+$employeeJoinSql = '';
+$userJoinSql = '';
+
+if (hasTable($conn, 'employees') && hasColumn($conn, 'employees', 'employee_id') && hasColumn($conn, 'employees', 'user_id')) {
+    $employeeJoinSql = ' LEFT JOIN employees emp ON emp.employee_id = req.employee_id';
+    $requestEmployeeExpr = 'COALESCE(emp.user_id, req.employee_id)';
+}
+
+if (hasTable($conn, 'users') && hasColumn($conn, 'users', 'id') && hasColumn($conn, 'users', 'role')) {
+    $userJoinSql = " LEFT JOIN users requester ON requester.id = $requestEmployeeExpr";
+    $requesterRoleExpr = 'COALESCE(requester.role, "")';
+}
+
+$checkStmt = $conn->prepare("SELECT req.status, $requestEmployeeExpr AS requester_user_id, $requesterRoleExpr AS requester_role FROM $table req $employeeJoinSql $userJoinSql WHERE req.$idColumn = ? LIMIT 1");
 $checkStmt->bind_param('i', $requestId);
 $checkStmt->execute();
 $existing = $checkStmt->get_result()->fetch_assoc();
@@ -55,6 +84,14 @@ $currentStatus = strtolower((string)($existing['status'] ?? ''));
 if ($currentStatus !== 'endorsed') {
     http_response_code(409);
     echo json_encode(["error" => "Only endorsed requests can be finalized by admin."]);
+    exit;
+}
+
+$requesterRole = strtolower((string)($existing['requester_role'] ?? ''));
+$requesterUserId = (int)($existing['requester_user_id'] ?? 0);
+if ($requesterRole === 'admin' && $requesterUserId > 0 && $requesterUserId === $adminId) {
+    http_response_code(403);
+    echo json_encode(["error" => "You cannot finalize your own admin request."]);
     exit;
 }
 
