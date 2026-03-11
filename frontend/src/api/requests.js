@@ -22,6 +22,17 @@ export async function updateTeamRequestStatus(payload) {
   });
 }
 
+export async function fetchAdminTeamRequests() {
+  return apiFetch("api/admin/admin_team_requests.php");
+}
+
+export async function updateAdminTeamRequestStatus(payload) {
+  return apiFetch("api/admin/admin_update_team_request_status.php", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export function buildRequestHighlights(requests = []) {
   const totals = requests.reduce(
     (acc, item) => {

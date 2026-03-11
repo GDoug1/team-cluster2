@@ -1497,6 +1497,10 @@ export default function CoachDashboard() {
                         records={teamRequests}
                         onRequestAction={handleTeamRequestAction}
                         requestActionLoadingId={requestActionLoadingId}
+                        requestActions={[
+                          { label: "Endorse", status: "Endorsed", variant: "btn", allowedStatuses: ["pending"] },
+                          { label: "Reject", status: "Rejected", variant: "btn secondary", allowedStatuses: ["pending"] }
+                        ]}
                       />
                     </>
                   ) : isTeamClusterAttendanceView ? (

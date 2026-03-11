@@ -52,8 +52,15 @@ export default function DataPanel({
   onExternalDateFilterChange = null,
   onRequestAction = null,
   requestActionLoadingId = "",
+  requestActions = null,
 }) {
   const config = panelConfig[type] ?? panelConfig.attendance;
+  const resolvedRequestActions = Array.isArray(requestActions) && requestActions.length > 0
+    ? requestActions
+    : [
+      { label: "Endorse", status: "Approved", variant: "btn", allowedStatuses: ["pending"] },
+      { label: "Reject", status: "Rejected", variant: "btn secondary", allowedStatuses: ["pending"] }
+    ];
   const [searchQuery, setSearchQuery] = useState("");
   const [dateStartFilter, setDateStartFilter] = useState("");
   const [dateEndFilter, setDateEndFilter] = useState("");
@@ -184,22 +191,25 @@ export default function DataPanel({
             {onRequestAction && (
               <span role="cell">
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                  <button
-                    className="btn"
-                    type="button"
-                    disabled={requestActionLoadingId === item.id || !String(item.status ?? "").toLowerCase().includes("pending")}
-                    onClick={() => onRequestAction(item, "Approved")}
-                  >
-                    {requestActionLoadingId === item.id ? "Saving..." : "Endorse"}
-                  </button>
-                  <button
-                    className="btn secondary"
-                    type="button"
-                    disabled={requestActionLoadingId === item.id || !String(item.status ?? "").toLowerCase().includes("pending")}
-                    onClick={() => onRequestAction(item, "Rejected")}
-                  >
-                    Reject
-                  </button>
+                  {resolvedRequestActions.map(action => {
+                    const currentStatus = String(item.status ?? "").toLowerCase();
+                    const allowedStatuses = Array.isArray(action.allowedStatuses)
+                      ? action.allowedStatuses.map(value => String(value).toLowerCase())
+                      : ["pending"];
+                    const isEnabled = allowedStatuses.some(status => currentStatus.includes(status));
+
+                    return (
+                      <button
+                        key={`${item.id}-${action.status}`}
+                        className={action.variant ?? "btn"}
+                        type="button"
+                        disabled={requestActionLoadingId === item.id || !isEnabled}
+                        onClick={() => onRequestAction(item, action.status)}
+                      >
+                        {requestActionLoadingId === item.id ? "Saving..." : action.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </span>
             )}

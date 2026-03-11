@@ -7,8 +7,7 @@ import useCurrentUser from "../hooks/useCurrentUser";
 import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
 import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
-import { buildRequestHighlights, fetchMyRequests } from "../api/requests";
-
+import { buildRequestHighlights, fetchAdminTeamRequests, fetchMyRequests, updateAdminTeamRequestStatus } from "../api/requests";
 
 export default function AdminDashboard() {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -41,6 +40,9 @@ export default function AdminDashboard() {
   const [allAttendance, setAllAttendance] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
   const [managingScheduleCluster, setManagingScheduleCluster] = useState(null);
+  const [teamRequests, setTeamRequests] = useState([]);
+  const [teamRequestsError, setTeamRequestsError] = useState("");
+  const [requestActionLoadingId, setRequestActionLoadingId] = useState("");
   const [scheduleModalMessage, setScheduleModalMessage] = useState("");
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
   const [scheduleForm, setScheduleForm] = useState({
@@ -208,6 +210,41 @@ export default function AdminDashboard() {
       setMyRequests(Array.isArray(response) ? response : []);
     }).catch(() => setMyRequests([]));
   }, []);
+
+  useEffect(() => {
+    if (activeNav !== "Team Request") return;
+
+    fetchAdminTeamRequests()
+      .then(response => {
+        setTeamRequests(Array.isArray(response) ? response : []);
+        setTeamRequestsError("");
+      })
+      .catch(() => {
+        setTeamRequests([]);
+        setTeamRequestsError("Unable to load endorsed team requests.");
+      });
+  }, [activeNav]);
+
+  const handleAdminTeamRequestAction = async (request, status) => {
+    if (!request?.id || !request?.request_source) return;
+
+    setRequestActionLoadingId(request.id);
+    setTeamRequestsError("");
+    try {
+      await updateAdminTeamRequestStatus({
+        request_source: request.request_source,
+        request_id: request.source_id,
+        status
+      });
+
+      setTeamRequests(prev => prev.map(item => (item.id === request.id ? { ...item, status } : item)));
+    } catch (error) {
+      setTeamRequestsError(error?.error ?? "Unable to finalize team request status.");
+    } finally {
+      setRequestActionLoadingId("");
+    }
+  };
+
 
   useEffect(() => {
     if (activeNav !== "Attendance") return;
@@ -451,6 +488,7 @@ const handleOpenRejectModal = cluster => {
   };
 
   const myRequestHighlights = buildRequestHighlights(myRequests);
+  const teamRequestHighlights = buildRequestHighlights(teamRequests);
 
   const formatDate = dateString => {
     if (!dateString) return "—";
@@ -578,8 +616,19 @@ const handleOpenRejectModal = cluster => {
         ) : activeNav === "Team Request" ? (
           <section className="content">
             <div className="section-title">Team Requests</div>
-            <AttendanceHistoryHighlights highlights={myRequestHighlights} />
-            <DataPanel type="requests" records={myRequests} />
+            <p className="table-subtitle">Endorsed team requests waiting for final admin approval or rejection.</p>
+            <AttendanceHistoryHighlights highlights={teamRequestHighlights} />
+            {teamRequestsError && <div className="error">{teamRequestsError}</div>}
+            <DataPanel
+              type="requests"
+              records={teamRequests}
+              onRequestAction={handleAdminTeamRequestAction}
+              requestActionLoadingId={requestActionLoadingId}
+              requestActions={[
+                { label: "Accept", status: "Approved", variant: "btn", allowedStatuses: ["endorsed"] },
+                { label: "Reject", status: "Denied", variant: "btn secondary", allowedStatuses: ["endorsed"] }
+              ]}
+            />
           </section>
         ) : (
           <section className="content">
