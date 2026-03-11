@@ -3,6 +3,8 @@ include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
 requireRole("admin");
 
+$currentAdminId = (int)($_SESSION['user']['id'] ?? 0);
+
 function hasTable(mysqli $conn, string $table): bool {
     $safe = $conn->real_escape_string($table);
     $result = $conn->query("SHOW TABLES LIKE '{$safe}'");
@@ -49,6 +51,10 @@ $usersIdColumn = in_array('id', $userColumns, true) ? 'id' : (in_array('user_id'
 $userDisplayColumn = in_array('fullname', $userColumns, true) ? 'fullname' : (in_array('username', $userColumns, true) ? 'username' : null);
 $canJoinEmployees = in_array('user_id', $employeeColumns, true) && in_array('employee_id', $employeeColumns, true);
 
+$rolesColumns = hasTable($conn, 'roles') ? getColumns($conn, 'roles') : [];
+$rolesIdColumn = in_array('id', $rolesColumns, true) ? 'id' : (in_array('role_id', $rolesColumns, true) ? 'role_id' : null);
+$rolesNameColumn = in_array('name', $rolesColumns, true) ? 'name' : (in_array('role_name', $rolesColumns, true) ? 'role_name' : null);
+
 $requestEmployeeExpr = 'req.employee_id';
 $employeeJoinSql = '';
 if ($requestEmployeeReference === 'users' && $canJoinEmployees) {
@@ -58,6 +64,7 @@ if ($requestEmployeeReference === 'users' && $canJoinEmployees) {
 
 $employeeNameExpr = "CONCAT('Employee #', $requestEmployeeExpr)";
 $userJoinSql = '';
+$requesterUserExpr = 'NULL';
 if ($usersIdColumn !== null && $userDisplayColumn !== null) {
     if ($requestEmployeeReference === 'users') {
         $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = req.employee_id";
@@ -66,11 +73,23 @@ if ($usersIdColumn !== null && $userDisplayColumn !== null) {
         $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = $requestEmployeeExpr";
         $employeeNameExpr = "COALESCE(requester.$userDisplayColumn, CONCAT('Employee #', $requestEmployeeExpr))";
     }
+    $requesterUserExpr = "requester.$usersIdColumn";
+}
+
+$requesterRoleJoinSql = '';
+$requesterIsAdminExpr = '0';
+if ($usersIdColumn !== null) {
+    if (in_array('role', $userColumns, true)) {
+        $requesterIsAdminExpr = "(LOWER(COALESCE(requester.role, '')) = 'admin')";
+    } elseif (in_array('role_id', $userColumns, true) && $rolesIdColumn !== null && $rolesNameColumn !== null) {
+        $requesterRoleJoinSql = " LEFT JOIN roles requester_role ON requester_role.$rolesIdColumn = requester.role_id";
+        $requesterIsAdminExpr = "(LOWER(COALESCE(requester_role.$rolesNameColumn, '')) = 'admin' OR LOWER(COALESCE(requester_role.$rolesNameColumn, '')) = 'administrator')";
+    }
 }
 
 $items = [];
 
-$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType) use ($conn, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, &$items) {
+$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType) use ($conn, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $requesterRoleJoinSql, $employeeNameExpr, $requesterUserExpr, $requesterIsAdminExpr, $currentAdminId, &$items) {
     $sql = "SELECT DISTINCT
                 req.$idColumn AS source_id,
                 req.created_at AS filed_at,
@@ -85,10 +104,17 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
             FROM $table req
             $employeeJoinSql
             LEFT JOIN cluster_members cm ON cm.employee_id = $requestEmployeeExpr
-            INNER JOIN clusters c ON (c.$clusterIdColumn = cm.cluster_id OR c.$clusterOwnerColumn = req.employee_id)
+            LEFT JOIN clusters c ON (c.$clusterIdColumn = cm.cluster_id OR c.$clusterOwnerColumn = req.employee_id)
             $userJoinSql
-            WHERE c.status = 'active'
-              AND LOWER(COALESCE(req.status, '')) = 'endorsed'";
+            $requesterRoleJoinSql
+            WHERE LOWER(COALESCE(req.status, '')) = 'endorsed'
+              AND (
+                    c.status = 'active'
+                    OR (
+                        $requesterUserExpr <> $currentAdminId
+                        AND $requesterIsAdminExpr
+                    )
+                  )";
 
     $res = $conn->query($sql);
     if (!$res) {
