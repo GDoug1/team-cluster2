@@ -22,6 +22,17 @@ export async function updateTeamRequestStatus(payload) {
   });
 }
 
+export async function fetchTeamRequests() {
+  return apiFetch("api/coach_team_requests.php");
+}
+
+export async function updateTeamRequestStatus(payload) {
+  return apiFetch("api/coach_update_request_status.php", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export function buildRequestHighlights(requests = []) {
   const totals = requests.reduce(
     (acc, item) => {
