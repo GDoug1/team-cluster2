@@ -15,6 +15,16 @@ export default function AdminDashboard() {
   const FIXED_SHIFT_START = { time: "9:00", period: "AM" };
   const FIXED_SHIFT_END = { time: "6:00", period: "PM" };
   const FIXED_SHIFT_LABEL = `${FIXED_SHIFT_START.time} ${FIXED_SHIFT_START.period} - ${FIXED_SHIFT_END.time} ${FIXED_SHIFT_END.period}`;
+  const adminMainDashboardSchedule = {
+    startTime: FIXED_SHIFT_START.time,
+    startPeriod: FIXED_SHIFT_START.period,
+    endTime: FIXED_SHIFT_END.time,
+    endPeriod: FIXED_SHIFT_END.period,
+    breakStartTime: "3:00",
+    breakStartPeriod: "PM",
+    breakEndTime: "3:30",
+    breakEndPeriod: "PM"
+  };
   const defaultDaySchedule = {
     shiftType: "Morning Shift",
     startTime: FIXED_SHIFT_START.time,
@@ -525,7 +535,13 @@ const handleOpenRejectModal = cluster => {
       <main className="main">
         {activeNav === "Dashboard" ? (
           <section className="content">
-            <MainDashboard />
+            <MainDashboard
+              schedule={adminMainDashboardSchedule}
+              dashboardMeta={{
+                scheduleTag: "Fixed schedule",
+                breakTime: "3:00 PM - 3:30 PM"
+              }}
+            />
           </section>
         ) : activeNav === "Team" ? (
           <>
