@@ -20,28 +20,74 @@ function getColumns(mysqli $conn, string $table): array {
     return $columns;
 }
 
+function getClusterMemberEmployeeReference(mysqli $conn): ?string {
+    $sql = "SELECT REFERENCED_TABLE_NAME
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'cluster_members'
+              AND COLUMN_NAME = 'employee_id'
+              AND REFERENCED_TABLE_NAME IS NOT NULL
+            LIMIT 1";
+
+    $result = $conn->query($sql);
+    if (!$result) {
+        return null;
+    }
+
+    $row = $result->fetch_assoc();
+    return $row['REFERENCED_TABLE_NAME'] ?? null;
+}
+
 $coachId = (int)($_SESSION['user']['id'] ?? 0);
 $clusterColumns = getColumns($conn, 'clusters');
+$userColumns = hasTable($conn, 'users') ? getColumns($conn, 'users') : [];
+$employeeColumns = hasTable($conn, 'employees') ? getColumns($conn, 'employees') : [];
+$requestEmployeeReference = getClusterMemberEmployeeReference($conn);
 $clusterIdColumn = in_array('id', $clusterColumns, true) ? 'id' : 'cluster_id';
 $clusterOwnerColumn = in_array('coach_id', $clusterColumns, true) ? 'coach_id' : 'user_id';
 
+$usersIdColumn = in_array('id', $userColumns, true) ? 'id' : (in_array('user_id', $userColumns, true) ? 'user_id' : null);
+$userDisplayColumn = in_array('fullname', $userColumns, true) ? 'fullname' : (in_array('username', $userColumns, true) ? 'username' : null);
+$canJoinEmployees = in_array('user_id', $employeeColumns, true) && in_array('employee_id', $employeeColumns, true);
+
+$requestEmployeeExpr = 'req.employee_id';
+$employeeJoinSql = '';
+if ($requestEmployeeReference === 'users' && $canJoinEmployees) {
+    $requestEmployeeExpr = 'COALESCE(emp.employee_id, req.employee_id)';
+    $employeeJoinSql = ' LEFT JOIN employees emp ON emp.user_id = req.employee_id';
+}
+
+$employeeNameExpr = "CONCAT('Employee #', $requestEmployeeExpr)";
+$userJoinSql = '';
+if ($usersIdColumn !== null && $userDisplayColumn !== null) {
+    if ($requestEmployeeReference === 'users') {
+        $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = req.employee_id";
+        $employeeNameExpr = "COALESCE(requester.$userDisplayColumn, CONCAT('Employee #', $requestEmployeeExpr))";
+    } else {
+        $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = $requestEmployeeExpr";
+        $employeeNameExpr = "COALESCE(requester.$userDisplayColumn, CONCAT('Employee #', $requestEmployeeExpr))";
+    }
+}
+
 $items = [];
 
-$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType) use ($conn, $coachId, $clusterIdColumn, $clusterOwnerColumn, &$items) {
-    $sql = "SELECT
+$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType) use ($conn, $coachId, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, &$items) {
+    $sql = "SELECT DISTINCT
                 req.$idColumn AS source_id,
                 req.created_at AS filed_at,
                 req.$typeColumn AS request_type,
                 req.$detailsColumn AS details,
                 $scheduleExpr AS schedule_period,
                 req.status,
-                req.employee_id,
-                COALESCE(u.fullname, CONCAT('Employee #', req.employee_id)) AS employee_name
+                $requestEmployeeExpr AS employee_id,
+                $employeeNameExpr AS employee_name
             FROM $table req
-            INNER JOIN cluster_members cm ON cm.employee_id = req.employee_id
+            $employeeJoinSql
+            INNER JOIN cluster_members cm ON cm.employee_id = $requestEmployeeExpr
             INNER JOIN clusters c ON c.$clusterIdColumn = cm.cluster_id
-            LEFT JOIN users u ON u.id = req.employee_id
-            WHERE c.$clusterOwnerColumn = ?";
+            $userJoinSql
+            WHERE c.$clusterOwnerColumn = ?
+              AND c.status = 'active'";
 
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
