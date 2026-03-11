@@ -3,6 +3,8 @@ include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
 requireRole("admin");
 
+$adminId = (int)($_SESSION['user']['id'] ?? 0);
+
 function hasTable(mysqli $conn, string $table): bool {
     $safe = $conn->real_escape_string($table);
     $result = $conn->query("SHOW TABLES LIKE '{$safe}'");
@@ -68,9 +70,21 @@ if ($usersIdColumn !== null && $userDisplayColumn !== null) {
     }
 }
 
+$requesterIdentityJoinSql = '';
+$requesterUserIdExpr = 'NULL';
+$requesterRoleExpr = "''";
+if ($usersIdColumn !== null && hasTable($conn, 'users') && hasTable($conn, 'employees')) {
+    $requesterIdentityJoinSql = "
+            LEFT JOIN employees req_emp ON req_emp.employee_id = req.employee_id
+            LEFT JOIN users requester_direct ON requester_direct.$usersIdColumn = req.employee_id
+            LEFT JOIN users requester_employee ON requester_employee.$usersIdColumn = req_emp.user_id";
+    $requesterUserIdExpr = "COALESCE(requester_direct.$usersIdColumn, requester_employee.$usersIdColumn)";
+    $requesterRoleExpr = "LOWER(COALESCE(requester_direct.role, requester_employee.role, ''))";
+}
+
 $items = [];
 
-$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType) use ($conn, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, &$items) {
+$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType) use ($conn, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, $requesterIdentityJoinSql, $requesterUserIdExpr, $requesterRoleExpr, $adminId, &$items) {
     $sql = "SELECT DISTINCT
                 req.$idColumn AS source_id,
                 req.created_at AS filed_at,
@@ -80,10 +94,13 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
                 req.status,
                 $requestEmployeeExpr AS employee_id,
                 $employeeNameExpr AS employee_name,
+                $requesterUserIdExpr AS requester_user_id,
+                $requesterRoleExpr AS requester_role,
                 c.$clusterIdColumn AS cluster_id,
                 c.name AS cluster_name
             FROM $table req
             $employeeJoinSql
+            $requesterIdentityJoinSql
             LEFT JOIN cluster_members cm ON cm.employee_id = $requestEmployeeExpr
             LEFT JOIN clusters c ON (c.$clusterIdColumn = cm.cluster_id OR c.$clusterOwnerColumn = req.employee_id)
                 AND c.status = 'active'
@@ -107,6 +124,11 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
             'status' => $row['status'] ?: 'Pending',
             'employee_id' => (int)$row['employee_id'],
             'employee_name' => $row['employee_name'] ?: 'Employee',
+            'can_admin_finalize' => !(
+                (int)($row['requester_user_id'] ?? 0) > 0
+                && (int)($row['requester_user_id'] ?? 0) === $adminId
+                && strtolower((string)($row['requester_role'] ?? '')) === 'admin'
+            ),
             'cluster_id' => isset($row['cluster_id']) ? (int)$row['cluster_id'] : null,
             'cluster_name' => $row['cluster_name'] ?: '—'
         ];

@@ -197,13 +197,14 @@ export default function DataPanel({
                       ? action.allowedStatuses.map(value => String(value).toLowerCase())
                       : ["pending"];
                     const isEnabled = allowedStatuses.some(status => currentStatus.includes(status));
+                    const canActOnRequest = item.can_admin_finalize !== false;
 
                     return (
                       <button
                         key={`${item.id}-${action.status}`}
                         className={action.variant ?? "btn"}
                         type="button"
-                        disabled={requestActionLoadingId === item.id || !isEnabled}
+                        disabled={requestActionLoadingId === item.id || !isEnabled || !canActOnRequest}
                         onClick={() => onRequestAction(item, action.status)}
                       >
                         {requestActionLoadingId === item.id ? "Saving..." : action.label}
