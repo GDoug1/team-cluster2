@@ -387,3 +387,8 @@
   border-radius: 6px;
   cursor: pointer;
 }
+.control-panel-modal-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 0.85rem;
+}
