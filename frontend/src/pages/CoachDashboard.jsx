@@ -9,6 +9,7 @@ import DataPanel from "../components/DataPanel";
 import { buildRequestHighlights, fetchMyRequests, fetchTeamRequests, updateTeamRequestStatus } from "../api/requests";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
+import usePermissions from "../hooks/usePermissions";
 import { normalizeSchedule as normalizeAttendanceSchedule, parseDateValue, resolveAttendanceMainTag } from "../utils/attendanceTags";
 
 
@@ -119,25 +120,43 @@ export default function CoachDashboard() {
   });
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
+  const { can } = usePermissions(user);
+  const canViewDashboard = can("View Dashboard");
+  const canViewTeam = can("View Team");
+  const canViewAttendance = can("View Attendance");
   const attendanceNavItems = ["My Attendance", "Team Cluster Attendance", "My Requests", "My Filing Center", "Team Request"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
   const navItems = [
-    { label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") },
-    { label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") },
-    {
-      label: "Attendance",
-      active: isAttendanceView,
-      expanded: attendanceExpanded,
-      onClick: () => setAttendanceExpanded(prev => !prev),
-      children: attendanceNavItems.map(label => ({
-        label,
-        active: (label === "My Attendance" && activeNav === "Attendance") || activeNav === label,
-        onClick: () => setActiveNav(label === "My Attendance" ? "Attendance" : label)
-      }))
-    },
-    { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") }
-  ];
+    canViewDashboard ? { label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") } : null,
+    canViewTeam ? { label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") } : null,
+    canViewAttendance
+      ? {
+          label: "Attendance",
+          active: isAttendanceView,
+          expanded: attendanceExpanded,
+          onClick: () => setAttendanceExpanded(prev => !prev),
+          children: attendanceNavItems.map(label => ({
+            label,
+            active: (label === "My Attendance" && activeNav === "Attendance") || activeNav === label,
+            onClick: () => setActiveNav(label === "My Attendance" ? "Attendance" : label)
+          }))
+        }
+      : null,
+    canViewTeam ? { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") } : null
+  ].filter(Boolean);
+
+
+  useEffect(() => {
+    const allowedNavs = [];
+    if (canViewDashboard) allowedNavs.push("Dashboard");
+    if (canViewTeam) allowedNavs.push("Team", "Schedule");
+    if (canViewAttendance) allowedNavs.push("Attendance", ...attendanceNavItems.filter(label => label !== "My Attendance"));
+
+    if (allowedNavs.length > 0 && !allowedNavs.includes(activeNav)) {
+      setActiveNav(allowedNavs[0]);
+    }
+  }, [activeNav, canViewAttendance, canViewDashboard, canViewTeam]);
 
 
 
@@ -1447,7 +1466,7 @@ export default function CoachDashboard() {
       />
 
       <main className="main">
-        {activeNav === "Dashboard" ? (
+        {canViewDashboard && activeNav === "Dashboard" ? (
           <section className="content">
             <MainDashboard
               showMemberStatusCard
@@ -1488,7 +1507,7 @@ export default function CoachDashboard() {
                       <AttendanceHistoryHighlights highlights={myRequestHighlights} />
                       <DataPanel type="requests" records={myRequests} />
                     </>
-                  ) : isTeamRequestView ? (
+                  ) : canViewAttendance && isTeamRequestView ? (
                     <>
                       <AttendanceHistoryHighlights highlights={teamRequestHighlights} />
                       {teamRequestsError && <div className="error">{teamRequestsError}</div>}
@@ -1502,7 +1521,7 @@ export default function CoachDashboard() {
                         ]}
                       />
                     </>
-                  ) : isTeamClusterAttendanceView ? (
+                  ) : canViewAttendance && isTeamClusterAttendanceView ? (
                     <>
                       {activeMembersLoading && <div className="modal-text">Loading attendance records...</div>}
                       {!activeMembersLoading && activeMembersError && <div className="error">{activeMembersError}</div>}

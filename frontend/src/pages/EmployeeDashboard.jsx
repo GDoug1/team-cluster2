@@ -9,6 +9,7 @@ import DataPanel from "../components/DataPanel";
 import { buildRequestHighlights, fetchMyRequests } from "../api/requests";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
+import usePermissions from "../hooks/usePermissions";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 
 
@@ -19,27 +20,33 @@ export default function EmployeeDashboard() {
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const isAttendanceView = attendanceNavItems.includes(activeNav);
-  const sidebarNavItems = navItems.map(item => {
-    if (item === "Attendance") {
+  const sidebarNavItems = navItems
+    .filter(item => {
+      if (item === "Dashboard") return canViewDashboard;
+      if (item === "Attendance") return canViewAttendance;
+      return canViewTeam;
+    })
+    .map(item => {
+      if (item === "Attendance") {
+        return {
+          label: item,
+          active: isAttendanceView,
+          expanded: attendanceExpanded,
+          onClick: () => setAttendanceExpanded(prev => !prev),
+          children: attendanceNavItems.map(label => ({
+            label,
+            active: activeNav === label,
+            onClick: () => setActiveNav(label)
+          }))
+        };
+      }
+
       return {
         label: item,
-        active: isAttendanceView,
-        expanded: attendanceExpanded,
-        onClick: () => setAttendanceExpanded(prev => !prev),
-        children: attendanceNavItems.map(label => ({
-          label,
-          active: activeNav === label,
-          onClick: () => setActiveNav(label)
-        }))
+        active: activeNav === item,
+        onClick: () => setActiveNav(item)
       };
-    }
-
-    return {
-      label: item,
-      active: activeNav === item,
-      onClick: () => setActiveNav(item)
-    };
-  });
+    });
   const [attendanceLog, setAttendanceLog] = useState({
     timeInAt: null,
     timeOutAt: null,
@@ -50,6 +57,10 @@ export default function EmployeeDashboard() {
   const activeCluster = data[0];
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
+  const { can } = usePermissions(user);
+  const canViewDashboard = can("View Dashboard");
+  const canViewTeam = can("View Team");
+  const canViewAttendance = can("View Attendance");
 
   const normalizeSchedule = schedule => {
     if (!schedule) return schedule;
@@ -394,6 +405,18 @@ export default function EmployeeDashboard() {
   }, []);
 
 
+
+  useEffect(() => {
+    const allowedNavs = [];
+    if (canViewDashboard) allowedNavs.push("Dashboard");
+    if (canViewAttendance) allowedNavs.push(...attendanceNavItems);
+    if (canViewTeam) allowedNavs.push("Team", "Schedule");
+
+    if (allowedNavs.length > 0 && !allowedNavs.includes(activeNav)) {
+      setActiveNav(allowedNavs[0]);
+    }
+  }, [activeNav, attendanceNavItems, canViewAttendance, canViewDashboard, canViewTeam]);
+
   const myRequestHighlights = buildRequestHighlights(myRequests);
 
   const handleLogout = async () => {
@@ -437,7 +460,7 @@ export default function EmployeeDashboard() {
         </header>
 
         <section className="content content-muted">
-            {activeNav === "Dashboard" && (
+            {canViewDashboard && activeNav === "Dashboard" && (
             <MainDashboard
               attendanceControls={{
                 timeInAt: attendanceLog.timeInAt,
@@ -460,11 +483,11 @@ export default function EmployeeDashboard() {
             />
           )}
 
-          {data.length === 0 && !isAttendanceView && (
+          {canViewTeam && data.length === 0 && !isAttendanceView && (
             <div className="empty-state">No team cluster details available.</div>
           )}
 
-          {(isAttendanceView || data.length > 0) && activeNav !== "Dashboard" && (
+          {((canViewAttendance && isAttendanceView) || (canViewTeam && data.length > 0)) && activeNav !== "Dashboard" && (
             <div className="employee-panel">
               {activeNav === "My Attendance" && (
                 <div className="employee-card">

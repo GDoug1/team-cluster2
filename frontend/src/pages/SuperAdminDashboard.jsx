@@ -4,6 +4,7 @@ import DashboardSidebar from "../components/DashboardSidebar";
 import MainDashboard from "./MainDashboard";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
+import usePermissions from "../hooks/usePermissions";
 import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
 import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
@@ -77,27 +78,48 @@ export default function SuperAdminDashboard() {
   const [editForm, setEditForm] = useState({ timeInAt: "", timeOutAt: "", tag: "", note: "" });
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
+  const { can } = usePermissions(user);
+  const canViewDashboard = can("View Dashboard");
+  const canViewTeam = can("View Team");
+  const canViewAttendance = can("View Attendance");
   const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "Team Request"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
+  const canViewEmployeeList = can("View Employee List");
+  const canAccessControlPanel = can("Access Control Panel");
   const navItems = [
-    { label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") },
-    { label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") },
-    {
-      label: "Attendance",
-      active: isAttendanceView,
-      expanded: attendanceExpanded,
-      onClick: () => setAttendanceExpanded(prev => !prev),
-      children: attendanceNavItems.map(label => ({
-        label,
-        active: (label === "My Attendance" && activeNav === "Attendance") || activeNav === label,
-        onClick: () => setActiveNav(label === "My Attendance" ? "Attendance" : label)
-      }))
-    },
-    { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") },
-    { label: "Employees", active: activeNav === "Employees", onClick: () => setActiveNav("Employees") },
-    { label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }
-  ];
+    canViewDashboard ? { label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") } : null,
+    canViewTeam ? { label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") } : null,
+    canViewAttendance
+      ? {
+          label: "Attendance",
+          active: isAttendanceView,
+          expanded: attendanceExpanded,
+          onClick: () => setAttendanceExpanded(prev => !prev),
+          children: attendanceNavItems.map(label => ({
+            label,
+            active: (label === "My Attendance" && activeNav === "Attendance") || activeNav === label,
+            onClick: () => setActiveNav(label === "My Attendance" ? "Attendance" : label)
+          }))
+        }
+      : null,
+    canViewTeam ? { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") } : null,
+    canViewEmployeeList ? { label: "Employees", active: activeNav === "Employees", onClick: () => setActiveNav("Employees") } : null,
+    canAccessControlPanel ? { label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") } : null
+  ].filter(Boolean);
+  useEffect(() => {
+    const allowedNavs = [];
+    if (canViewDashboard) allowedNavs.push("Dashboard");
+    if (canViewTeam) allowedNavs.push("Team", "Schedule");
+    if (canViewAttendance) allowedNavs.push("Attendance", ...attendanceNavItems.filter(label => label !== "My Attendance"));
+    if (canViewEmployeeList) allowedNavs.push("Employees");
+    if (canAccessControlPanel) allowedNavs.push("Control Panel");
+
+    if (allowedNavs.length > 0 && !allowedNavs.includes(activeNav)) {
+      setActiveNav(allowedNavs[0]);
+    }
+  }, [activeNav, canAccessControlPanel, canViewAttendance, canViewDashboard, canViewEmployeeList, canViewTeam]);
+
   const formatTimeRange = daySchedule => {
     if (!daySchedule || typeof daySchedule !== "object") return "—";
     return FIXED_SHIFT_LABEL;
@@ -526,7 +548,7 @@ const handleOpenRejectModal = cluster => {
       />
 
       <main className="main">
-        {activeNav === "Dashboard" ? (
+        {canViewDashboard && activeNav === "Dashboard" ? (
           <section className="content">
             <MainDashboard
               schedule={adminMainDashboardSchedule}
@@ -536,7 +558,7 @@ const handleOpenRejectModal = cluster => {
               }}
             />
           </section>
-        ) : activeNav === "Team" ? (
+        ) : canViewTeam && activeNav === "Team" ? (
           <>
             <header className="topbar">
               <div>
@@ -599,7 +621,7 @@ const handleOpenRejectModal = cluster => {
               )}
           </section>
           </>
-        ) : activeNav === "Attendance" ? (
+        ) : canViewAttendance && activeNav === "Attendance" ? (
           <section className="content">
             <div className="section-title">Coach Attendance</div>
             <AttendanceHistoryHighlights />
@@ -613,7 +635,7 @@ const handleOpenRejectModal = cluster => {
               onExternalDateFilterChange={setAttendanceDate}
             />
           </section>
-          ) : activeNav === "All Attendance" ? (
+          ) : canViewAttendance && activeNav === "All Attendance" ? (
           <section className="content">
             <div className="section-title">All Attendance</div>
             <AttendanceHistoryHighlights />
@@ -627,17 +649,17 @@ const handleOpenRejectModal = cluster => {
               onExternalDateFilterChange={setAttendanceDate}
             />
           </section>
-        ) : activeNav === "My Requests" ? (
+        ) : canViewAttendance && activeNav === "My Requests" ? (
           <section className="content">
             <div className="section-title">My Requests</div>
             <AttendanceHistoryHighlights highlights={myRequestHighlights} />
             <DataPanel type="requests" records={myRequests} />
           </section>
-        ) : activeNav === "My Filing Center" ? (
+        ) : canViewAttendance && activeNav === "My Filing Center" ? (
           <section className="content">
             <FilingCenterPanel onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
           </section>
-        ) : activeNav === "Team Request" ? (
+        ) : canViewAttendance && activeNav === "Team Request" ? (
           <section className="content">
             <div className="section-title">Team Requests</div>
             <p className="table-subtitle">Endorsed team requests waiting for final super admin approval or rejection.</p>
@@ -654,7 +676,7 @@ const handleOpenRejectModal = cluster => {
               ]}
             />
           </section>
-          ) : activeNav === "Control Panel" ? (
+          ) : canAccessControlPanel && activeNav === "Control Panel" ? (
           <ControlPanelSection />
         ) : (
           <section className="content">
