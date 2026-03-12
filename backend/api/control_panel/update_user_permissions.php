@@ -9,17 +9,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 session_start();
 
+require_once "../utils/auth.php";
+requireSuperAdmin();
+
 require_once "../config/database.php";
 
 header('Content-Type: application/json');
 
-/* Read raw request body */
 $raw = file_get_contents("php://input");
-
-/* Decode JSON */
 $data = json_decode($raw, true);
 
-/* Debug if JSON is missing */
 if (!$data) {
     echo json_encode([
         "success" => false,

@@ -2,17 +2,10 @@
 require_once "../cors.php";
 session_start();
 
-if (!isset($_SESSION['user_id'], $_SESSION['employee_id'])) {
-    http_response_code(401);
-    echo json_encode([
-        "success" => false,
-        "message" => "Not authenticated"
-    ]);
-    exit();
-}
+require_once "../utils/auth.php";
+requireAuthenticated();
 
 require_once "../config/database.php";
-
 
 $sql = "
 SELECT 

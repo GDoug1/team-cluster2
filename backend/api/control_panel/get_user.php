@@ -3,25 +3,20 @@
 require_once "../cors.php";
 session_start();
 
-if (!isset($_SESSION['user_id'], $_SESSION['employee_id'])) {
-    http_response_code(401);
-    echo json_encode([
-        "success" => false,
-        "message" => "Not authenticated"
-    ]);
-    exit();
-}
+require_once "../utils/auth.php";
+requireAuthenticated();
 
 require_once "../config/database.php";
 
+$currentUserId = getSessionUserId();
 $stmt = $conn->prepare("
     SELECT first_name
     FROM employees
-    WHERE employee_id = ?
+    WHERE user_id = ?
     LIMIT 1
 ");
 
-$stmt->bind_param("i", $_SESSION['employee_id']);
+$stmt->bind_param("i", $currentUserId);
 $stmt->execute();
 $result = $stmt->get_result();
 
@@ -40,7 +35,7 @@ echo json_encode([
     "success" => true,
     "user" => [
         "first_name" => $employee['first_name'],
-        "role_name"  => $_SESSION['role_name'] ?? null,
+        "role_name"  => getSessionRole(),
         "permissions" => $_SESSION['permissions'] ?? []
     ]
 ]);

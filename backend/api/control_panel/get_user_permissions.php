@@ -3,10 +3,8 @@
 require_once "../cors.php";
 session_start();
 
-if (!isset($_SESSION['role_name']) || $_SESSION['role_name'] !== 'Superadmin') {
-    http_response_code(403);
-    exit();
-}
+require_once "../utils/auth.php";
+requireSuperAdmin();
 
 require_once "../config/database.php";
 

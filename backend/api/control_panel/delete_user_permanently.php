@@ -5,21 +5,11 @@ header("Content-Type: application/json");
 
 session_start();
 
-if (!isset($_SESSION['role_name']) || $_SESSION['role_name'] !== 'Superadmin') {
-    http_response_code(403);
-    echo json_encode([
-        "success" => false,
-        "message" => "Unauthorized"
-    ]);
-    exit();
-}
+require_once "../utils/auth.php";
+requireSuperAdmin();
 
 require_once "../config/database.php";
 require_once "../utils/logger.php";
-
-/* =========================
-   GET EMPLOYEE ID
-========================= */
 
 if (!isset($_GET['employee_id'])) {
     echo json_encode([
@@ -30,10 +20,6 @@ if (!isset($_GET['employee_id'])) {
 }
 
 $employee_id = intval($_GET['employee_id']);
-
-/* =========================
-   DELETE EMPLOYEE
-========================= */
 
 $stmt = $conn->prepare("
 DELETE FROM employees
@@ -50,15 +36,11 @@ if (!$stmt->execute()) {
     exit();
 }
 
-/* =========================
-   LOG ACTION
-========================= */
-
 logAction(
     $conn,
-    $_SESSION['user_id'],
+    getSessionUserId(),
     "Deleted Employee Permanently",
-    $employee_id
+    "Employee ID: $employee_id"
 );
 
 echo json_encode([
