@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import AdminDashboard from "./pages/AdminDashboard";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import CoachDashboard from "./pages/CoachDashboard";
 import EmployeeDashboard from "./pages/EmployeeDashboard.jsx";
 
@@ -18,6 +19,8 @@ const renderRoute = path => {
       return <Register />;
     case "/admin":
       return <AdminDashboard />;
+    case "/super-admin":
+      return <SuperAdminDashboard />;
     case "/coach":
       return <CoachDashboard />;
     case "/coach/attendance":

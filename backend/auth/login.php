@@ -15,6 +15,9 @@ session_start();
 
 function normalizeRole(?string $roleName): string {
     $role = strtolower(trim((string)$roleName));
+    if (str_contains($role, 'super admin')) {
+        return 'super admin';
+    }
     if ($role === 'administrator') {
         return 'admin';
     }
@@ -58,7 +61,9 @@ $user = $stmt->get_result()->fetch_assoc();
 if ($user && password_verify($password, $user['password'])) {
     $role = normalizeRole($user['role_name'] ?? '');
     $redirect = '/employee';
-    if ($role === 'admin') {
+    if ($role === 'super admin') {
+        $redirect = '/super-admin';
+    } elseif ($role === 'admin') {
         $redirect = '/admin';
     } elseif ($role === 'coach') {
         $redirect = '/coach';

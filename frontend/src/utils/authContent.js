@@ -20,4 +20,4 @@ export const registerHighlights = [
   },
 ];
 
-export const demoAccounts = ["coach@mail.com", "employee@mail.com", "admin@mail.com"];
+export const demoAccounts = ["coach@mail.com", "employee@mail.com", "admin@mail.com", "superadmin@mail.com"];

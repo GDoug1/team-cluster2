@@ -27,11 +27,13 @@ export default function Login() {
         }));
       }
       const redirectPath = data.redirect
-        || (normalizedRole.includes("admin")
-          ? "/admin"
-          : normalizedRole.includes("coach")
-            ? "/coach"
-            : "/employee");
+        || (normalizedRole.includes("super admin")
+          ? "/super-admin"
+          : normalizedRole.includes("admin")
+            ? "/admin"
+            : normalizedRole.includes("coach")
+              ? "/coach"
+              : "/employee");
 
       window.location.href = redirectPath;
     } catch (err) {
