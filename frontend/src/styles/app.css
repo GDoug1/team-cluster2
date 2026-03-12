@@ -557,6 +557,26 @@ body {
   border-bottom: none;
 }
 
+.employee-list-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.employee-list-count {
+  font-size: 14px;
+  color: #374151;
+  margin-top: -8px;
+  margin-bottom: 10px;
+}
+
+.employee-list-header,
+.employee-list-row {
+  grid-template-columns: 0.4fr 1.2fr 1fr 1fr 0.8fr 0.8fr 0.8fr 1.1fr;
+}
+
 .table-cell {
   color: #1f2937;
 }
@@ -660,6 +680,94 @@ body {
   min-height: 0;
   overflow-y: auto;
   padding-right: 6px;
+}
+
+.add-employee-modal {
+  width: min(1220px, 96vw);
+  border-radius: 20px;
+  padding: 34px 40px 26px;
+}
+
+.add-employee-management-form {
+  display: grid;
+  gap: 20px;
+}
+
+.add-employee-tabs {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0;
+}
+
+.add-employee-tab {
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  font-size: 16px;
+  font-weight: 500;
+  padding: 12px 24px;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+}
+
+.add-employee-tab.active {
+  color: #1d7ff2;
+  border-bottom-color: #1d7ff2;
+}
+
+.add-employee-tab-panel {
+  min-height: 300px;
+  padding-top: 8px;
+}
+
+.add-employee-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.add-employee-grid .form-field {
+  margin: 0;
+}
+
+.add-employee-grid .form-field input,
+.add-employee-grid .form-field select {
+  width: 100%;
+  min-height: 62px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 16px;
+  color: #374151;
+  padding: 12px 18px;
+  background: #ffffff;
+}
+
+.add-employee-last-name {
+  grid-column: 1 / span 1;
+}
+
+.add-employee-full-width {
+  grid-column: 1 / -1;
+}
+
+.add-employee-form-error {
+  margin-top: -8px;
+}
+
+.add-employee-footer-actions {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.add-employee-footer-actions .btn {
+  padding: 10px 24px;
+  font-size: 16px;
+  border-radius: 10px;
 }
 
 .modal-text {
@@ -1668,7 +1776,7 @@ body {
 
 .auth-panel h1 {
   margin: 0;
-  font-size: 32px;
+  font-size: 16px;
   line-height: 1.2;
 }
 
@@ -1882,7 +1990,7 @@ body {
 
 .attendance-history-highlight-value {
   color: #cbd5e1;
-  font-size: 34px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1;
 }
@@ -2178,7 +2286,7 @@ body {
 }
 
 .team-cluster-summary-card strong {
-  font-size: 28px;
+  font-size: 16px;
   line-height: 1;
 }
 
@@ -2249,7 +2357,7 @@ body {
 .filing-center-header p {
   margin: 8px 0 0;
   color: #5f7390;
-  font-size: 30px;
+  font-size: 16px;
 }
 
 .filing-center-shell {
@@ -2309,7 +2417,7 @@ body {
 
 .filing-center-panel-header {
   padding: 22px 28px;
-  font-size: 34px;
+  font-size: 16px;
   font-weight: 700;
   color: #13294a;
   border-bottom: 1px solid #eef2f7;
@@ -2451,7 +2559,7 @@ body {
   border: 1px solid #d4d9e1;
   background: #f3f4f6;
   color: #b5bcc8;
-  font-size: 34px;
+  font-size: 16px;
   padding: 14px 18px;
   border-radius: 2px;
 }
@@ -2531,7 +2639,7 @@ body {
   }
 
   .offline-data-empty-title {
-    font-size: 30px;
+    font-size: 16px;
   }
 
   .offline-data-empty-subtitle {

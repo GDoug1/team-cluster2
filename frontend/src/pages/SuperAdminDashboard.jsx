@@ -60,6 +60,29 @@ export default function SuperAdminDashboard() {
   const [teamRequests, setTeamRequests] = useState([]);
   const [teamRequestsError, setTeamRequestsError] = useState("");
   const [requestActionLoadingId, setRequestActionLoadingId] = useState("");
+  const [employees, setEmployees] = useState([]);
+  const [employeeError, setEmployeeError] = useState("");
+  const [employeeLoading, setEmployeeLoading] = useState(false);
+  const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);
+  const [isAddingEmployee, setIsAddingEmployee] = useState(false);
+  const [addEmployeeError, setAddEmployeeError] = useState("");
+  const [addEmployeeActiveTab, setAddEmployeeActiveTab] = useState("personal");
+  const [addEmployeeForm, setAddEmployeeForm] = useState({
+    first_name: "",
+    middle_name: "",
+    last_name: "",
+    address: "",
+    birthdate: "",
+    contact_number: "",
+    civil_status: "",
+    personal_email: "",
+    work_email: "",
+    position: "",
+    account: "",
+    employee_type: "",
+    employment_status: "Active",
+    date_hired: ""
+  });
   const [scheduleModalMessage, setScheduleModalMessage] = useState("");
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
   const [scheduleForm, setScheduleForm] = useState({
@@ -240,6 +263,25 @@ export default function SuperAdminDashboard() {
       });
   }, [activeNav]);
 
+  const fetchEmployees = useCallback(async () => {
+    setEmployeeLoading(true);
+    setEmployeeError("");
+    try {
+      const data = await apiFetch("api/admin/employee_management.php");
+      setEmployees(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setEmployees([]);
+      setEmployeeError(error?.error ?? "Unable to load employees.");
+    } finally {
+      setEmployeeLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeNav !== "Employees") return;
+    fetchEmployees();
+  }, [activeNav, fetchEmployees]);
+
   const handleAdminTeamRequestAction = async (request, status) => {
     if (!request?.id || !request?.request_source) return;
 
@@ -322,6 +364,65 @@ export default function SuperAdminDashboard() {
     } finally {
       localStorage.removeItem("teamClusterUser");
       window.location.href = "/login";
+    }
+  };
+
+  const handleAddEmployeeChange = event => {
+    const { name, value } = event.target;
+    setAddEmployeeForm(current => ({ ...current, [name]: value }));
+  };
+
+  const handleCloseAddEmployeeModal = () => {
+    setIsAddEmployeeModalOpen(false);
+    setIsAddingEmployee(false);
+    setAddEmployeeError("");
+    setAddEmployeeActiveTab("personal");
+    setAddEmployeeForm({
+      first_name: "",
+      middle_name: "",
+      last_name: "",
+      address: "",
+      birthdate: "",
+      contact_number: "",
+      civil_status: "",
+      personal_email: "",
+      work_email: "",
+      position: "",
+      account: "",
+      employee_type: "",
+      employment_status: "Active",
+      date_hired: ""
+    });
+  };
+
+  const handleSubmitAddEmployee = async event => {
+    event.preventDefault();
+    if (isAddingEmployee) return;
+
+    setIsAddingEmployee(true);
+    setAddEmployeeError("");
+    try {
+      const response = await apiFetch("api/admin/employee_management.php", {
+        method: "POST",
+        body: JSON.stringify({
+          ...addEmployeeForm,
+          email: addEmployeeForm.work_email,
+          employment_status: addEmployeeForm.employment_status || "Active"
+        })
+      });
+
+      const generatedEmail = response?.generated_account?.email;
+      const generatedPassword = response?.generated_account?.password;
+      if (generatedEmail && generatedPassword) {
+        window.alert(`Employee created.\nEmail: ${generatedEmail}\nPassword: ${generatedPassword}`);
+      }
+
+      handleCloseAddEmployeeModal();
+      await fetchEmployees();
+    } catch (error) {
+      setAddEmployeeError(error?.error ?? error?.message ?? "Unable to add employee.");
+    } finally {
+      setIsAddingEmployee(false);
     }
   };
 
@@ -654,6 +755,59 @@ const handleOpenRejectModal = cluster => {
               ]}
             />
           </section>
+          ) : activeNav === "Employees" ? (
+          <section className="content">
+            <div className="employee-list-toolbar">
+              <div>
+                <div className="section-title">EMPLOYEE LIST</div>
+                <div className="employee-list-count">{employees.length} Employees</div>
+              </div>
+              <button
+                className="btn primary"
+                type="button"
+                onClick={() => {
+                  setAddEmployeeActiveTab("personal");
+                  setAddEmployeeError("");
+                  setIsAddEmployeeModalOpen(true);
+                }}
+              >
+                + Add Employee
+              </button>
+            </div>
+
+            {employeeError && <div className="error">{employeeError}</div>}
+
+            {employeeLoading ? (
+              <div className="empty-state">Loading employees...</div>
+            ) : employees.length === 0 ? (
+              <div className="empty-state">No employees found.</div>
+            ) : (
+              <div className="table-card">
+                <div className="table-header employee-list-header">
+                  <div>ID</div>
+                  <div>Name</div>
+                  <div>Position</div>
+                  <div>Account</div>
+                  <div>Type</div>
+                  <div>Status</div>
+                  <div>Hired</div>
+                  <div>Info</div>
+                </div>
+                {employees.map(employee => (
+                  <div key={employee.id} className="table-row employee-list-row">
+                    <div className="table-cell">{employee.id}</div>
+                    <div className="table-cell">{employee.fullname || "—"}</div>
+                    <div className="table-cell">{employee.position || "—"}</div>
+                    <div className="table-cell">{employee.account || "—"}</div>
+                    <div className="table-cell">{employee.employee_type || "—"}</div>
+                    <div className="table-cell">{employee.employment_status || "—"}</div>
+                    <div className="table-cell">{formatDate(employee.date_hired)}</div>
+                    <div className="table-cell muted">{employee.email || "—"}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
           ) : activeNav === "Control Panel" ? (
           <ControlPanelSection />
         ) : (
@@ -899,6 +1053,114 @@ const handleOpenRejectModal = cluster => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isAddEmployeeModalOpen && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="add-employee-title">
+          <div className="modal-card add-employee-modal">
+            <div className="modal-header">
+              <div>
+                <div id="add-employee-title" className="modal-title">Add Employee</div>
+              </div>
+            </div>
+
+            <form className="modal-body add-employee-management-form" onSubmit={handleSubmitAddEmployee}>
+              <div className="add-employee-tabs" role="tablist" aria-label="Add employee sections">
+                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "personal"} className={`add-employee-tab ${addEmployeeActiveTab === "personal" ? "active" : ""}`} onClick={() => setAddEmployeeActiveTab("personal")}>Personal Information</button>
+                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "employment"} className={`add-employee-tab ${addEmployeeActiveTab === "employment" ? "active" : ""}`} onClick={() => setAddEmployeeActiveTab("employment")}>Employment Details</button>
+                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "benefits"} className={`add-employee-tab ${addEmployeeActiveTab === "benefits" ? "active" : ""}`} onClick={() => setAddEmployeeActiveTab("benefits")}>Benefit Details</button>
+              </div>
+
+              {addEmployeeActiveTab === "personal" && (
+                <div className="add-employee-tab-panel" role="tabpanel">
+                  <div className="add-employee-grid">
+                    <label className="form-field" htmlFor="employee-first-name">
+                      <input id="employee-first-name" name="first_name" placeholder="First Name" value={addEmployeeForm.first_name} onChange={handleAddEmployeeChange} required />
+                    </label>
+                    <label className="form-field" htmlFor="employee-middle-name">
+                      <input id="employee-middle-name" name="middle_name" placeholder="Middle Name" value={addEmployeeForm.middle_name} onChange={handleAddEmployeeChange} />
+                    </label>
+                    <label className="form-field add-employee-last-name" htmlFor="employee-last-name">
+                      <input id="employee-last-name" name="last_name" placeholder="Last Name" value={addEmployeeForm.last_name} onChange={handleAddEmployeeChange} required />
+                    </label>
+                    <label className="form-field add-employee-full-width" htmlFor="employee-address">
+                      <input id="employee-address" name="address" placeholder="Address" value={addEmployeeForm.address} onChange={handleAddEmployeeChange} />
+                    </label>
+                    <label className="form-field" htmlFor="employee-birthdate">
+                      <input id="employee-birthdate" type="date" name="birthdate" value={addEmployeeForm.birthdate} onChange={handleAddEmployeeChange} />
+                    </label>
+                    <label className="form-field" htmlFor="employee-contact-number">
+                      <input id="employee-contact-number" name="contact_number" placeholder="Contact Number" value={addEmployeeForm.contact_number} onChange={handleAddEmployeeChange} />
+                    </label>
+                    <label className="form-field" htmlFor="employee-civil-status">
+                      <select id="employee-civil-status" name="civil_status" value={addEmployeeForm.civil_status} onChange={handleAddEmployeeChange}>
+                        <option value="">Civil Status</option>
+                        <option value="Single">Single</option>
+                        <option value="Married">Married</option>
+                        <option value="Widowed">Widowed</option>
+                        <option value="Separated">Separated</option>
+                      </select>
+                    </label>
+                    <label className="form-field" htmlFor="employee-personal-email">
+                      <input id="employee-personal-email" type="email" name="personal_email" placeholder="Personal Email" value={addEmployeeForm.personal_email} onChange={handleAddEmployeeChange} />
+                    </label>
+                    <label className="form-field" htmlFor="employee-work-email">
+                      <input id="employee-work-email" type="email" name="work_email" placeholder="Work Email" value={addEmployeeForm.work_email} onChange={handleAddEmployeeChange} required />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {addEmployeeActiveTab === "employment" && (
+                <div className="add-employee-tab-panel" role="tabpanel">
+                  <div className="add-employee-grid">
+                    <label className="form-field" htmlFor="employee-position">
+                      <select id="employee-position" name="position" value={addEmployeeForm.position} onChange={handleAddEmployeeChange}>
+                        <option value="">Select Position</option>
+                        <option value="Customer Support">Customer Support</option>
+                        <option value="Team Leader">Team Leader</option>
+                        <option value="QA Specialist">QA Specialist</option>
+                      </select>
+                    </label>
+                    <label className="form-field" htmlFor="employee-account">
+                      <select id="employee-account" name="account" value={addEmployeeForm.account} onChange={handleAddEmployeeChange}>
+                        <option value="">Select Account</option>
+                        <option value="Retail">Retail</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="Telecom">Telecom</option>
+                      </select>
+                    </label>
+                    <label className="form-field" htmlFor="employee-type">
+                      <select id="employee-type" name="employee_type" value={addEmployeeForm.employee_type} onChange={handleAddEmployeeChange}>
+                        <option value="">Select Employee Type</option>
+                        <option value="Regular">Regular</option>
+                        <option value="Probationary">Probationary</option>
+                        <option value="Contractual">Contractual</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {addEmployeeActiveTab === "benefits" && (
+                <div className="add-employee-tab-panel" role="tabpanel">
+                  <p className="modal-text">Benefits module coming soon...</p>
+                </div>
+              )}
+
+              {addEmployeeError && <div className="error add-employee-form-error">{addEmployeeError}</div>}
+
+              <div className="add-employee-footer-actions">
+                <button className="btn secondary" type="button" onClick={handleCloseAddEmployeeModal} disabled={isAddingEmployee}>
+                  Close
+                </button>
+                <button className="btn primary" type="submit" disabled={isAddingEmployee}>
+                  {isAddingEmployee ? "Creating..." : "Create"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
