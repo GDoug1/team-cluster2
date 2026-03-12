@@ -2,6 +2,48 @@ import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
 import "../styles/ControlPanel.css";
 
+const GENERAL_ROLE_LAYOUT = [
+  {
+    role_name: "Super Admin",
+    permissions: [
+      "Add Employee",
+      "Edit Employee",
+      "Delete Employee",
+      "Set Attendance",
+      "Edit Attendance",
+      "View Dashboard",
+      "View Team",
+      "View Attendance",
+      "View Employee List",
+      "Edit Profile",
+      "Access Control Panel"
+    ]
+  },
+  {
+    role_name: "Admin",
+    permissions: [
+      "Add Employee",
+      "Edit Employee",
+      "Delete Employee",
+      "Set Attendance",
+      "Edit Attendance",
+      "View Dashboard",
+      "View Team",
+      "View Attendance",
+      "View Employee List",
+      "Edit Profile"
+    ]
+  },
+  {
+    role_name: "Team Coach",
+    permissions: ["Edit Attendance", "View Dashboard", "View Team", "View Attendance", "View Employee List"]
+  },
+  {
+    role_name: "Employee",
+    permissions: ["View Dashboard", "View Team", "View Attendance"]
+  }
+];
+
 export default function ControlPanelSection() {
   const [activeTab, setActiveTab] = useState("General");
   const [roles, setRoles] = useState([]);
@@ -62,6 +104,18 @@ export default function ControlPanelSection() {
     [roles]
   );
 
+  const generalRoles = useMemo(
+    () =>
+      GENERAL_ROLE_LAYOUT.map(layoutRole => {
+        const roleFromApi = roles.find(role => role.role_name === layoutRole.role_name);
+        return {
+          ...layoutRole,
+          role_id: roleFromApi?.role_id
+        };
+      }),
+    [roles]
+  );
+
   const openRoleEditor = role => {
     setSelectedRole(role);
     setTempPermissions(Array.isArray(role.permissions) ? [...role.permissions] : []);
@@ -74,7 +128,7 @@ export default function ControlPanelSection() {
   };
 
   const saveRolePermissions = async () => {
-    if (!selectedRole) return;
+    if (!selectedRole || typeof selectedRole.role_id === "undefined") return;
 
     await apiFetch("api/control_panel/update_role_permissions.php", {
       method: "POST",
@@ -165,8 +219,8 @@ export default function ControlPanelSection() {
 
         {activeTab === "General" && (
           <div className="control-panel-grid">
-            {roles.map(role => (
-              <article key={role.role_id} className="control-panel-card">
+            {generalRoles.map(role => (
+              <article key={role.role_name} className="control-panel-card">
                 <header className="control-panel-card-header">{role.role_name}</header>
                 <div className="control-panel-card-body">
                   <p className="control-panel-permission-title">Permissions:</p>
