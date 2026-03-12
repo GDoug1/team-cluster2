@@ -108,15 +108,23 @@ export default function ControlPanelSection() {
     () =>
       GENERAL_ROLE_LAYOUT.map(layoutRole => {
         const roleFromApi = roles.find(role => role.role_name === layoutRole.role_name);
+        const isSuperAdminRole = layoutRole.role_name === "Super Admin";
         return {
           ...layoutRole,
-          role_id: roleFromApi?.role_id
+          role_id: roleFromApi?.role_id,
+          permissions: isSuperAdminRole
+            ? layoutRole.permissions
+            : Array.isArray(roleFromApi?.permissions)
+              ? roleFromApi.permissions
+              : layoutRole.permissions,
+          isEditable: !isSuperAdminRole
         };
       }),
     [roles]
   );
 
   const openRoleEditor = role => {
+    if (!role?.isEditable) return;
     setSelectedRole(role);
     setTempPermissions(Array.isArray(role.permissions) ? [...role.permissions] : []);
   };
@@ -229,9 +237,13 @@ export default function ControlPanelSection() {
                       <li key={`${role.role_id}-${permission}`}>{permission}</li>
                     ))}
                   </ul>
-                  <button type="button" className="control-panel-permission-btn" onClick={() => openRoleEditor(role)}>
-                    Edit Permissions
-                  </button>
+                  {role.isEditable ? (
+                    <button type="button" className="control-panel-permission-btn" onClick={() => openRoleEditor(role)}>
+                      Edit Permissions
+                    </button>
+                  ) : (
+                    <p className="control-panel-note">Super Admin always has full access.</p>
+                  )}
                 </div>
               </article>
             ))}

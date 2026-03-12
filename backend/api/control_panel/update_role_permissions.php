@@ -26,6 +26,21 @@ if (!$data || !isset($data['role_id'], $data['permissions'])) {
 $role_id = $data['role_id'];
 $permissions = $data['permissions'];
 
+$roleStmt = $conn->prepare("SELECT role_name FROM roles WHERE role_id = ? LIMIT 1");
+$roleStmt->bind_param("i", $role_id);
+$roleStmt->execute();
+$roleResult = $roleStmt->get_result()->fetch_assoc();
+$roleName = strtolower(trim((string)($roleResult['role_name'] ?? '')));
+
+if ($roleName === 'super admin') {
+    http_response_code(403);
+    echo json_encode([
+        "success" => false,
+        "message" => "Super Admin permissions are fixed and cannot be edited."
+    ]);
+    exit();
+}
+
 // Delete old permissions
 $stmt = $conn->prepare("DELETE FROM role_permissions WHERE role_id = ?");
 $stmt->bind_param("i", $role_id);
