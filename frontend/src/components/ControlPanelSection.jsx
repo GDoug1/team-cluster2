@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
 import "../styles/ControlPanel.css";
+
+const CONTROL_PANEL_TABS = ["General", "Search", "Logs", "User Archives"];
 
 export default function ControlPanelSection() {
   const [activeTab, setActiveTab] = useState("General");
@@ -8,20 +10,29 @@ export default function ControlPanelSection() {
   const [roles, setRoles] = useState([]);
   const [rolesLoading, setRolesLoading] = useState(true);
   const [rolesError, setRolesError] = useState("");
+
   const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersError, setUsersError] = useState("");
 
   const [selectedRole, setSelectedRole] = useState(null);
   const [tempPermissions, setTempPermissions] = useState([]);
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [userPermissions, setUserPermissions] = useState([]);
+  const [userPermissionLoading, setUserPermissionLoading] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
 
   const [logs, setLogs] = useState([]);
-  const [archivedUsers, setArchivedUsers] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState("");
 
-  const fetchRoles = async () => {
+  const [archivedUsers, setArchivedUsers] = useState([]);
+  const [archivedUsersLoading, setArchivedUsersLoading] = useState(false);
+  const [archivedUsersError, setArchivedUsersError] = useState("");
+
+  const fetchRoles = useCallback(async () => {
     setRolesLoading(true);
     setRolesError("");
 
@@ -29,6 +40,9 @@ export default function ControlPanelSection() {
       const data = await apiFetch("api/control_panel/get_roles_with_permissions.php");
       if (data.success) {
         setRoles(data.data);
+      } else {
+        setRoles([]);
+        setRolesError(data?.message ?? "Unable to load roles.");
       }
     } catch (error) {
       setRoles([]);
@@ -36,19 +50,32 @@ export default function ControlPanelSection() {
     } finally {
       setRolesLoading(false);
     }
-  };
+  }, []);
 
-  const fetchUsers = async () => {
-    const data = await apiFetch("api/control_panel/get_users_with_permissions.php");
-    if (data.success) {
-      setUsers(data.data);
+  const fetchUsers = useCallback(async () => {
+    setUsersLoading(true);
+    setUsersError("");
+
+    try {
+      const data = await apiFetch("api/control_panel/get_users_with_permissions.php");
+      if (data.success) {
+        setUsers(data.data);
+      } else {
+        setUsers([]);
+        setUsersError(data?.message ?? "Unable to load users.");
+      }
+    } catch (error) {
+      setUsers([]);
+      setUsersError(error?.error ?? "Unable to load users. Please refresh and try again.");
+    } finally {
+      setUsersLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchRoles();
     fetchUsers();
-  }, []);
+  }, [fetchRoles, fetchUsers]);
 
   const handleOpenRole = role => {
     setSelectedRole(role);
@@ -80,11 +107,17 @@ export default function ControlPanelSection() {
   };
 
   const handleOpenUserPermissions = async user => {
-    const data = await apiFetch(`api/control_panel/get_user_permissions.php?user_id=${user.id}`);
+    setUserPermissionLoading(true);
 
-    if (data.success) {
-      setSelectedUser(user);
-      setUserPermissions(data.permissions);
+    try {
+      const data = await apiFetch(`api/control_panel/get_user_permissions.php?user_id=${user.id}`);
+
+      if (data.success) {
+        setSelectedUser(user);
+        setUserPermissions(data.permissions);
+      }
+    } finally {
+      setUserPermissionLoading(false);
     }
   };
 
@@ -115,33 +148,59 @@ export default function ControlPanelSection() {
     }
   };
 
-  const fetchLogs = async () => {
-    const data = await apiFetch("api/control_panel/get_logs.php");
+  const fetchLogs = useCallback(async () => {
+    setLogsLoading(true);
+    setLogsError("");
 
-    if (data.success) {
-      setLogs(data.logs);
+    try {
+      const data = await apiFetch("api/control_panel/get_logs.php");
+
+      if (data.success) {
+        setLogs(data.logs);
+      } else {
+        setLogs([]);
+        setLogsError(data?.message ?? "Unable to load logs.");
+      }
+    } catch (error) {
+      setLogs([]);
+      setLogsError(error?.error ?? "Unable to load logs. Please refresh and try again.");
+    } finally {
+      setLogsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (activeTab === "Logs") {
       fetchLogs();
     }
-  }, [activeTab]);
+  }, [activeTab, fetchLogs]);
 
-  const fetchArchivedUsers = async () => {
-    const data = await apiFetch("api/control_panel/get_archived_users.php");
+  const fetchArchivedUsers = useCallback(async () => {
+    setArchivedUsersLoading(true);
+    setArchivedUsersError("");
 
-    if (data.success) {
-      setArchivedUsers(data.users);
+    try {
+      const data = await apiFetch("api/control_panel/get_archived_users.php");
+
+      if (data.success) {
+        setArchivedUsers(data.users);
+      } else {
+        setArchivedUsers([]);
+        setArchivedUsersError(data?.message ?? "Unable to load archived users.");
+      }
+    } catch (error) {
+      setArchivedUsers([]);
+      setArchivedUsersError(error?.error ?? "Unable to load archived users. Please refresh and try again.");
+    } finally {
+      setArchivedUsersLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (activeTab === "User Archives") {
       fetchArchivedUsers();
     }
-  }, [activeTab]);
+  }, [activeTab, fetchArchivedUsers]);
 
   const restoreUser = async id => {
     await apiFetch("api/control_panel/restore_user.php", {
@@ -153,25 +212,33 @@ export default function ControlPanelSection() {
   };
 
   const deleteUser = async id => {
-    const data = await apiFetch(`api/control_panel/delete_user_permanently.php?employee_id=${id}`, {
-      method: "POST"
+    const data = await apiFetch("api/control_panel/delete_user_permanently.php", {
+      method: "POST",
+      body: JSON.stringify({ employee_id: id })
     });
 
     if (data.success) {
       fetchArchivedUsers();
-    } else {
-      alert(data.message);
+      return;
     }
+
+    alert(data.message);
   };
 
-  const filteredUsers = users.filter(user =>
-    Object.values(user)
-      .join(" ")
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
+  const filteredUsers = useMemo(
+    () => users.filter(user =>
+      Object.values(user)
+        .join(" ")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
+    ),
+    [users, searchTerm]
   );
 
-  const allPermissions = [...new Set(roles.flatMap(role => role.permissions ?? []))];
+  const allPermissions = useMemo(
+    () => [...new Set(roles.flatMap(role => role.permissions ?? []))],
+    [roles]
+  );
 
   return (
     <section className="content control-panel-content">
@@ -182,7 +249,7 @@ export default function ControlPanelSection() {
         </div>
 
         <div className="control-panel-tabs">
-          {["General", "Search", "Logs", "User Archives"].map(tab => (
+          {CONTROL_PANEL_TABS.map(tab => (
             <button
               key={tab}
               className={`control-panel-tab ${activeTab === tab ? "active" : ""}`}
@@ -250,117 +317,176 @@ export default function ControlPanelSection() {
               />
             </div>
 
-            <div className="control-panel-table-wrapper">
-              <table className="control-panel-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Full Name</th>
-                    <th>Role</th>
-                    <th>Position</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
+            {usersError && (
+              <div className="control-panel-empty-state" role="alert">
+                <p>{usersError}</p>
+                <button className="control-panel-permission-btn" onClick={fetchUsers}>
+                  Retry
+                </button>
+              </div>
+            )}
 
-                <tbody>
-                  {filteredUsers.map(user => (
-                    <tr key={user.id}>
-                      <td>{user.id}</td>
-                      <td>{user.fullName}</td>
-                      <td>{user.role}</td>
-                      <td>{user.position}</td>
+            {!usersError && usersLoading && <p className="control-panel-status">Loading users...</p>}
 
-                      <td>
-                        <button
-                          className="control-panel-permission-btn"
-                          onClick={() => handleOpenUserPermissions(user)}
-                        >
-                          Permissions
-                        </button>
-                      </td>
+            {!usersError && !usersLoading && (
+              <div className="control-panel-table-wrapper">
+                <table className="control-panel-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Full Name</th>
+                      <th>Role</th>
+                      <th>Position</th>
+                      <th>Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+
+                  <tbody>
+                    {filteredUsers.map(user => (
+                      <tr key={user.id}>
+                        <td>{user.id}</td>
+                        <td>{user.fullName}</td>
+                        <td>{user.role}</td>
+                        <td>{user.position}</td>
+
+                        <td>
+                          <button
+                            className="control-panel-permission-btn"
+                            disabled={userPermissionLoading}
+                            onClick={() => handleOpenUserPermissions(user)}
+                          >
+                            {userPermissionLoading ? "Loading..." : "Permissions"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredUsers.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="control-panel-status">No users found.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </>
         )}
 
         {activeTab === "User Archives" && (
-          <div className="control-panel-table-wrapper">
-            <table className="control-panel-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Full Name</th>
-                  <th>Position</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
+          <>
+            {archivedUsersError && (
+              <div className="control-panel-empty-state" role="alert">
+                <p>{archivedUsersError}</p>
+                <button className="control-panel-permission-btn" onClick={fetchArchivedUsers}>
+                  Retry
+                </button>
+              </div>
+            )}
 
-              <tbody>
-                {archivedUsers.map(user => (
-                  <tr key={user.employee_id}>
-                    <td>{user.employee_id}</td>
-                    <td>{user.fullName}</td>
-                    <td>{user.position}</td>
+            {!archivedUsersError && archivedUsersLoading && <p className="control-panel-status">Loading archived users...</p>}
 
-                    <td>
-                      <button
-                        className="control-panel-restore-btn"
-                        onClick={() => {
-                          if (confirm("Restore this employee?")) {
-                            restoreUser(user.employee_id);
-                          }
-                        }}
-                      >
-                        Restore
-                      </button>
+            {!archivedUsersError && !archivedUsersLoading && (
+              <div className="control-panel-table-wrapper">
+                <table className="control-panel-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Full Name</th>
+                      <th>Position</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
 
-                      <button
-                        className="control-panel-delete-btn"
-                        onClick={() => {
-                          if (confirm("Permanently delete this employee?")) {
-                            deleteUser(user.employee_id);
-                          }
-                        }}
-                      >
-                        Delete Permanently
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  <tbody>
+                    {archivedUsers.map(user => (
+                      <tr key={user.employee_id}>
+                        <td>{user.employee_id}</td>
+                        <td>{user.fullName}</td>
+                        <td>{user.position}</td>
+
+                        <td>
+                          <button
+                            className="control-panel-restore-btn"
+                            onClick={() => {
+                              if (confirm("Restore this employee?")) {
+                                restoreUser(user.employee_id);
+                              }
+                            }}
+                          >
+                            Restore
+                          </button>
+
+                          <button
+                            className="control-panel-delete-btn"
+                            onClick={() => {
+                              if (confirm("Permanently delete this employee?")) {
+                                deleteUser(user.employee_id);
+                              }
+                            }}
+                          >
+                            Delete Permanently
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {archivedUsers.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="control-panel-status">No archived users found.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
 
         {activeTab === "Logs" && (
-          <div className="control-panel-table-wrapper">
-            <table className="control-panel-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>User</th>
-                  <th>Action</th>
-                  <th>Target</th>
-                  <th>Date</th>
-                </tr>
-              </thead>
+          <>
+            {logsError && (
+              <div className="control-panel-empty-state" role="alert">
+                <p>{logsError}</p>
+                <button className="control-panel-permission-btn" onClick={fetchLogs}>
+                  Retry
+                </button>
+              </div>
+            )}
 
-              <tbody>
-                {logs.map(log => (
-                  <tr key={log.id}>
-                    <td>{log.id}</td>
-                    <td>{log.user}</td>
-                    <td>{log.action}</td>
-                    <td>{log.target}</td>
-                    <td>{log.date}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            {!logsError && logsLoading && <p className="control-panel-status">Loading logs...</p>}
+
+            {!logsError && !logsLoading && (
+              <div className="control-panel-table-wrapper">
+                <table className="control-panel-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>User</th>
+                      <th>Action</th>
+                      <th>Target</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {logs.map(log => (
+                      <tr key={log.id}>
+                        <td>{log.id}</td>
+                        <td>{log.user}</td>
+                        <td>{log.action}</td>
+                        <td>{log.target}</td>
+                        <td>{log.date}</td>
+                      </tr>
+                    ))}
+                    {logs.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="control-panel-status">No logs found.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </div>
 
