@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import Sidebar from "./DashboardSidebar";
 import "../styles/ControlPanel.css";
 import DashboardSidebar from "./DashboardSidebar";
+import { apiFetch } from "../api/api";
 
 /* =========================
    TYPES
@@ -46,12 +46,7 @@ const ControlPanel = () => {
   ========================== */
 
   const fetchRoles = async () => {
-    const res = await fetch(
-      "http://localhost/hris/backend/control_panel/get_roles_with_permissions.php",
-      { credentials: "include" }
-    );
-
-    const data = await res.json();
+    const data = await apiFetch("control_panel/get_roles_with_permissions.php");
 
     if (data.success) {
       setRoles(data.data);
@@ -63,12 +58,7 @@ const ControlPanel = () => {
   ========================== */
 
   const fetchUsers = async () => {
-    const res = await fetch(
-      "http://localhost/hris/backend/control_panel/get_users_with_permissions.php",
-      { credentials: "include" }
-    );
-
-    const data = await res.json();
+    const data = await apiFetch("control_panel/get_users_with_permissions.php");
 
     if (data.success) {
       setUsers(data.data);
@@ -101,20 +91,13 @@ const ControlPanel = () => {
 
     if (!selectedRole) return;
 
-    await fetch(
-      "http://localhost/hris/backend/control_panel/update_role_permissions.php",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          role_id: selectedRole.role_id,
-          permissions: tempPermissions
-        })
-      }
-    );
+    await apiFetch("control_panel/update_role_permissions.php", {
+      method: "POST",
+      body: JSON.stringify({
+        role_id: selectedRole.role_id,
+        permissions: tempPermissions
+      })
+    });
 
     setSelectedRole(null);
 
@@ -128,12 +111,9 @@ const ControlPanel = () => {
 
   const handleOpenUserPermissions = async (user: UserRow) => {
 
-    const res = await fetch(
-      `http://localhost/hris/backend/control_panel/get_user_permissions.php?user_id=${user.id}`,
-      { credentials: "include" }
+    const data = await apiFetch(
+      `control_panel/get_user_permissions.php?user_id=${user.id}`
     );
-
-    const data = await res.json();
 
     if (data.success) {
       setSelectedUser(user);
@@ -158,25 +138,13 @@ const saveUserPermissions = async () => {
 
   try {
 
-    const res = await fetch(
-      "http://localhost/hris/backend/control_panel/update_user_permissions.php",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          user_id: selectedUser.id,
-          permissions: userPermissions
-        })
-      }
-    );
-
-    const text = await res.text();
-    console.log("SERVER RESPONSE:", text);
-
-    const data = JSON.parse(text);
+    const data = await apiFetch("control_panel/update_user_permissions.php", {
+      method: "POST",
+      body: JSON.stringify({
+        user_id: selectedUser.id,
+        permissions: userPermissions
+      })
+    });
 
     if (data.success) {
 
@@ -217,12 +185,7 @@ const saveUserPermissions = async () => {
 
   const fetchLogs = async () => {
 
-  const res = await fetch(
-    "http://localhost/hris/backend/control_panel/get_logs.php",
-    { credentials: "include" }
-  );
-
-  const data = await res.json();
+  const data = await apiFetch("control_panel/get_logs.php");
 
   if (data.success) {
     setLogs(data.logs);
@@ -245,12 +208,7 @@ useEffect(() => {
 
   const fetchArchivedUsers = async () => {
 
-    const res = await fetch(
-      "http://localhost/hris/backend/control_panel/get_archived_users.php",
-      { credentials: "include" }
-    );
-
-    const data = await res.json();
+    const data = await apiFetch("control_panel/get_archived_users.php");
 
     if (data.success) {
       setArchivedUsers(data.users);
@@ -268,30 +226,22 @@ useEffect(() => {
 
 const restoreUser = async (id: number) => {
 
-  await fetch(
-    "http://localhost/hris/backend/control_panel/restore_user.php",
-    {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ employee_id: id })
-    }
-  );
+  await apiFetch("control_panel/restore_user.php", {
+    method: "POST",
+    body: JSON.stringify({ employee_id: id })
+  });
 
   fetchArchivedUsers();
 };
 
 const deleteUser = async (id: number) => {
 
-  const res = await fetch(
-    `http://localhost/hris/backend/control_panel/delete_user_permanently.php?employee_id=${id}`,
+  const data = await apiFetch(
+    `control_panel/delete_user_permanently.php?employee_id=${id}`,
     {
-      method: "POST",
-      credentials: "include"
+      method: "POST"
     }
   );
-
-  const data = await res.json();
 
   console.log("Delete response:", data);
 
