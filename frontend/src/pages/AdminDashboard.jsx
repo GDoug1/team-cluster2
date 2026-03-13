@@ -7,6 +7,7 @@ import useCurrentUser from "../hooks/useCurrentUser";
 import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
 import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
+import ControlPanelSection from "../components/ControlPanelSection";
 import { buildRequestHighlights, fetchAdminTeamRequests, fetchMyRequests, updateAdminTeamRequestStatus } from "../api/requests";
 
 export default function AdminDashboard() {
@@ -93,7 +94,8 @@ export default function AdminDashboard() {
         onClick: () => setActiveNav(label === "My Attendance" ? "Attendance" : label)
       }))
     },
-    { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") }
+    { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") },
+    { label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }
   ];
 
   const formatTimeRange = daySchedule => {
@@ -652,7 +654,7 @@ const handleOpenRejectModal = cluster => {
               ]}
             />
           </section>
-        ) : (
+        ) : activeNav === "Schedule" ? (
           <section className="content">
             <div className="section-title">Team Coach Schedule</div>
             {clusters.length === 0 ? (
@@ -729,7 +731,11 @@ const handleOpenRejectModal = cluster => {
               </>
             )}
           </section>
-        )}
+        ) : activeNav === "Control Panel" ? (
+          <section className="content">
+            <ControlPanelSection />
+          </section>
+        ) : null}
       </main>
 
       {editingCoachAttendance && (

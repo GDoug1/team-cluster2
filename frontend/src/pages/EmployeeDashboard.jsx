@@ -3,6 +3,7 @@ import { apiFetch } from "../api/api";
 import { saveDashboardAttendance } from "../api/attendance";
 import DashboardSidebar from "../components/DashboardSidebar";
 import MainDashboard from "./MainDashboard";
+import ControlPanelSection from "../components/ControlPanelSection";
 import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
 import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
@@ -13,7 +14,7 @@ import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 
 
 export default function EmployeeDashboard() {
-  const navItems = ["Dashboard", "Team", "Attendance", "Schedule"];
+  const navItems = ["Dashboard", "Team", "Attendance", "Schedule", "Control Panel"];
   const attendanceNavItems = ["My Attendance", "My Requests", "My Filing Center"];
   const [data, setData] = useState([]);
   const [activeNav, setActiveNav] = useState("Dashboard");
@@ -494,7 +495,11 @@ export default function EmployeeDashboard() {
                 <FilingCenterPanel onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
               )}
 
-              {!isAttendanceView && (
+              {activeNav === "Control Panel" && (
+                <ControlPanelSection />
+              )}
+
+              {!isAttendanceView && activeNav !== "Control Panel" && (
                 <>
               <div className="employee-card">
                 <div className="employee-card-header">

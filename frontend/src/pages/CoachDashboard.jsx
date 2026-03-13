@@ -6,6 +6,7 @@ import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighligh
 import MainDashboard from "./MainDashboard";
 import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
+import ControlPanelSection from "../components/ControlPanelSection";
 import { buildRequestHighlights, fetchMyRequests, fetchTeamRequests, updateTeamRequestStatus } from "../api/requests";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
@@ -136,7 +137,8 @@ export default function CoachDashboard() {
         onClick: () => setActiveNav(label === "My Attendance" ? "Attendance" : label)
       }))
     },
-    { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") }
+    { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") },
+    { label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }
   ];
 
 
@@ -1674,6 +1676,10 @@ export default function CoachDashboard() {
                 </section>
               </div>
             )}
+          </section>
+        ) : activeNav === "Control Panel" ? (
+          <section className="content">
+            <ControlPanelSection />
           </section>
         ) : (
           <>

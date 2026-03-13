@@ -1,7 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../../config/auth.php';
-requireRole('super admin');
+requireRole(['super admin', 'admin', 'coach', 'employee']);
 
 function currentUserId(): int
 {
