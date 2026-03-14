@@ -10,11 +10,15 @@ import DataPanel from "../components/DataPanel";
 import { buildRequestHighlights, fetchMyRequests } from "../api/requests";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
+import usePermissions from "../hooks/usePermissions";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 
 
 export default function EmployeeDashboard() {
-  const navItems = ["Dashboard", "Team", "Attendance", "Schedule", "Control Panel"];
+  const { user } = useCurrentUser();
+  const { hasPermission } = usePermissions();
+  const canAccessControlPanel = hasPermission("Access Control Panel");
+  const navItems = ["Dashboard", "Team", "Attendance", "Schedule", ...(canAccessControlPanel ? ["Control Panel"] : [])];
   const attendanceNavItems = ["My Attendance", "My Requests", "My Filing Center"];
   const [data, setData] = useState([]);
   const [activeNav, setActiveNav] = useState("Dashboard");
@@ -50,7 +54,13 @@ export default function EmployeeDashboard() {
   const [myRequests, setMyRequests] = useState([]);
   const activeCluster = data[0];
   const dateTimeLabel = useLiveDateTime();
-  const { user } = useCurrentUser();
+
+
+  useEffect(() => {
+    if (!canAccessControlPanel && activeNav === "Control Panel") {
+      setActiveNav("Dashboard");
+    }
+  }, [activeNav, canAccessControlPanel]);
 
   const normalizeSchedule = schedule => {
     if (!schedule) return schedule;
@@ -495,7 +505,7 @@ export default function EmployeeDashboard() {
                 <FilingCenterPanel onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
               )}
 
-              {activeNav === "Control Panel" && (
+              {canAccessControlPanel && activeNav === "Control Panel" && (
                 <ControlPanelSection />
               )}
 

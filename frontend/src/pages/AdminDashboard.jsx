@@ -4,6 +4,7 @@ import DashboardSidebar from "../components/DashboardSidebar";
 import MainDashboard from "./MainDashboard";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
+import usePermissions from "../hooks/usePermissions";
 import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
 import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
@@ -77,6 +78,8 @@ export default function AdminDashboard() {
   const [editForm, setEditForm] = useState({ timeInAt: "", timeOutAt: "", tag: "", note: "" });
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
+  const { hasPermission } = usePermissions();
+  const canAccessControlPanel = hasPermission("Access Control Panel");
   const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "Team Request"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
@@ -95,8 +98,14 @@ export default function AdminDashboard() {
       }))
     },
     { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") },
-    { label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }
+    ...(canAccessControlPanel ? [{ label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }] : [])
   ];
+
+  useEffect(() => {
+    if (!canAccessControlPanel && activeNav === "Control Panel") {
+      setActiveNav("Dashboard");
+    }
+  }, [activeNav, canAccessControlPanel]);
 
   const formatTimeRange = daySchedule => {
     if (!daySchedule || typeof daySchedule !== "object") return "—";
@@ -731,7 +740,7 @@ const handleOpenRejectModal = cluster => {
               </>
             )}
           </section>
-        ) : activeNav === "Control Panel" ? (
+        ) : canAccessControlPanel && activeNav === "Control Panel" ? (
           <section className="content">
             <ControlPanelSection />
           </section>
