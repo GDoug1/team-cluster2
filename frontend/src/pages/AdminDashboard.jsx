@@ -9,6 +9,7 @@ import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighligh
 import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
 import ControlPanelSection from "../components/ControlPanelSection";
+import EmployeesSection from "../components/EmployeesSection";
 import { buildRequestHighlights, fetchAdminTeamRequests, fetchMyRequests, updateAdminTeamRequestStatus } from "../api/requests";
 
 export default function AdminDashboard() {
@@ -80,6 +81,11 @@ export default function AdminDashboard() {
   const { user } = useCurrentUser();
   const { hasPermission } = usePermissions();
   const canAccessControlPanel = hasPermission("Access Control Panel");
+  const canViewEmployeeList = hasPermission("View Employee List");
+  const canAddEmployee = hasPermission("Add Employee");
+  const canEditEmployee = hasPermission("Edit Employee");
+  const canDeleteEmployee = hasPermission("Delete Employee");
+  const canAccessEmployeesTab = canViewEmployeeList || canAddEmployee || canEditEmployee || canDeleteEmployee;
   const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "Team Request"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
@@ -98,6 +104,7 @@ export default function AdminDashboard() {
       }))
     },
     { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") },
+    ...(canAccessEmployeesTab ? [{ label: "Employees", active: activeNav === "Employees", onClick: () => setActiveNav("Employees") }] : []),
     ...(canAccessControlPanel ? [{ label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }] : [])
   ];
 
@@ -106,6 +113,12 @@ export default function AdminDashboard() {
       setActiveNav("Dashboard");
     }
   }, [activeNav, canAccessControlPanel]);
+
+  useEffect(() => {
+    if (!canAccessEmployeesTab && activeNav === "Employees") {
+      setActiveNav("Dashboard");
+    }
+  }, [activeNav, canAccessEmployeesTab]);
 
   const formatTimeRange = daySchedule => {
     if (!daySchedule || typeof daySchedule !== "object") return "—";
@@ -663,6 +676,8 @@ const handleOpenRejectModal = cluster => {
               ]}
             />
           </section>
+        ) : activeNav === "Employees" ? (
+          <EmployeesSection />
         ) : activeNav === "Schedule" ? (
           <section className="content">
             <div className="section-title">Team Coach Schedule</div>

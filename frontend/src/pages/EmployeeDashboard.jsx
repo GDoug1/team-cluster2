@@ -7,6 +7,7 @@ import ControlPanelSection from "../components/ControlPanelSection";
 import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
 import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
+import EmployeesSection from "../components/EmployeesSection";
 import { buildRequestHighlights, fetchMyRequests } from "../api/requests";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
@@ -18,7 +19,12 @@ export default function EmployeeDashboard() {
   const { user } = useCurrentUser();
   const { hasPermission } = usePermissions();
   const canAccessControlPanel = hasPermission("Access Control Panel");
-  const navItems = ["Dashboard", "Team", "Attendance", "Schedule", ...(canAccessControlPanel ? ["Control Panel"] : [])];
+  const canViewEmployeeList = hasPermission("View Employee List");
+  const canAddEmployee = hasPermission("Add Employee");
+  const canEditEmployee = hasPermission("Edit Employee");
+  const canDeleteEmployee = hasPermission("Delete Employee");
+  const canAccessEmployeesTab = canViewEmployeeList || canAddEmployee || canEditEmployee || canDeleteEmployee;
+  const navItems = ["Dashboard", "Team", "Attendance", "Schedule", ...(canAccessEmployeesTab ? ["Employees"] : []), ...(canAccessControlPanel ? ["Control Panel"] : [])];
   const attendanceNavItems = ["My Attendance", "My Requests", "My Filing Center"];
   const [data, setData] = useState([]);
   const [activeNav, setActiveNav] = useState("Dashboard");
@@ -61,6 +67,12 @@ export default function EmployeeDashboard() {
       setActiveNav("Dashboard");
     }
   }, [activeNav, canAccessControlPanel]);
+
+  useEffect(() => {
+    if (!canAccessEmployeesTab && activeNav === "Employees") {
+      setActiveNav("Dashboard");
+    }
+  }, [activeNav, canAccessEmployeesTab]);
 
   const normalizeSchedule = schedule => {
     if (!schedule) return schedule;
@@ -475,7 +487,7 @@ export default function EmployeeDashboard() {
             <div className="empty-state">No team cluster details available.</div>
           )}
 
-          {(isAttendanceView || data.length > 0) && activeNav !== "Dashboard" && (
+          {((isAttendanceView || data.length > 0 || activeNav === "Employees" || activeNav === "Control Panel") && activeNav !== "Dashboard") && (
             <div className="employee-panel">
               {activeNav === "My Attendance" && (
                 <div className="employee-card">
@@ -505,11 +517,15 @@ export default function EmployeeDashboard() {
                 <FilingCenterPanel onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
               )}
 
+              {activeNav === "Employees" && (
+                <EmployeesSection />
+              )}
+
               {canAccessControlPanel && activeNav === "Control Panel" && (
                 <ControlPanelSection />
               )}
 
-              {!isAttendanceView && activeNav !== "Control Panel" && (
+              {!isAttendanceView && activeNav !== "Control Panel" && activeNav !== "Employees" && (
                 <>
               <div className="employee-card">
                 <div className="employee-card-header">
