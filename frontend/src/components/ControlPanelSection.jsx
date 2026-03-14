@@ -1,63 +1,5 @@
-import { useMemo, useState } from "react";
-
-const PERMISSION_OPTIONS = [
-  "Add Employee",
-  "Edit Employee",
-  "Delete Employee",
-  "Set Attendance",
-  "Edit Attendance",
-  "View Dashboard",
-  "View Team",
-  "View Attendance",
-  "View Employee List",
-  "Edit Profile",
-  "Access Control Panel"
-];
-
-const INITIAL_ROLE_PERMISSIONS = [
-  {
-    id: "super-admin",
-    role: "Super Admin",
-    description: "Full platform control and approvals.",
-    permissions: [...PERMISSION_OPTIONS]
-  },
-  {
-    id: "admin",
-    role: "Admin",
-    description: "Manages team operations and employee records.",
-    permissions: [
-      "Add Employee",
-      "Edit Employee",
-      "Delete Employee",
-      "Set Attendance",
-      "Edit Attendance",
-      "View Dashboard",
-      "View Team",
-      "View Attendance",
-      "View Employee List",
-      "Edit Profile"
-    ]
-  },
-  {
-    id: "coach",
-    role: "Coach",
-    description: "Handles team attendance and schedule updates.",
-    permissions: [
-      "Set Attendance",
-      "Edit Attendance",
-      "View Dashboard",
-      "View Team",
-      "View Attendance",
-      "View Employee List"
-    ]
-  },
-  {
-    id: "employee",
-    role: "Employee",
-    description: "Tracks attendance and submits requests.",
-    permissions: ["View Dashboard", "View Attendance", "Edit Profile"]
-  }
-];
+import { useEffect, useMemo, useState } from "react";
+import { apiFetch } from "../api/api";
 
 const INITIAL_USER_PERMISSIONS = [
   {
@@ -89,19 +31,19 @@ const INITIAL_USER_PERMISSIONS = [
   }
 ];
 
-function PermissionEditorModal({ title, selectedPermissions, onClose, onSave }) {
-  const [draftPermissions, setDraftPermissions] = useState(selectedPermissions);
+function PermissionEditorModal({ title, selectedPermissionIds, permissionOptions, onClose, onSave }) {
+  const [draftPermissionIds, setDraftPermissionIds] = useState(selectedPermissionIds);
 
-  const togglePermission = permission => {
-    setDraftPermissions(current => {
-      if (current.includes(permission)) {
-        return current.filter(item => item !== permission);
+  const togglePermission = permissionId => {
+    setDraftPermissionIds(current => {
+      if (current.includes(permissionId)) {
+        return current.filter(item => item !== permissionId);
       }
-      return [...current, permission];
+      return [...current, permissionId];
     });
   };
 
-  const handleSave = () => onSave(draftPermissions);
+  const handleSave = () => onSave(draftPermissionIds);
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={`${title} permission editor`}>
@@ -110,14 +52,14 @@ function PermissionEditorModal({ title, selectedPermissions, onClose, onSave }) 
         <p className="modal-subtitle">{title}</p>
 
         <div className="permission-modal-list" role="group" aria-label="Permission options">
-          {PERMISSION_OPTIONS.map(permission => (
-            <label key={permission} className="permission-modal-item">
+          {permissionOptions.map(permission => (
+            <label key={permission.id} className="permission-modal-item">
               <input
                 type="checkbox"
-                checked={draftPermissions.includes(permission)}
-                onChange={() => togglePermission(permission)}
+                checked={draftPermissionIds.includes(permission.id)}
+                onChange={() => togglePermission(permission.id)}
               />
-              <span>{permission}</span>
+              <span>{permission.name}</span>
             </label>
           ))}
         </div>
@@ -134,10 +76,47 @@ function PermissionEditorModal({ title, selectedPermissions, onClose, onSave }) 
 export default function ControlPanelSection() {
   const [activeTab, setActiveTab] = useState("role");
   const [searchTerm, setSearchTerm] = useState("");
-  const [rolePermissions, setRolePermissions] = useState(INITIAL_ROLE_PERMISSIONS);
+  const [permissionOptions, setPermissionOptions] = useState([]);
+  const [rolePermissions, setRolePermissions] = useState([]);
   const [userPermissions, setUserPermissions] = useState(INITIAL_USER_PERMISSIONS);
   const [editingRoleId, setEditingRoleId] = useState("");
   const [editingUserId, setEditingUserId] = useState("");
+  const [loadingRolePermissions, setLoadingRolePermissions] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadControlPanelPermissions = async () => {
+      try {
+        const response = await apiFetch("api/admin/control_panel_permissions.php");
+        if (!mounted) return;
+
+        const options = Array.isArray(response.permissionOptions) ? response.permissionOptions : [];
+        const roles = Array.isArray(response.rolePermissions) ? response.rolePermissions : [];
+        setPermissionOptions(options.map(item => ({ id: item.id, name: item.name })));
+        setRolePermissions(roles.map(role => ({
+          id: String(role.id),
+          roleId: role.id,
+          role: role.role,
+          description: role.description,
+          permissionIds: Array.isArray(role.permissionIds) ? role.permissionIds : [],
+          permissions: Array.isArray(role.permissions) ? role.permissions : []
+        })));
+      } catch {
+        if (!mounted) return;
+        setPermissionOptions([]);
+        setRolePermissions([]);
+      } finally {
+        if (mounted) setLoadingRolePermissions(false);
+      }
+    };
+
+    loadControlPanelPermissions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const filteredRoles = useMemo(() => {
     const value = searchTerm.trim().toLowerCase();
@@ -165,11 +144,31 @@ export default function ControlPanelSection() {
   const editingRole = rolePermissions.find(item => item.id === editingRoleId);
   const editingUser = userPermissions.find(item => item.id === editingUserId);
 
-  const handleSaveRolePermissions = permissions => {
-    setRolePermissions(current => current.map(item => (
-      item.id === editingRoleId ? { ...item, permissions } : item
-    )));
-    setEditingRoleId("");
+  const handleSaveRolePermissions = async permissionIds => {
+    const role = rolePermissions.find(item => item.id === editingRoleId);
+    if (!role) return;
+
+    try {
+      const response = await apiFetch("api/admin/control_panel_permissions.php", {
+        method: "POST",
+        body: JSON.stringify({
+          role_id: role.roleId,
+          permission_ids: permissionIds
+        })
+      });
+
+      const roles = Array.isArray(response.rolePermissions) ? response.rolePermissions : [];
+      setRolePermissions(roles.map(item => ({
+        id: String(item.id),
+        roleId: item.id,
+        role: item.role,
+        description: item.description,
+        permissionIds: Array.isArray(item.permissionIds) ? item.permissionIds : [],
+        permissions: Array.isArray(item.permissions) ? item.permissions : []
+      })));
+    } finally {
+      setEditingRoleId("");
+    }
   };
 
   const handleSaveUserPermissions = permissions => {
@@ -216,28 +215,32 @@ export default function ControlPanelSection() {
       />
 
       {activeTab === "role" ? (
-        <div className="permission-card-grid">
-          {filteredRoles.map(roleItem => (
-            <article key={roleItem.id} className="permission-card">
-              <div className="permission-card-header">{roleItem.role}</div>
-              <div className="permission-card-body">
-                <p className="permission-card-label">{roleItem.description}</p>
-                <ul>
-                  {roleItem.permissions.map(permission => (
-                    <li key={`${roleItem.id}-${permission}`}>{permission}</li>
-                  ))}
-                </ul>
-                <button
-                  className="btn permission-edit-btn"
-                  type="button"
-                  onClick={() => setEditingRoleId(roleItem.id)}
-                >
-                  Edit Permission
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
+        loadingRolePermissions ? (
+          <p className="team-empty-note">Loading role permissions...</p>
+        ) : (
+          <div className="permission-card-grid">
+            {filteredRoles.map(roleItem => (
+              <article key={roleItem.id} className="permission-card">
+                <div className="permission-card-header">{roleItem.role}</div>
+                <div className="permission-card-body">
+                  <p className="permission-card-label">{roleItem.description}</p>
+                  <ul>
+                    {roleItem.permissions.map(permission => (
+                      <li key={`${roleItem.id}-${permission}`}>{permission}</li>
+                    ))}
+                  </ul>
+                  <button
+                    className="btn permission-edit-btn"
+                    type="button"
+                    onClick={() => setEditingRoleId(roleItem.id)}
+                  >
+                    Edit Permission
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )
       ) : (
         <div className="control-panel-table-wrap" role="table" aria-label="Individual permission table">
           <div className="control-panel-table-header" role="row">
@@ -271,7 +274,8 @@ export default function ControlPanelSection() {
       {editingRole ? (
         <PermissionEditorModal
           title={`${editingRole.role} Role`}
-          selectedPermissions={editingRole.permissions}
+          selectedPermissionIds={editingRole.permissionIds}
+          permissionOptions={permissionOptions}
           onClose={() => setEditingRoleId("")}
           onSave={handleSaveRolePermissions}
         />
@@ -280,9 +284,17 @@ export default function ControlPanelSection() {
       {editingUser ? (
         <PermissionEditorModal
           title={`${editingUser.name} (${editingUser.role})`}
-          selectedPermissions={editingUser.permissions}
+          selectedPermissionIds={editingUser.permissions
+            .map(name => permissionOptions.find(option => option.name === name)?.id)
+            .filter(Boolean)}
+          permissionOptions={permissionOptions}
           onClose={() => setEditingUserId("")}
-          onSave={handleSaveUserPermissions}
+          onSave={permissionIds => {
+            const selectedNames = permissionOptions
+              .filter(option => permissionIds.includes(option.id))
+              .map(option => option.name);
+            handleSaveUserPermissions(selectedNames);
+          }}
         />
       ) : null}
     </section>

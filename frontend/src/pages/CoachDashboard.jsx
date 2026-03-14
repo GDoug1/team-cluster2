@@ -10,6 +10,7 @@ import ControlPanelSection from "../components/ControlPanelSection";
 import { buildRequestHighlights, fetchMyRequests, fetchTeamRequests, updateTeamRequestStatus } from "../api/requests";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
+import usePermissions from "../hooks/usePermissions";
 import { normalizeSchedule as normalizeAttendanceSchedule, parseDateValue, resolveAttendanceMainTag } from "../utils/attendanceTags";
 
 
@@ -120,6 +121,8 @@ export default function CoachDashboard() {
   });
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
+  const { hasPermission } = usePermissions();
+  const canAccessControlPanel = hasPermission("Access Control Panel");
   const attendanceNavItems = ["My Attendance", "Team Cluster Attendance", "My Requests", "My Filing Center", "Team Request"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
@@ -138,10 +141,16 @@ export default function CoachDashboard() {
       }))
     },
     { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") },
-    { label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }
+    ...(canAccessControlPanel ? [{ label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }] : [])
   ];
 
 
+
+  useEffect(() => {
+    if (!canAccessControlPanel && activeNav === "Control Panel") {
+      setActiveNav("Dashboard");
+    }
+  }, [activeNav, canAccessControlPanel]);
 
   useEffect(() => {
     if (window.location.pathname === "/coach/attendance") {
@@ -1677,7 +1686,7 @@ export default function CoachDashboard() {
               </div>
             )}
           </section>
-        ) : activeNav === "Control Panel" ? (
+        ) : canAccessControlPanel && activeNav === "Control Panel" ? (
           <section className="content">
             <ControlPanelSection />
           </section>
