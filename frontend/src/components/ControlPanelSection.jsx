@@ -8,15 +8,17 @@ export default function ControlPanelSection() {
   const [activeTab, setActiveTab] = useState("General");
 
   const [roles, setRoles] = useState([]);
+  const [permissionsCatalog, setPermissionsCatalog] = useState([]);
   const [rolesLoading, setRolesLoading] = useState(true);
   const [rolesError, setRolesError] = useState("");
+  const [roleEditorRoleId, setRoleEditorRoleId] = useState(null);
+  const [roleEditorPermissions, setRoleEditorPermissions] = useState([]);
+  const [roleSaveLoading, setRoleSaveLoading] = useState(false);
+  const [roleSaveError, setRoleSaveError] = useState("");
 
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [usersError, setUsersError] = useState("");
-
-  const [selectedRole, setSelectedRole] = useState(null);
-  const [tempPermissions, setTempPermissions] = useState([]);
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [userPermissions, setUserPermissions] = useState([]);
@@ -40,12 +42,15 @@ export default function ControlPanelSection() {
       const data = await apiFetch("api/control_panel/get_roles_with_permissions.php");
       if (data.success) {
         setRoles(data.data);
+        setPermissionsCatalog(data.permissions_catalog ?? []);
       } else {
         setRoles([]);
+        setPermissionsCatalog([]);
         setRolesError(data?.message ?? "Unable to load roles.");
       }
     } catch (error) {
       setRoles([]);
+      setPermissionsCatalog([]);
       setRolesError(error?.error ?? "Unable to load roles. Please refresh and try again.");
     } finally {
       setRolesLoading(false);
@@ -77,13 +82,14 @@ export default function ControlPanelSection() {
     fetchUsers();
   }, [fetchRoles, fetchUsers]);
 
-  const handleOpenRole = role => {
-    setSelectedRole(role);
-    setTempPermissions([...(role.permissions ?? [])]);
+  const handleOpenRoleEditor = role => {
+    setRoleEditorRoleId(role.role_id);
+    setRoleEditorPermissions([...(role.permissions ?? [])]);
+    setRoleSaveError("");
   };
 
   const handleTogglePermission = permission => {
-    setTempPermissions(previous =>
+    setRoleEditorPermissions(previous =>
       previous.includes(permission)
         ? previous.filter(item => item !== permission)
         : [...previous, permission]
@@ -91,19 +97,34 @@ export default function ControlPanelSection() {
   };
 
   const handleSaveRolePermissions = async () => {
-    if (!selectedRole) return;
+    if (!roleEditorRoleId) return;
 
-    await apiFetch("api/control_panel/update_role_permissions.php", {
-      method: "POST",
-      body: JSON.stringify({
-        role_id: selectedRole.role_id,
-        permissions: tempPermissions
-      })
-    });
+    setRoleSaveLoading(true);
+    setRoleSaveError("");
 
-    setSelectedRole(null);
-    fetchRoles();
-    fetchUsers();
+    try {
+      const data = await apiFetch("api/control_panel/update_role_permissions.php", {
+        method: "POST",
+        body: JSON.stringify({
+          role_id: roleEditorRoleId,
+          permissions: roleEditorPermissions
+        })
+      });
+
+      if (!data.success) {
+        setRoleSaveError(data?.message ?? "Unable to save role permissions.");
+        return;
+      }
+
+      setRoleEditorRoleId(null);
+      setRoleEditorPermissions([]);
+      fetchRoles();
+      fetchUsers();
+    } catch (error) {
+      setRoleSaveError(error?.error ?? "Unable to save role permissions.");
+    } finally {
+      setRoleSaveLoading(false);
+    }
   };
 
   const handleOpenUserPermissions = async user => {
@@ -236,8 +257,8 @@ export default function ControlPanelSection() {
   );
 
   const allPermissions = useMemo(
-    () => [...new Set(roles.flatMap(role => role.permissions ?? []))],
-    [roles]
+    () => [...new Set([...(permissionsCatalog ?? []), ...roles.flatMap(role => role.permissions ?? [])])],
+    [permissionsCatalog, roles]
   );
 
   return (
@@ -295,9 +316,50 @@ export default function ControlPanelSection() {
                         ))}
                       </ul>
 
-                      <button className="control-panel-permission-btn" onClick={() => handleOpenRole(role)}>
-                        Edit Permissions
-                      </button>
+                      {roleEditorRoleId === role.role_id ? (
+                        <>
+                          <div className="control-panel-permission-list role-editor-list">
+                            {allPermissions.map(permission => (
+                              <label key={`${role.role_id}-edit-${permission}`}>
+                                <input
+                                  type="checkbox"
+                                  checked={roleEditorPermissions.includes(permission)}
+                                  onChange={() => handleTogglePermission(permission)}
+                                />
+
+                                {permission}
+                              </label>
+                            ))}
+                          </div>
+
+                          {roleSaveError && <p className="control-panel-modal-error">{roleSaveError}</p>}
+
+                          <div className="control-panel-role-actions">
+                            <button
+                              className="control-panel-cancel-btn"
+                              onClick={() => {
+                                setRoleEditorRoleId(null);
+                                setRoleEditorPermissions([]);
+                                setRoleSaveError("");
+                              }}
+                            >
+                              Cancel
+                            </button>
+
+                            <button
+                              className="control-panel-apply-btn"
+                              disabled={roleSaveLoading}
+                              onClick={handleSaveRolePermissions}
+                            >
+                              {roleSaveLoading ? "Saving..." : "Save"}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <button className="control-panel-permission-btn" onClick={() => handleOpenRoleEditor(role)}>
+                          Edit Permissions
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -489,39 +551,6 @@ export default function ControlPanelSection() {
           </>
         )}
       </div>
-
-      {selectedRole && (
-        <div className="control-panel-modal-overlay">
-          <div className="control-panel-modal">
-            <h3>{selectedRole.role_name}</h3>
-
-            <div className="control-panel-permission-list">
-              {allPermissions.map(permission => (
-                <label key={permission}>
-                  <input
-                    type="checkbox"
-                    checked={tempPermissions.includes(permission)}
-                    onChange={() => handleTogglePermission(permission)}
-                  />
-
-                  {permission}
-                </label>
-              ))}
-            </div>
-
-            <div className="control-panel-modal-actions">
-              <button className="control-panel-cancel-btn" onClick={() => setSelectedRole(null)}>
-                Cancel
-              </button>
-
-              <button className="control-panel-apply-btn" onClick={handleSaveRolePermissions}>
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {selectedUser && (
         <div className="control-panel-modal-overlay">
           <div className="control-panel-modal">

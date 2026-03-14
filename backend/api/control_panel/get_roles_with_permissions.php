@@ -40,7 +40,20 @@ while ($row = $result->fetch_assoc()) {
     }
 }
 
+$permissionsResult = $conn->query("SELECT permission_name FROM permissions ORDER BY permission_name ASC");
+$permissionsCatalog = [];
+
+if ($permissionsResult !== false) {
+    while ($permissionRow = $permissionsResult->fetch_assoc()) {
+        $permissionName = trim((string)$permissionRow['permission_name']);
+        if ($permissionName !== '') {
+            $permissionsCatalog[] = $permissionName;
+        }
+    }
+}
+
 echo json_encode([
     "success" => true,
-    "data" => array_values($roles)
+    "data" => array_values($roles),
+    "permissions_catalog" => $permissionsCatalog
 ]);
