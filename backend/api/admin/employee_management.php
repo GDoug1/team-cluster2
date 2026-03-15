@@ -83,19 +83,30 @@ function resolveEmployeeRoleId(mysqli $conn): ?int {
     return isset($row['role_id']) ? (int)$row['role_id'] : null;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+$requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+if ($requestMethod === 'GET') {
     requireAnyPermission($conn, ['View Employee List']);
     $sql = "SELECT
                 e.employee_id,
+                COALESCE(e.first_name, '') AS first_name,
+                COALESCE(e.middle_name, '') AS middle_name,
+                COALESCE(e.last_name, '') AS last_name,
                 CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name) AS fullname,
+                COALESCE(e.address, '') AS address,
+                e.birthdate,
+                COALESCE(e.contact_number, '') AS contact_number,
+                COALESCE(e.civil_status, '') AS civil_status,
                 COALESCE(e.position, '') AS position,
                 COALESCE(e.account, '') AS account,
                 COALESCE(e.employee_type, '') AS employee_type,
                 COALESCE(e.employment_status, '') AS employment_status,
                 e.date_hired,
-                COALESCE(e.email, u.email, '') AS email
+                COALESCE(e.email, u.email, '') AS email,
+                COALESCE(e.personal_email, '') AS personal_email
             FROM employees e
             LEFT JOIN users u ON u.user_id = e.user_id
+            WHERE COALESCE(e.archived, 0) = 0
             ORDER BY e.employee_id DESC";
 
     $result = $conn->query($sql);
@@ -108,13 +119,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     while ($row = $result->fetch_assoc()) {
         $employees[] = [
             "id" => (int)$row['employee_id'],
+            "first_name" => $row['first_name'],
+            "middle_name" => $row['middle_name'],
+            "last_name" => $row['last_name'],
             "fullname" => trim((string)$row['fullname']) ?: "Employee #{$row['employee_id']}",
+            "address" => $row['address'],
+            "birthdate" => $row['birthdate'],
+            "contact_number" => $row['contact_number'],
+            "civil_status" => $row['civil_status'],
             "position" => $row['position'],
             "account" => $row['account'],
             "employee_type" => $row['employee_type'],
             "employment_status" => $row['employment_status'],
             "date_hired" => $row['date_hired'],
-            "email" => $row['email']
+            "email" => $row['email'],
+            "personal_email" => $row['personal_email']
         ];
     }
 
@@ -122,7 +141,182 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+if ($requestMethod === 'PUT') {
+    requireAnyPermission($conn, ['Edit Employee']);
+
+    $data = json_decode(file_get_contents("php://input"), true);
+    if (!$data || !is_array($data)) {
+        http_response_code(400);
+        exit(json_encode(["success" => false, "message" => "Invalid JSON"]));
+    }
+
+    $employeeId = (int)($data['employee_id'] ?? $data['id'] ?? 0);
+    if ($employeeId <= 0) {
+        http_response_code(400);
+        exit(json_encode(["success" => false, "message" => "Employee id is required."]));
+    }
+
+    $firstName = trim((string)($data['first_name'] ?? ''));
+    $middleName = trim((string)($data['middle_name'] ?? ''));
+    $lastName = trim((string)($data['last_name'] ?? ''));
+    $address = trim((string)($data['address'] ?? ''));
+    $birthdate = trim((string)($data['birthdate'] ?? ''));
+    $civilStatus = trim((string)($data['civil_status'] ?? ''));
+    $email = strtolower(trim((string)($data['email'] ?? $data['work_email'] ?? '')));
+    $personalEmail = strtolower(trim((string)($data['personal_email'] ?? '')));
+    $position = trim((string)($data['position'] ?? ''));
+    $account = trim((string)($data['account'] ?? ''));
+    $contactNumber = trim((string)($data['contact_number'] ?? ''));
+    $employeeType = trim((string)($data['employee_type'] ?? ''));
+    $employmentStatus = trim((string)($data['employment_status'] ?? 'Active'));
+    $dateHired = trim((string)($data['date_hired'] ?? ''));
+
+    if ($firstName === '' || $lastName === '' || $email === '') {
+        http_response_code(400);
+        exit(json_encode(["success" => false, "message" => "First name, last name, and email are required."]));
+    }
+
+    $conn->begin_transaction();
+    try {
+        $employeeStmt = $conn->prepare("SELECT employee_id, user_id FROM employees WHERE employee_id = ? AND COALESCE(archived, 0) = 0 LIMIT 1");
+        if (!$employeeStmt) {
+            throw new Exception("Unable to load employee record.");
+        }
+
+        $employeeStmt->bind_param("i", $employeeId);
+        if (!$employeeStmt->execute()) {
+            throw new Exception("Unable to load employee record.");
+        }
+
+        $employeeResult = $employeeStmt->get_result();
+        $employeeRow = $employeeResult ? $employeeResult->fetch_assoc() : null;
+        if (!$employeeRow) {
+            throw new Exception("Employee not found.");
+        }
+
+        $linkedUserId = isset($employeeRow['user_id']) ? (int)$employeeRow['user_id'] : 0;
+
+        $emailCheck = $conn->prepare("SELECT user_id FROM users WHERE email = ? LIMIT 1");
+        if (!$emailCheck) {
+            throw new Exception("Unable to validate email.");
+        }
+
+        $emailCheck->bind_param("s", $email);
+        if (!$emailCheck->execute()) {
+            throw new Exception("Unable to validate email.");
+        }
+
+        $emailResult = $emailCheck->get_result();
+        $emailRow = $emailResult ? $emailResult->fetch_assoc() : null;
+        if ($emailRow) {
+            $existingUserId = (int)($emailRow['user_id'] ?? 0);
+            if ($linkedUserId <= 0 || $existingUserId !== $linkedUserId) {
+                throw new Exception("Email already exists.");
+            }
+        }
+
+        if ($linkedUserId > 0) {
+            $updateUserStmt = $conn->prepare("UPDATE users SET email = ? WHERE user_id = ?");
+            if (!$updateUserStmt) {
+                throw new Exception("Unable to update linked user account.");
+            }
+
+            $updateUserStmt->bind_param("si", $email, $linkedUserId);
+            if (!$updateUserStmt->execute()) {
+                throw new Exception("Unable to update linked user account.");
+            }
+        }
+
+        $updateEmployeeStmt = $conn->prepare(
+            "UPDATE employees
+             SET first_name = ?,
+                 middle_name = ?,
+                 last_name = ?,
+                 address = ?,
+                 birthdate = NULLIF(?, ''),
+                 civil_status = ?,
+                 email = ?,
+                 personal_email = ?,
+                 position = ?,
+                 account = ?,
+                 contact_number = ?,
+                 employment_status = ?,
+                 employee_type = ?,
+                 date_hired = NULLIF(?, '')
+             WHERE employee_id = ?"
+        );
+        if (!$updateEmployeeStmt) {
+            throw new Exception("Unable to update employee profile.");
+        }
+
+        $updateEmployeeStmt->bind_param(
+            "ssssssssssssssi",
+            $firstName,
+            $middleName,
+            $lastName,
+            $address,
+            $birthdate,
+            $civilStatus,
+            $email,
+            $personalEmail,
+            $position,
+            $account,
+            $contactNumber,
+            $employmentStatus,
+            $employeeType,
+            $dateHired,
+            $employeeId
+        );
+
+        if (!$updateEmployeeStmt->execute()) {
+            throw new Exception("Unable to update employee profile.");
+        }
+
+        $conn->commit();
+        echo json_encode(["success" => true]);
+    } catch (Throwable $error) {
+        $conn->rollback();
+        http_response_code(500);
+        echo json_encode([
+            "success" => false,
+            "message" => $error->getMessage()
+        ]);
+    }
+    exit;
+}
+
+if ($requestMethod === 'DELETE') {
+    requireAnyPermission($conn, ['Delete Employee']);
+
+    $data = json_decode(file_get_contents("php://input"), true);
+    $employeeId = (int)($data['employee_id'] ?? $data['id'] ?? $_GET['employee_id'] ?? 0);
+    if ($employeeId <= 0) {
+        http_response_code(400);
+        exit(json_encode(["success" => false, "message" => "Employee id is required."]));
+    }
+
+    $stmt = $conn->prepare("UPDATE employees SET archived = 1, employment_status = 'Archived' WHERE employee_id = ? AND COALESCE(archived, 0) = 0");
+    if (!$stmt) {
+        http_response_code(500);
+        exit(json_encode(["success" => false, "message" => "Unable to archive employee."]));
+    }
+
+    $stmt->bind_param("i", $employeeId);
+    if (!$stmt->execute()) {
+        http_response_code(500);
+        exit(json_encode(["success" => false, "message" => "Unable to archive employee."]));
+    }
+
+    if ($stmt->affected_rows <= 0) {
+        http_response_code(404);
+        exit(json_encode(["success" => false, "message" => "Employee not found."]));
+    }
+
+    echo json_encode(["success" => true]);
+    exit;
+}
+
+if ($requestMethod !== 'POST') {
     http_response_code(405);
     exit(json_encode(["success" => false, "message" => "Method not allowed."]));
 }
