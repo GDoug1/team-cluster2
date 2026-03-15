@@ -191,50 +191,119 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+
+function getUserRoleId(mysqli $conn, int $userId): int {
+    $stmt = $conn->prepare("SELECT role_id FROM users WHERE user_id = ? LIMIT 1");
+    if (!$stmt) {
+        return 0;
+    }
+
+    $stmt->bind_param("i", $userId);
+    if (!$stmt->execute()) {
+        return 0;
+    }
+
+    $result = $stmt->get_result();
+    if (!$result) {
+        return 0;
+    }
+
+    $row = $result->fetch_assoc();
+    return (int)($row['role_id'] ?? 0);
+}
+
+function getRolePermissionIdMap(mysqli $conn, int $roleId): array {
+    if ($roleId <= 0) {
+        return [];
+    }
+
+    $stmt = $conn->prepare("SELECT permission_id FROM role_permissions WHERE role_id = ?");
+    if (!$stmt) {
+        return [];
+    }
+
+    $stmt->bind_param("i", $roleId);
+    if (!$stmt->execute()) {
+        return [];
+    }
+
+    $result = $stmt->get_result();
+    if (!$result) {
+        return [];
+    }
+
+    $permissionMap = [];
+    while ($row = $result->fetch_assoc()) {
+        $permissionId = (int)($row['permission_id'] ?? 0);
+        if ($permissionId > 0) {
+            $permissionMap[$permissionId] = true;
+        }
+    }
+
+    return $permissionMap;
+}
+
 $payload = json_decode(file_get_contents('php://input'), true);
-$roleId = (int)($payload['role_id'] ?? 0);
+$userId = (int)($payload['user_id'] ?? 0);
 $permissionIds = $payload['permission_ids'] ?? null;
 
-if ($roleId <= 0 || !is_array($permissionIds)) {
+if ($userId <= 0 || !is_array($permissionIds)) {
     http_response_code(400);
-    echo json_encode(['error' => 'role_id and permission_ids are required']);
+    echo json_encode(['error' => 'user_id and permission_ids are required']);
     exit;
 }
 
-$cleanPermissionIds = [];
+$requestedPermissionMap = [];
 foreach ($permissionIds as $permissionId) {
     $value = (int)$permissionId;
     if ($value > 0) {
-        $cleanPermissionIds[$value] = true;
+        $requestedPermissionMap[$value] = true;
     }
 }
-$cleanPermissionIds = array_keys($cleanPermissionIds);
+
+$roleId = getUserRoleId($conn, $userId);
+if ($roleId <= 0) {
+    http_response_code(404);
+    echo json_encode(['error' => 'User not found']);
+    exit;
+}
+
+$rolePermissionMap = getRolePermissionIdMap($conn, $roleId);
 
 $conn->begin_transaction();
 
 try {
-    if ($roleId > 0) {
-        $deleteStmt = $conn->prepare("DELETE FROM role_permissions WHERE role_id = ?");
-        if (!$deleteStmt) {
-            throw new Exception('Failed to prepare delete statement');
-        }
+    $deleteStmt = $conn->prepare("DELETE FROM user_permissions WHERE user_id = ?");
+    if (!$deleteStmt) {
+        throw new Exception('Failed to prepare delete statement');
+    }
 
-        $deleteStmt->bind_param("i", $roleId);
-        if (!$deleteStmt->execute()) {
-            throw new Exception('Failed to clear role permissions');
+    $deleteStmt->bind_param("i", $userId);
+    if (!$deleteStmt->execute()) {
+        throw new Exception('Failed to clear user permission overrides');
+    }
+
+    $insertStmt = $conn->prepare("INSERT INTO user_permissions (user_id, permission_id, is_allowed) VALUES (?, ?, ?)");
+    if (!$insertStmt) {
+        throw new Exception('Failed to prepare insert statement');
+    }
+
+    foreach ($requestedPermissionMap as $permissionId => $_) {
+        if (!isset($rolePermissionMap[$permissionId])) {
+            $isAllowed = 1;
+            $insertStmt->bind_param("iii", $userId, $permissionId, $isAllowed);
+            if (!$insertStmt->execute()) {
+                throw new Exception('Failed to save user allow override');
+            }
         }
     }
 
-    if (count($cleanPermissionIds) > 0) {
-        $insertStmt = $conn->prepare("INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)");
-        if (!$insertStmt) {
-            throw new Exception('Failed to prepare insert statement');
-        }
-
-        foreach ($cleanPermissionIds as $permissionId) {
-            $insertStmt->bind_param("ii", $roleId, $permissionId);
+    foreach ($rolePermissionMap as $permissionId => $_) {
+        if (!isset($requestedPermissionMap[$permissionId])) {
+            $isAllowed = 0;
+            $insertStmt->bind_param("iii", $userId, $permissionId, $isAllowed);
             if (!$insertStmt->execute()) {
-                throw new Exception('Failed to save role permissions');
+                throw new Exception('Failed to save user deny override');
             }
         }
     }
