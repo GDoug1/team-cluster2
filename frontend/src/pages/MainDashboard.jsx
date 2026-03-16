@@ -14,6 +14,7 @@ function TimeCard({
   hasActiveTimeIn,
   onToggleTimeIn,
   canToggleTimeIn,
+  hasScheduleToday = true,
   hasCompletedShift = false,
 }) {
   return (
@@ -23,6 +24,8 @@ function TimeCard({
 
         {hasCompletedShift ? (
           <p className="time-complete-message">Thank you for your hard work.</p>
+        ) : !hasScheduleToday ? (
+          <p className="time-complete-message">No schedule for today.</p>
         ) : (
           <button
             type="button"
@@ -147,10 +150,14 @@ function HolidayCard({ canEdit = true }) {
 }
 
 
-function SummaryCard({ timeInStart, totalHours, dashboardMeta = null }) {
+function SummaryCard({ timeInStart, totalHours, hasScheduleToday = true, dashboardMeta = null }) {
   const isPresent = Boolean(timeInStart);
-  const availabilityLabel = dashboardMeta?.availabilityLabel ?? "Available";
+  const availabilityLabel = !hasScheduleToday ? "Not Available" : (dashboardMeta?.availabilityLabel ?? "Available");
   const isAvailable = !/not\s+available|unavailable/i.test(availabilityLabel);
+  const attendanceLabel = hasScheduleToday ? (isPresent ? "Present" : "Absent") : "Not Scheduled";
+  const attendanceTag = hasScheduleToday
+    ? (dashboardMeta?.attendanceTag ?? (isPresent ? "On Time" : "Pending"))
+    : "Not Scheduled";
   return (
     <div className="card summary-card">
       <div className="summary-section summary-section-status">
@@ -173,8 +180,8 @@ function SummaryCard({ timeInStart, totalHours, dashboardMeta = null }) {
       </div>
       <div className="summary-section">
         <div className="summary-label">Attendance</div>
-        <div className="big-value">{isPresent ? "Present" : "Absent"}</div>
-        <div className="summary-tag">{dashboardMeta?.attendanceTag ?? (isPresent ? "On Time" : "Pending")}</div>
+        <div className="big-value">{attendanceLabel}</div>
+        <div className="summary-tag">{attendanceTag}</div>
       </div>
     </div>
   );
@@ -215,9 +222,10 @@ export default function MainDashboard({
   const activeTimeOut = attendanceControls?.timeOutAt ?? null;
   const hasCompletedShift = Boolean(attendanceControls?.hasCompletedShift);
   const hasActiveTimeIn = Boolean(activeTimeIn && !activeTimeOut);
+  const hasScheduleToday = Boolean(getTodayShiftSchedule(schedule));
   const canToggleTimeIn = attendanceControls
-    ? Boolean(attendanceControls.canClickTimeIn || attendanceControls.canClickTimeOut)
-    : true;
+    ? Boolean(attendanceControls.canClickTimeIn || attendanceControls.canClickTimeOut) && hasScheduleToday
+    : hasScheduleToday;
 
   const counterDisplay = useMemo(() => {
     if (!activeTimeIn) return "00:00:00";
@@ -312,13 +320,19 @@ export default function MainDashboard({
           hasActiveTimeIn={hasActiveTimeIn}
           onToggleTimeIn={onToggleTimeIn}
           canToggleTimeIn={canToggleTimeIn}
+          hasScheduleToday={hasScheduleToday}
           hasCompletedShift={hasCompletedShift}
         />
         <AnnouncementCard canEdit={canEditCards} />
         <ShiftCard schedule={schedule} dashboardMeta={dashboardMeta} />
         <CalendarCard calendarData={calendarData} />
         <HolidayCard canEdit={canEditCards} />
-        <SummaryCard timeInStart={activeTimeIn} totalHours={totalHours} dashboardMeta={dashboardMeta} />
+        <SummaryCard
+          timeInStart={activeTimeIn}
+          totalHours={totalHours}
+          hasScheduleToday={hasScheduleToday}
+          dashboardMeta={dashboardMeta}
+        />
         {showMemberStatusCard ? <MemberStatusCard /> : null}
       </div>
 
