@@ -103,7 +103,7 @@ export default function AdminDashboard() {
         onClick: () => setActiveNav(label === "My Attendance" ? "Attendance" : label)
       }))
     },
-    { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") },
+    { label: "Team Coach Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") },
     ...(canAccessEmployeesTab ? [{ label: "Employees", active: activeNav === "Employees", onClick: () => setActiveNav("Employees") }] : []),
     ...(canAccessControlPanel ? [{ label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }] : [])
   ];
@@ -712,7 +712,7 @@ const handleOpenRejectModal = cluster => {
                 </div>
 
                 <div className="section-title">Team Coach Schedule by Coach</div>
-                <div className="active-members-schedule-table" role="table" aria-label="Team coach schedule by coach">
+                <div className="active-members-schedule-table team-coach-schedule-scroll" role="table" aria-label="Team coach schedule by coach">
                   <div className="active-members-schedule-header" role="row">
                     <span role="columnheader">Members</span>
                     <span role="columnheader">Mon</span>
@@ -724,34 +724,36 @@ const handleOpenRejectModal = cluster => {
                     <span role="columnheader">Sun</span>
                     <span role="columnheader">Status</span>
                   </div>
-                  {[...clusters]
-                    .sort((a, b) => (a.coach ?? "").localeCompare(b.coach ?? ""))
-                    .map(cluster => (
-                      <div key={`coach-schedule-${cluster.id}`} className="active-members-schedule-row" role="row">
-                        <div className="active-members-owner" role="cell">{cluster.coach || "—"}</div>
-                        {dayOptions.map(day => {
-                          const daySchedule = formatCoachDaySchedule(cluster.coach_schedule, day);
+                  <div className="active-members-schedule-body" role="rowgroup">
+                    {[...clusters]
+                      .sort((a, b) => (a.coach ?? "").localeCompare(b.coach ?? ""))
+                      .map(cluster => (
+                        <div key={`coach-schedule-${cluster.id}`} className="active-members-schedule-row" role="row">
+                          <div className="active-members-owner" role="cell">{cluster.coach || "—"}</div>
+                          {dayOptions.map(day => {
+                            const daySchedule = formatCoachDaySchedule(cluster.coach_schedule, day);
 
-                          if (typeof daySchedule === "string") {
+                            if (typeof daySchedule === "string") {
+                              return (
+                                <div key={`${cluster.id}-${day}`} role="cell">{daySchedule}</div>
+                              );
+                            }
+
                             return (
-                              <div key={`${cluster.id}-${day}`} role="cell">{daySchedule}</div>
+                              <div key={`${cluster.id}-${day}`} role="cell" className="active-day-cell">
+                                <div>{daySchedule.shift}</div>
+                                <span className="active-day-tag break-tag">
+                                  Break time: {daySchedule.breakTime}
+                                </span>
+                              </div>
                             );
-                          }
-
-                          return (
-                            <div key={`${cluster.id}-${day}`} role="cell" className="active-day-cell">
-                              <div>{daySchedule.shift}</div>
-                              <span className="active-day-tag break-tag">
-                                Break time: {daySchedule.breakTime}
-                              </span>
-                            </div>
-                          );
-                        })}
-                        <div role="cell" className="member-status-and-tags-cell">
-                          <span className={`badge ${cluster.status}`}>{cluster.status}</span>
+                          })}
+                          <div role="cell" className="member-status-and-tags-cell">
+                            <span className={`badge ${cluster.status}`}>{cluster.status}</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                  </div>
                 </div>
               </>
             )}

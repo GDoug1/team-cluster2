@@ -149,6 +149,7 @@ body {
 
 .main {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   padding: 24px 32px;
@@ -213,6 +214,7 @@ body {
   border-radius: 16px;
   padding: 20px;
   min-height: 480px;
+  min-width: 0;
   border: 1px solid var(--border);
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
 }
@@ -910,8 +912,22 @@ body {
   border: 1px solid #d1d5db;
   border-radius: 12px;
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: hidden;
   background: #f8fafc;
+}
+
+
+.team-coach-schedule-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+
+.active-members-schedule-body {
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 .active-members-schedule-header,
