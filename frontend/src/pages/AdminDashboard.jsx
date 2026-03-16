@@ -285,7 +285,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (activeNav !== "Attendance") return;
-    apiFetch(`api/admin/admin_coach_attendance.php?attendance_date=${attendanceDate}`)
+    apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${attendanceDate}`)
       .then(data => setCoachAttendance(Array.isArray(data) ? data : []))
       .catch(() => setCoachAttendance([]));
   }, [activeNav, attendanceDate]);
@@ -332,7 +332,7 @@ export default function AdminDashboard() {
       })
     });
     setEditingCoachAttendance(null);
-    const refreshed = await apiFetch(`api/admin/admin_coach_attendance.php?attendance_date=${attendanceDate}`);
+    const refreshed = await apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${attendanceDate}`);
     setCoachAttendance(Array.isArray(refreshed) ? refreshed : []);
   };
 
@@ -624,13 +624,11 @@ const handleOpenRejectModal = cluster => {
           </>
         ) : activeNav === "Attendance" ? (
           <section className="content">
-            <div className="section-title">Coach Attendance</div>
+            <div className="section-title">My Attendance</div>
             <AttendanceHistoryHighlights />
             <DataPanel
               type="attendance"
               records={coachAttendance}
-              personField="employee_name"
-              personLabel="Coach"
               onEditRow={openAttendanceEdit}
               externalDateFilter={attendanceDate}
               onExternalDateFilterChange={setAttendanceDate}
