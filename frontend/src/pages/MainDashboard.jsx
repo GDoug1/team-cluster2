@@ -155,8 +155,11 @@ function SummaryCard({ timeInStart, totalHours, hasScheduleToday = true, dashboa
   const availabilityLabel = !hasScheduleToday ? "Not Available" : (dashboardMeta?.availabilityLabel ?? "Available");
   const isAvailable = !/not\s+available|unavailable/i.test(availabilityLabel);
   const attendanceLabel = hasScheduleToday ? (isPresent ? "Present" : "Absent") : "Not Scheduled";
+  const resolvedAttendanceTag = dashboardMeta?.attendanceTag;
   const attendanceTag = hasScheduleToday
-    ? (dashboardMeta?.attendanceTag ?? (isPresent ? "On Time" : "Pending"))
+    ? (resolvedAttendanceTag && resolvedAttendanceTag !== "Pending"
+      ? resolvedAttendanceTag
+      : (isPresent ? "On Time" : "Scheduled"))
     : "Not Scheduled";
   return (
     <div className="card summary-card">
