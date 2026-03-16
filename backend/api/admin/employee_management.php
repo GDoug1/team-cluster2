@@ -87,8 +87,15 @@ $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($requestMethod === 'GET') {
     requireAnyPermission($conn, ['View Employee List']);
+
+    $showArchived = (string)($_GET['archived'] ?? '0') === '1';
+    $archiveFilter = $showArchived
+        ? "COALESCE(e.archived, 0) = 1"
+        : "COALESCE(e.archived, 0) = 0";
+
     $sql = "SELECT
                 e.employee_id,
+                e.user_id,
                 COALESCE(e.first_name, '') AS first_name,
                 COALESCE(e.middle_name, '') AS middle_name,
                 COALESCE(e.last_name, '') AS last_name,
@@ -106,7 +113,7 @@ if ($requestMethod === 'GET') {
                 COALESCE(e.personal_email, '') AS personal_email
             FROM employees e
             LEFT JOIN users u ON u.user_id = e.user_id
-            WHERE COALESCE(e.archived, 0) = 0
+            WHERE {$archiveFilter}
             ORDER BY e.employee_id DESC";
 
     $result = $conn->query($sql);
@@ -119,6 +126,7 @@ if ($requestMethod === 'GET') {
     while ($row = $result->fetch_assoc()) {
         $employees[] = [
             "id" => (int)$row['employee_id'],
+            "user_id" => isset($row['user_id']) ? (int)$row['user_id'] : null,
             "first_name" => $row['first_name'],
             "middle_name" => $row['middle_name'],
             "last_name" => $row['last_name'],
@@ -139,6 +147,72 @@ if ($requestMethod === 'GET') {
 
     echo json_encode($employees);
     exit;
+}
+
+if ($requestMethod === 'PATCH') {
+    requireAnyPermission($conn, ['Delete Employee']);
+
+    $data = json_decode(file_get_contents("php://input"), true);
+    $employeeId = (int)($data['employee_id'] ?? $data['id'] ?? 0);
+    $action = trim((string)($data['action'] ?? ''));
+
+    if ($employeeId <= 0 || $action === '') {
+        http_response_code(400);
+        exit(json_encode(["success" => false, "message" => "Employee id and action are required."]));
+    }
+
+    if ($action === 'restore') {
+        $stmt = $conn->prepare(
+            "UPDATE employees
+             SET archived = 0,
+                 employment_status = CASE WHEN employment_status = 'Archived' THEN 'Active' ELSE employment_status END
+             WHERE employee_id = ? AND COALESCE(archived, 0) = 1"
+        );
+
+        if (!$stmt) {
+            http_response_code(500);
+            exit(json_encode(["success" => false, "message" => "Unable to restore employee."]));
+        }
+
+        $stmt->bind_param("i", $employeeId);
+        if (!$stmt->execute()) {
+            http_response_code(500);
+            exit(json_encode(["success" => false, "message" => "Unable to restore employee."]));
+        }
+
+        if ($stmt->affected_rows <= 0) {
+            http_response_code(404);
+            exit(json_encode(["success" => false, "message" => "Archived employee not found."]));
+        }
+
+        echo json_encode(["success" => true]);
+        exit;
+    }
+
+    if ($action === 'permanent_delete') {
+        $stmt = $conn->prepare("DELETE FROM employees WHERE employee_id = ? AND COALESCE(archived, 0) = 1");
+        if (!$stmt) {
+            http_response_code(500);
+            exit(json_encode(["success" => false, "message" => "Unable to permanently delete employee."]));
+        }
+
+        $stmt->bind_param("i", $employeeId);
+        if (!$stmt->execute()) {
+            http_response_code(500);
+            exit(json_encode(["success" => false, "message" => "Unable to permanently delete employee."]));
+        }
+
+        if ($stmt->affected_rows <= 0) {
+            http_response_code(404);
+            exit(json_encode(["success" => false, "message" => "Archived employee not found."]));
+        }
+
+        echo json_encode(["success" => true]);
+        exit;
+    }
+
+    http_response_code(400);
+    exit(json_encode(["success" => false, "message" => "Invalid archive action."]));
 }
 
 if ($requestMethod === 'PUT') {
