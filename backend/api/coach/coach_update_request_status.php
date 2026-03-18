@@ -38,6 +38,42 @@ function getClusterMemberEmployeeReference(mysqli $conn): ?string {
     return $row['REFERENCED_TABLE_NAME'] ?? null;
 }
 
+function resolveRequesterRole(mysqli $conn, int $requesterId, ?string $requestEmployeeReference): string {
+    if ($requesterId <= 0) {
+        return '';
+    }
+
+    if ($requestEmployeeReference === 'users') {
+        $stmt = $conn->prepare("SELECT LOWER(COALESCE(role, '')) AS role_name FROM users WHERE id = ? LIMIT 1");
+        if ($stmt) {
+            $stmt->bind_param('i', $requesterId);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $row = $result ? $result->fetch_assoc() : null;
+            return trim((string)($row['role_name'] ?? ''));
+        }
+
+        return '';
+    }
+
+    $stmt = $conn->prepare(
+        "SELECT LOWER(COALESCE(u.role, '')) AS role_name
+         FROM employees e
+         INNER JOIN users u ON u.id = e.user_id
+         WHERE e.employee_id = ?
+         LIMIT 1"
+    );
+    if (!$stmt) {
+        return '';
+    }
+
+    $stmt->bind_param('i', $requesterId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+    return trim((string)($row['role_name'] ?? ''));
+}
+
 $body = json_decode(file_get_contents("php://input"), true);
 if (!is_array($body)) {
     http_response_code(400);
@@ -49,11 +85,7 @@ $source = trim((string)($body['request_source'] ?? ''));
 $requestId = (int)($body['request_id'] ?? 0);
 $status = trim((string)($body['status'] ?? ''));
 
-if ($status === 'Approved') {
-    $status = 'Endorsed';
-}
-
-if (!in_array($source, ['leave', 'overtime', 'dispute'], true) || $requestId <= 0 || $status !== 'Endorsed') {
+if (!in_array($source, ['leave', 'overtime', 'dispute'], true) || $requestId <= 0 || !in_array($status, ['Approved', 'Endorsed'], true)) {
     http_response_code(422);
     echo json_encode(["error" => "Invalid request update payload."]);
     exit;
@@ -99,8 +131,17 @@ if (!$allowed || $allowed->num_rows === 0) {
     exit;
 }
 
+$allowedRow = $allowed->fetch_assoc();
+$requesterId = (int)($allowedRow['employee_id'] ?? 0);
+$requesterRole = resolveRequesterRole($conn, $requesterId, $requestEmployeeReference);
+
+$nextStatus = 'Endorsed';
+if ($source === 'overtime' && strpos($requesterRole, 'coach') === false) {
+    $nextStatus = 'Approved';
+}
+
 $updateStmt = $conn->prepare("UPDATE $table SET status = ? WHERE $idColumn = ?");
-$updateStmt->bind_param('si', $status, $requestId);
+$updateStmt->bind_param('si', $nextStatus, $requestId);
 $updateStmt->execute();
 
 if ($conn->errno) {
