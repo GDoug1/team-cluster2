@@ -1,3 +1,5 @@
+import "../styles/DashboardLayout.css";
+import "../styles/EmployeeDashboard.css";
 import { useEffect, useState } from "react";
 import { apiFetch } from "../api/api";
 import { saveDashboardAttendance } from "../api/attendance";
@@ -492,7 +494,7 @@ export default function EmployeeDashboard() {
             <div className="employee-panel">
               {activeNav === "My Attendance" && (
                 <div className="employee-card">
-                  <div className="employee-card-body" style={{ padding: 0 }}>
+                  <div className="employee-card-body employee-card-body-flush">
                     <AttendanceModule />
                   </div>
                 </div>

@@ -1,3 +1,4 @@
+import "../styles/DashboardLayout.css";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "../api/api";
 import DashboardSidebar from "../components/DashboardSidebar";

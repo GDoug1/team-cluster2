@@ -1,3 +1,4 @@
+import "../styles/AuthPages.css";
 import { useEffect, useState } from "react";
 import { apiFetch } from "../api/api";
 import AuthLayout from "../components/AuthLayout";

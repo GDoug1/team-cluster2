@@ -1,3 +1,4 @@
+import "../styles/DashboardLayout.css";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
 import { parseSqlDateTime, saveDashboardAttendance } from "../api/attendance";
