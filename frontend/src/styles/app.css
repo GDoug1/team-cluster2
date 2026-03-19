@@ -14,6 +14,8 @@
   --text-secondary: #475569;
   --accent: #3b82f6;
   --accent-soft: #dbeafe;
+  --nav-accent: #1e3a8a;
+  --nav-accent-soft: rgba(219, 234, 254, 0.92);
 }
 
 body {
@@ -127,8 +129,8 @@ body {
 }
 
 .nav-item.active {
-  background: rgba(219, 234, 254, 0.92);
-  color: #1e3a8a;
+  background: var(--nav-accent-soft);
+  color: var(--nav-accent);
   font-weight: 600;
 }
 
@@ -171,8 +173,8 @@ body {
 }
 
 .nav-subitem.active {
-  background: rgba(219, 234, 254, 0.92);
-  color: #1e3a8a;
+  background: var(--nav-accent-soft);
+  color: var(--nav-accent);
   font-weight: 600;
 }
 
@@ -2630,8 +2632,9 @@ body {
 }
 
 .control-panel-tab.active {
-  background: #dbeafe;
-  border-color: #bfdbfe;
+  background: var(--nav-accent-soft);
+  border-color: var(--accent-soft);
+  color: var(--nav-accent);
 }
 
 .control-panel-search {
@@ -2668,7 +2671,7 @@ body {
 }
 
 .control-panel-table-header {
-  background: #2f8ccc;
+  background: var(--nav-accent);
   color: #fff;
   font-weight: 700;
 }
@@ -2786,7 +2789,7 @@ body {
 }
 
 .permission-card-header {
-  background: #2f8ccc;
+  background: var(--nav-accent);
   color: #fff;
   font-weight: 700;
   padding: 10px 14px;
@@ -2812,8 +2815,8 @@ body {
   margin-top: 14px;
   font-size: 13px;
   padding: 8px 14px;
-  border-color: #1d4ed8;
-  background: #1d4ed8;
+  border-color: var(--nav-accent);
+  background: var(--nav-accent);
   color: #ffffff;
 }
 
