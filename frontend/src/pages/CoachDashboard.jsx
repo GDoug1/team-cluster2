@@ -14,7 +14,7 @@ import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import usePermissions from "../hooks/usePermissions";
 import { normalizeSchedule as normalizeAttendanceSchedule, parseDateValue, resolveAttendanceMainTag } from "../utils/attendanceTags";
-
+import { logout } from "../utils/logout";
 
 const attendanceSortOptions = {
   newestAttendanceFirst: "newestAttendanceFirst",
@@ -714,16 +714,16 @@ export default function CoachDashboard() {
     availabilityLabel: dashboardCluster ? "Available" : "Not available"
   }), [dashboardCluster, coachAttendanceTag, todayCoachSchedule]);
 
-  const handleLogout = async () => {
-    try {
-      await apiFetch("auth/logout.php", { method: "POST" });
-    } catch {
-      console.error("Logout failed", error);
-    } finally {
-      localStorage.removeItem("teamClusterUser");
-      window.location.href = "/login";
-    }
-  };
+  // const handleLogout = async () => {
+  //   try {
+  //     await apiFetch("auth/logout.php", { method: "POST" });
+  //   } catch {
+  //     console.error("Logout failed", error);
+  //   } finally {
+  //     localStorage.removeItem("teamClusterUser");
+  //     window.location.href = "/login";
+  //   }
+  // };
 
   const handleChange = event => {
     const { name, value } = event.target;
@@ -1461,7 +1461,7 @@ export default function CoachDashboard() {
         roleLabel="Team Coach"
         userName={user?.fullname}
         navItems={navItems}
-        onLogout={handleLogout}
+        onLogout={logout}
       />
 
       <main className="main">

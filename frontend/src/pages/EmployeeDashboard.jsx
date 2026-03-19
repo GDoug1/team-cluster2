@@ -16,7 +16,7 @@ import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import usePermissions from "../hooks/usePermissions";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
-
+import { logout } from "../utils/logout";
 
 export default function EmployeeDashboard() {
   const { user } = useCurrentUser();
@@ -391,16 +391,16 @@ export default function EmployeeDashboard() {
 
   const myRequestHighlights = buildRequestHighlights(myRequests);
 
-  const handleLogout = async () => {
-    try {
-      await apiFetch("auth/logout.php", { method: "POST" });
-    } catch (error) {
-      console.error("Logout failed", error);
-    } finally {
-      localStorage.removeItem("teamClusterUser");
-      window.location.href = "/login";
-    }
-  };
+  // const handleLogout = async () => {
+  //   try {
+  //     await apiFetch("auth/logout.php", { method: "POST" });
+  //   } catch (error) {
+  //     console.error("Logout failed", error);
+  //   } finally {
+  //     localStorage.removeItem("teamClusterUser");
+  //     window.location.href = "/login";
+  //   }
+  // };
 
   return (
     <div className="dashboard">
@@ -409,7 +409,7 @@ export default function EmployeeDashboard() {
         roleLabel="Employee"
         userName={user?.fullname}
         navItems={sidebarNavItems}
-        onLogout={handleLogout}
+        onLogout={logout}
       />
 
       <main className="main">

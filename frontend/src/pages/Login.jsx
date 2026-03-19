@@ -3,6 +3,7 @@ import "../styles/login.css";
 import { useState } from "react";
 import { apiFetch } from "../api/api";
 import AuthLayout from "../components/AuthLayout";
+import { useNavigate } from "react-router-dom";
 
 import bg from "../assets/login_bg.svg";
 import logo from "../assets/ireply.png";
@@ -12,6 +13,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -46,7 +48,7 @@ export default function Login() {
           ? "/coach"
           : "/employee");
 
-      window.location.href = redirectPath;
+      navigate(redirectPath);
     } catch (err) {
       setError(err.error || "Login failed");
     } finally {

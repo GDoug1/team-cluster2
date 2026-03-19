@@ -12,6 +12,7 @@ import DataPanel from "../components/DataPanel";
 import ControlPanelSection from "../components/ControlPanelSection";
 import EmployeesSection from "../components/EmployeesSection";
 import { buildRequestHighlights, fetchAdminTeamRequests, fetchMyRequests, updateAdminTeamRequestStatus } from "../api/requests";
+import { logout } from "../utils/logout";
 
 export default function SuperAdminDashboard() {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -337,16 +338,16 @@ export default function SuperAdminDashboard() {
     setCoachAttendance(Array.isArray(refreshed) ? refreshed : []);
   };
 
-  const handleLogout = async () => {
-    try {
-      await apiFetch("auth/logout.php", { method: "POST" });
-    } catch (error) {
-      console.error("Logout failed", error);
-    } finally {
-      localStorage.removeItem("teamClusterUser");
-      window.location.href = "/login";
-    }
-  };
+  // const handleLogout = async () => {
+  //   try {
+  //     await apiFetch("auth/logout.php", { method: "POST" });
+  //   } catch (error) {
+  //     console.error("Logout failed", error);
+  //   } finally {
+  //     localStorage.removeItem("teamClusterUser");
+  //     window.location.href = "/login";
+  //   }
+  // };
 
 
   const handleToggleScheduleDay = day => {
@@ -546,7 +547,7 @@ const handleOpenRejectModal = cluster => {
         roleLabel="Super Admin"
         userName={user?.fullname}
         navItems={navItems}
-        onLogout={handleLogout}
+        onLogout={logout}
       />
 
       <main className="main">

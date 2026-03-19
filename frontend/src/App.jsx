@@ -1,52 +1,70 @@
-import { useEffect, useState } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import AdminDashboard from "./pages/AdminDashboard";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import CoachDashboard from "./pages/CoachDashboard";
-import EmployeeDashboard from "./pages/EmployeeDashboard.jsx";
+import EmployeeDashboard from "./pages/EmployeeDashboard";
 
-const normalizePath = path => {
-  if (!path || path === "/") return "/login";
-  return path;
-};
-
-const renderRoute = path => {
-  switch (path) {
-    case "/login":
-      return <Login />;
-    case "/register":
-      return <Register />;
-    case "/admin":
-      return <AdminDashboard />;
-    case "/super-admin":
-      return <SuperAdminDashboard />;
-    case "/coach":
-      return <CoachDashboard />;
-    case "/coach/attendance":
-      return <CoachDashboard />;
-    case "/employee":
-      return <EmployeeDashboard />;
-    default:
-      return <Login />;
-  }
-};
+import ProtectedRoute from "./routes/ProtectedRoute";
 
 export default function App() {
-  const [currentPath, setCurrentPath] = useState(() => normalizePath(window.location.pathname));
+  return (
+    <Routes>
+      {/* PUBLIC */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
-  useEffect(() => {
-    if (window.location.pathname === "/") {
-      window.history.replaceState({}, "", "/login");
-    }
+      {/* PROTECTED */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
 
-    const onPathChange = () => {
-      setCurrentPath(normalizePath(window.location.pathname));
-    };
+      <Route
+        path="/super-admin"
+        element={
+          <ProtectedRoute allowedRoles={["super admin"]}>
+            <SuperAdminDashboard />
+          </ProtectedRoute>
+        }
+      />
 
-    window.addEventListener("popstate", onPathChange);
-    return () => window.removeEventListener("popstate", onPathChange);
-  }, []);
+      <Route
+        path="/coach"
+        element={
+          <ProtectedRoute allowedRoles={["coach"]}>
+            <CoachDashboard />
+          </ProtectedRoute>
+        }
+      />
 
-        return renderRoute(currentPath);
+      <Route
+        path="/coach/attendance"
+        element={
+          <ProtectedRoute allowedRoles={["coach"]}>
+            <CoachDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/employee"
+        element={
+          <ProtectedRoute>
+            <EmployeeDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* FALLBACK */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
+  );
 }
