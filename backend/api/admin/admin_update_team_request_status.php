@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 requireRole(["admin", "super admin"]);
 
 function getEmployeeReferenceTable(mysqli $conn, string $table): ?string {
@@ -118,5 +119,11 @@ if ($conn->errno) {
     echo json_encode(["error" => "Unable to update request status."]);
     exit;
 }
+
+logCurrentUserAction(
+    $conn,
+    'request_finalize',
+    buildAuditTarget($source, $requestId, 'status=' . $status)
+);
 
 echo json_encode(["success" => true]);

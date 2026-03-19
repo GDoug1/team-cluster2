@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 requireRole("coach");
 
 header("Content-Type: application/json");
@@ -52,6 +53,12 @@ if ($result !== true) {
 }
 
 $id = $conn->insert_id;
+
+logCurrentUserAction(
+    $conn,
+    'cluster_create',
+    buildAuditTarget('cluster', $id, $name)
+);
 
 echo json_encode([
     "id" => $id,

@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 requireRole(["coach", "admin"]);
 
 $data = json_decode(file_get_contents("php://input"), true);
@@ -139,6 +140,11 @@ try {
     }
 
     $conn->commit();
+    logCurrentUserAction(
+        $conn,
+        'schedule_save',
+        buildAuditTarget('cluster', $cluster_id, 'employee=' . $employee_id . ',days=' . implode(',', $days))
+    );
     echo json_encode(["success" => true]);
 } catch (Throwable $e) {
     $conn->rollback();

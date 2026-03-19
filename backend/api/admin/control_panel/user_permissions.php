@@ -1,8 +1,117 @@
 <?php
 include __DIR__ . "/../../../config/database.php";
 include __DIR__ . "/../../../config/auth.php";
+include __DIR__ . "/../../utils/logger.php";
 
 requireRoleOrPermission(["super admin", "admin"], $conn, "Access Control Panel");
+
+function ensureUserPermissionsSchema(mysqli $conn): void {
+    $indexes = [];
+    $result = $conn->query("SHOW INDEX FROM user_permissions");
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $keyName = (string)($row['Key_name'] ?? '');
+            $columnName = (string)($row['Column_name'] ?? '');
+            if ($keyName === '') {
+                continue;
+            }
+
+            if (!isset($indexes[$keyName])) {
+                $indexes[$keyName] = [];
+            }
+
+            $indexes[$keyName][] = $columnName;
+        }
+    }
+
+    $needsFix = isset($indexes['user_id']) || isset($indexes['permission_id']);
+    $hasComposite = false;
+
+    foreach ($indexes as $columns) {
+        if (count($columns) === 2 && $columns[0] === 'user_id' && $columns[1] === 'permission_id') {
+            $hasComposite = true;
+            break;
+        }
+    }
+
+    if (!$needsFix && $hasComposite) {
+        return;
+    }
+
+    $conn->begin_transaction();
+
+    try {
+        if (isset($indexes['user_id'])) {
+            if (!$conn->query("ALTER TABLE user_permissions DROP INDEX user_id")) {
+                throw new Exception('Failed to drop invalid user_permissions.user_id index');
+            }
+        }
+
+        if (isset($indexes['permission_id'])) {
+            if (!$conn->query("ALTER TABLE user_permissions DROP INDEX permission_id")) {
+                throw new Exception('Failed to drop invalid user_permissions.permission_id index');
+            }
+        }
+
+        if (!$hasComposite) {
+            if (!$conn->query("ALTER TABLE user_permissions ADD UNIQUE KEY uniq_user_permission (user_id, permission_id)")) {
+                throw new Exception('Failed to create user_permissions composite unique index');
+            }
+        }
+
+        $conn->commit();
+    } catch (Throwable $error) {
+        $conn->rollback();
+        throw $error;
+    }
+}
+
+ensureUserPermissionsSchema($conn);
+
+function normalizeRoleName(string $roleName): string {
+    return strtolower(trim($roleName));
+}
+
+function getRestrictedPermissionNamesForRole(string $roleName): array {
+    $normalizedRole = normalizeRoleName($roleName);
+
+    if ($normalizedRole === 'employee') {
+        return [
+            'Access Control Panel',
+            'Add Employee',
+            'Edit Employee',
+            'Delete Employee',
+            'Set Attendance',
+            'Edit Attendance',
+            'View Employee List'
+        ];
+    }
+
+    if ($normalizedRole === 'team coach' || $normalizedRole === 'coach') {
+        return [
+            'Access Control Panel',
+            'Add Employee',
+            'Edit Employee',
+            'Delete Employee'
+        ];
+    }
+
+    return [];
+}
+
+function getPermissionIdNameMap(mysqli $conn): array {
+    $result = $conn->query("SELECT permission_id, permission_name FROM permissions");
+    if (!$result) {
+        return [];
+    }
+
+    $permissionMap = [];
+    while ($row = $result->fetch_assoc()) {
+        $permissionMap[(int)$row['permission_id']] = (string)$row['permission_name'];
+    }
+
+    return $permissionMap;
+}
 
 function getAllPermissions(mysqli $conn): array {
     $result = $conn->query("SELECT permission_id, permission_name FROM permissions ORDER BY permission_id ASC");
@@ -100,7 +209,9 @@ function getUserPermissions(mysqli $conn): array {
     $userMap = [];
     while ($row = $usersResult->fetch_assoc()) {
         $userId = (int)($row['user_id'] ?? 0);
-        if ($userId <= 0) continue;
+        if ($userId <= 0) {
+            continue;
+        }
 
         $userMap[$userId] = [
             'userId' => $userId,
@@ -129,7 +240,9 @@ function getUserPermissions(mysqli $conn): array {
         while ($row = $rolePermissionsResult->fetch_assoc()) {
             $userId = (int)($row['user_id'] ?? 0);
             $permissionName = trim((string)($row['permission_name'] ?? ''));
-            if ($userId <= 0 || $permissionName === '') continue;
+            if ($userId <= 0 || $permissionName === '') {
+                continue;
+            }
 
             if (!isset($effectivePermissionMap[$userId])) {
                 $effectivePermissionMap[$userId] = [];
@@ -152,7 +265,9 @@ function getUserPermissions(mysqli $conn): array {
             $userId = (int)($row['user_id'] ?? 0);
             $permissionName = trim((string)($row['permission_name'] ?? ''));
             $isAllowed = (int)($row['is_allowed'] ?? 0) === 1;
-            if ($userId <= 0 || $permissionName === '') continue;
+            if ($userId <= 0 || $permissionName === '') {
+                continue;
+            }
 
             if (!isset($effectivePermissionMap[$userId])) {
                 $effectivePermissionMap[$userId] = [];
@@ -191,7 +306,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-
 function getUserRoleId(mysqli $conn, int $userId): int {
     $stmt = $conn->prepare("SELECT role_id FROM users WHERE user_id = ? LIMIT 1");
     if (!$stmt) {
@@ -210,6 +324,28 @@ function getUserRoleId(mysqli $conn, int $userId): int {
 
     $row = $result->fetch_assoc();
     return (int)($row['role_id'] ?? 0);
+}
+
+function getUserRoleName(mysqli $conn, int $userId): string {
+    $stmt = $conn->prepare(
+        "SELECT COALESCE(r.role_name, '') AS role_name
+         FROM users u
+         LEFT JOIN roles r ON r.role_id = u.role_id
+         WHERE u.user_id = ?
+         LIMIT 1"
+    );
+    if (!$stmt) {
+        return '';
+    }
+
+    $stmt->bind_param("i", $userId);
+    if (!$stmt->execute()) {
+        return '';
+    }
+
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+    return (string)($row['role_name'] ?? '');
 }
 
 function getRolePermissionIdMap(mysqli $conn, int $roleId): array {
@@ -268,6 +404,20 @@ if ($roleId <= 0) {
     exit;
 }
 
+$targetUserRoleName = getUserRoleName($conn, $userId);
+$restrictedPermissionNames = getRestrictedPermissionNamesForRole($targetUserRoleName);
+if (count($restrictedPermissionNames) > 0) {
+    $permissionIdNameMap = getPermissionIdNameMap($conn);
+    $restrictedMap = array_fill_keys($restrictedPermissionNames, true);
+
+    foreach (array_keys($requestedPermissionMap) as $permissionId) {
+        $permissionName = $permissionIdNameMap[$permissionId] ?? '';
+        if (isset($restrictedMap[$permissionName])) {
+            unset($requestedPermissionMap[$permissionId]);
+        }
+    }
+}
+
 $rolePermissionMap = getRolePermissionIdMap($conn, $roleId);
 
 $conn->begin_transaction();
@@ -309,6 +459,11 @@ try {
     }
 
     $conn->commit();
+    logCurrentUserAction(
+        $conn,
+        'user_permissions_update',
+        buildAuditTarget('user', $userId, 'permissions=' . implode(',', array_keys($requestedPermissionMap)))
+    );
 
     echo json_encode([
         'success' => true,

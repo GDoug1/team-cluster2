@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 requireRole("coach");
 
 function getColumns(mysqli $conn, string $table): array {
@@ -151,3 +152,12 @@ echo json_encode([
     "added" => $addedMembers,
     "added_count" => count($addedMembers)
 ]);
+
+if (count($addedMembers) > 0) {
+    $memberIds = array_map(static fn($member) => (string)((int)($member['id'] ?? 0)), $addedMembers);
+    logCurrentUserAction(
+        $conn,
+        'cluster_member_add',
+        buildAuditTarget('cluster', $cluster_id, 'members=' . implode(',', $memberIds))
+    );
+}

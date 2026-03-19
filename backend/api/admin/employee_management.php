@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 
 
 
@@ -185,6 +186,7 @@ if ($requestMethod === 'PATCH') {
             exit(json_encode(["success" => false, "message" => "Archived employee not found."]));
         }
 
+        logCurrentUserAction($conn, 'employee_restore', buildAuditTarget('employee', $employeeId));
         echo json_encode(["success" => true]);
         exit;
     }
@@ -207,6 +209,7 @@ if ($requestMethod === 'PATCH') {
             exit(json_encode(["success" => false, "message" => "Archived employee not found."]));
         }
 
+        logCurrentUserAction($conn, 'employee_delete_permanent', buildAuditTarget('employee', $employeeId));
         echo json_encode(["success" => true]);
         exit;
     }
@@ -347,6 +350,11 @@ if ($requestMethod === 'PUT') {
         }
 
         $conn->commit();
+        logCurrentUserAction(
+            $conn,
+            'employee_update',
+            buildAuditTarget('employee', $employeeId, $email)
+        );
         echo json_encode(["success" => true]);
     } catch (Throwable $error) {
         $conn->rollback();
@@ -386,6 +394,7 @@ if ($requestMethod === 'DELETE') {
         exit(json_encode(["success" => false, "message" => "Employee not found."]));
     }
 
+    logCurrentUserAction($conn, 'employee_archive', buildAuditTarget('employee', $employeeId));
     echo json_encode(["success" => true]);
     exit;
 }
@@ -512,6 +521,12 @@ try {
     }
 
     $conn->commit();
+    $employeeId = (int)$stmtEmp->insert_id;
+    logCurrentUserAction(
+        $conn,
+        'employee_create',
+        buildAuditTarget('employee', $employeeId, $email)
+    );
 
     echo json_encode([
         "success" => true,

@@ -1,12 +1,50 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
 
+const RESTRICTED_PERMISSIONS_BY_ROLE = {
+  employee: new Set([
+    "Access Control Panel",
+    "Add Employee",
+    "Edit Employee",
+    "Delete Employee",
+    "Set Attendance",
+    "Edit Attendance",
+    "View Employee List"
+  ]),
+  "team coach": new Set([
+    "Access Control Panel",
+    "Add Employee",
+    "Edit Employee",
+    "Delete Employee"
+  ]),
+  coach: new Set([
+    "Access Control Panel",
+    "Add Employee",
+    "Edit Employee",
+    "Delete Employee"
+  ])
+};
+
+function getEditablePermissionOptions(roleName, permissionOptions) {
+  const normalizedRole = String(roleName ?? "").trim().toLowerCase();
+  const restrictedPermissions = RESTRICTED_PERMISSIONS_BY_ROLE[normalizedRole];
+  if (!restrictedPermissions) {
+    return permissionOptions;
+  }
+
+  return permissionOptions.filter(permission => !restrictedPermissions.has(permission.name));
+}
+
 function PermissionEditorModal({ title, selectedPermissionIds, permissionOptions, onClose, onSave, isSaving = false, errorMessage = "" }) {
   const [draftPermissionIds, setDraftPermissionIds] = useState(selectedPermissionIds);
+  const selectedPermissionKey = useMemo(
+    () => [...selectedPermissionIds].sort((a, b) => a - b).join(","),
+    [selectedPermissionIds]
+  );
 
   useEffect(() => {
     setDraftPermissionIds(selectedPermissionIds);
-  }, [selectedPermissionIds]);
+  }, [selectedPermissionKey]);
 
   const togglePermission = permissionId => {
     setDraftPermissionIds(current => {
@@ -198,6 +236,25 @@ export default function ControlPanelSection() {
 
   const editingRole = rolePermissions.find(item => item.id === editingRoleId);
   const editingUser = userPermissions.find(item => item.id === editingUserId);
+  const editingRolePermissionIds = useMemo(
+    () => (editingRole?.permissionIds ?? []),
+    [editingRole]
+  );
+  const editingRolePermissionOptions = useMemo(
+    () => getEditablePermissionOptions(editingRole?.role, permissionOptions),
+    [editingRole, permissionOptions]
+  );
+  const editingUserPermissionIds = useMemo(() => {
+    if (!editingUser) return [];
+
+    return editingUser.permissions
+      .map(name => permissionOptions.find(option => option.name === name)?.id)
+      .filter(Boolean);
+  }, [editingUser, permissionOptions]);
+  const editingUserPermissionOptions = useMemo(
+    () => getEditablePermissionOptions(editingUser?.role, permissionOptions),
+    [editingUser, permissionOptions]
+  );
 
   const handleSaveRolePermissions = async permissionIds => {
     const role = rolePermissions.find(item => item.id === editingRoleId);
@@ -376,8 +433,8 @@ export default function ControlPanelSection() {
       {editingRole ? (
         <PermissionEditorModal
           title={`${editingRole.role} Role`}
-          selectedPermissionIds={editingRole.permissionIds}
-          permissionOptions={permissionOptions}
+          selectedPermissionIds={editingRolePermissionIds}
+          permissionOptions={editingRolePermissionOptions}
           onClose={() => setEditingRoleId("")}
           onSave={handleSaveRolePermissions}
         />
@@ -386,8 +443,8 @@ export default function ControlPanelSection() {
       {editingUser ? (
         <PermissionEditorModal
           title={`${editingUser.name} (${editingUser.role})`}
-          selectedPermissionIds={editingUser.permissions.map(name => permissionOptions.find(option => option.name === name)?.id).filter(Boolean)}
-          permissionOptions={permissionOptions}
+          selectedPermissionIds={editingUserPermissionIds}
+          permissionOptions={editingUserPermissionOptions}
           onClose={() => setEditingUserId("")}
           onSave={handleSaveUserPermissions}
           isSaving={savingUserPermissions}

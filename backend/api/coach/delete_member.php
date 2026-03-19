@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 requireRole("coach");
 
 header("Content-Type: application/json");
@@ -83,5 +84,11 @@ if ($deleteMemberStmt->affected_rows <= 0) {
     echo json_encode(["error" => "Member not found in this cluster."]);
     exit;
 }
+
+logCurrentUserAction(
+    $conn,
+    'cluster_member_remove',
+    buildAuditTarget('cluster', $cluster_id, 'member=' . $employee_id)
+);
 
 echo json_encode(["success" => true]);

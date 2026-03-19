@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 requireRole(["admin", "coach", "employee"]);
 
 function hasColumn(mysqli $conn, string $table, string $column): bool {
@@ -115,5 +116,11 @@ if ($conn->errno) {
     echo json_encode(["error" => "Unable to submit request."]);
     exit;
 }
+
+logCurrentUserAction(
+    $conn,
+    'request_create',
+    buildAuditTarget($type, $stmt->insert_id ?? null, 'status=' . $status)
+);
 
 echo json_encode(["success" => true]);

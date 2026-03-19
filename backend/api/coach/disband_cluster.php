@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 requireRole("coach");
 
 header("Content-Type: application/json");
@@ -73,5 +74,7 @@ if ($deleted !== true || $deleteClusterStmt->affected_rows <= 0) {
 }
 
 $conn->commit();
+
+logCurrentUserAction($conn, 'cluster_disband', buildAuditTarget('cluster', $cluster_id));
 
 echo json_encode(["success" => true]);

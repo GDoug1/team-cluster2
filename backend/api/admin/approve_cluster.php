@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 requireRole(["admin", "super admin"]);
 
 header("Content-Type: application/json");
@@ -52,5 +53,11 @@ if ($ok !== true) {
     http_response_code(500);
     exit(json_encode(["error" => "Failed to update cluster status."]));
 }
+
+logCurrentUserAction(
+    $conn,
+    $status === 'active' ? 'cluster_approve' : 'cluster_reject',
+    buildAuditTarget('cluster', $id, $status === 'rejected' ? $rejection_reason : null)
+);
 
 echo json_encode(["success" => true]);

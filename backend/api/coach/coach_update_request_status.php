@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 requireRole("coach");
 
 function hasTable(mysqli $conn, string $table): bool {
@@ -108,5 +109,11 @@ if ($conn->errno) {
     echo json_encode(["error" => "Unable to update request status."]);
     exit;
 }
+
+logCurrentUserAction(
+    $conn,
+    'request_endorse',
+    buildAuditTarget($source, $requestId, 'status=' . $status)
+);
 
 echo json_encode(["success" => true]);
