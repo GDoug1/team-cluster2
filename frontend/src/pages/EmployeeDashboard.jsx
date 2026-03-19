@@ -16,7 +16,7 @@ import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import usePermissions from "../hooks/usePermissions";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
-
+import { logout } from "../utils/logout";
 
 export default function EmployeeDashboard() {
   const { user } = useCurrentUser();
@@ -59,7 +59,6 @@ export default function EmployeeDashboard() {
     timeOutAt: null,
     tag: null
   });
-  const [attendanceHistory, setAttendanceHistory] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
   const activeCluster = data[0];
   const dateTimeLabel = useLiveDateTime();
@@ -221,29 +220,6 @@ export default function EmployeeDashboard() {
     return { label: "Available", className: "status-available" };
   };
 
-  const formatDateTimeLabel = value => {
-    const parsedDate = value instanceof Date ? value : parseSqlDateTime(value);
-    if (!parsedDate || Number.isNaN(parsedDate.getTime())) return "—";
-
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit"
-    }).format(parsedDate);
-  };
-
-  const toDateInputValue = value => {
-    const parsedDate = value instanceof Date ? value : parseSqlDateTime(value);
-    if (!parsedDate || Number.isNaN(parsedDate.getTime())) return null;
-
-    const year = parsedDate.getFullYear();
-    const month = `${parsedDate.getMonth() + 1}`.padStart(2, "0");
-    const day = `${parsedDate.getDate()}`.padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
   const parseSqlDateTime = value => {
     if (!value || typeof value !== "string") return null;
     const trimmedValue = value.trim();
@@ -292,9 +268,6 @@ export default function EmployeeDashboard() {
     });
 
     setAttendanceLog(savedAttendance);
-
-    const history = await apiFetch("api/employee/employee_attendance_history.php");
-    setAttendanceHistory(history);
   };
 
   const handleTimeIn = async () => {
@@ -410,10 +383,6 @@ export default function EmployeeDashboard() {
       }
     });
 
-    apiFetch("api/employee/employee_attendance_history.php").then(response => {
-      setAttendanceHistory(response);
-    });
-
     fetchMyRequests().then(response => {
       setMyRequests(Array.isArray(response) ? response : []);
     }).catch(() => setMyRequests([]));
@@ -422,16 +391,16 @@ export default function EmployeeDashboard() {
 
   const myRequestHighlights = buildRequestHighlights(myRequests);
 
-  const handleLogout = async () => {
-    try {
-      await apiFetch("auth/logout.php", { method: "POST" });
-    } catch (error) {
-      console.error("Logout failed", error);
-    } finally {
-      localStorage.removeItem("teamClusterUser");
-      window.location.href = "/login";
-    }
-  };
+  // const handleLogout = async () => {
+  //   try {
+  //     await apiFetch("auth/logout.php", { method: "POST" });
+  //   } catch (error) {
+  //     console.error("Logout failed", error);
+  //   } finally {
+  //     localStorage.removeItem("teamClusterUser");
+  //     window.location.href = "/login";
+  //   }
+  // };
 
   return (
     <div className="dashboard">
@@ -440,7 +409,7 @@ export default function EmployeeDashboard() {
         roleLabel="Employee"
         userName={user?.fullname}
         navItems={sidebarNavItems}
-        onLogout={handleLogout}
+        onLogout={logout}
       />
 
       <main className="main">

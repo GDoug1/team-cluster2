@@ -1,0 +1,100 @@
+/* 🔥 OVERRIDE ONLY LOGIN PAGE */
+
+.auth-login {
+  display: block;
+  padding: 0;
+  background: none;
+}
+
+.auth-login .auth-shell,
+.auth-login .auth-shell-single {
+  width: 100%;
+  max-width: none;
+  display: block;
+}
+
+.auth-login .auth-shell {
+  grid-template-columns: none;
+  gap: 0;
+}
+
+/* BACKGROUND */
+.login-page-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Card */
+.login-page-card {
+  width: 380px;
+  padding: 40px 30px;
+  background: #ffffff;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+}
+
+/* Logo */
+.login-page-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 25px;
+}
+
+.login-page-logo img {
+  width: 140px;
+}
+
+/* Error */
+.login-page-error {
+  color: red;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+/* Form */
+.login-page-group {
+  text-align: left;
+  margin-bottom: 18px;
+}
+
+.login-page-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.login-page-group input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+}
+
+.login-page-group input:focus {
+  border-color: #2f6ae1;
+}
+
+/* Button */
+.login-page-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #22386E, #1d4ed8);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(47, 106, 225, 0.4);
+  transition: 0.3s ease;
+}
+
+.login-page-btn:hover {
+  transform: translateY(-2px);
+}

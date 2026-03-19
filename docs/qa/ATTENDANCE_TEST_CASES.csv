@@ -1,0 +1,11 @@
+ID,FEATURE,SCENARIO,TEST STEPS,RESULTS,STATUS,TEST DATE,TESTER NAME
+ALL,Attendance,Persistence: Cross-Tab Navigation,"1. Log in to dashboard. 2. Click ""Time In"". 3. Navigate to a different page. 4. Return to ""Dashboard"".",,Pending,3/17/2026,
+ALL,Attendance,Persistence: Session Recovery,"1. Perform ""Time In"". 2. Refresh the browser (F5). 3. Wait for dashboard to load.",,Pending,3/17/2026,
+ALL,Attendance,Dashboard Stats Accuracy,1. Observe "Total Hours" on Dashboard while Timed In. 2. Wait for 10 minutes.,,Pending,3/17/2026,
+COACH,Attendance,Team Member Visibility,1. Log in as Coach. 2. Navigate to "Team Cluster Attendance".,,Pending,3/17/2026,
+COACH,Attendance,Dynamic Member Status,1. Access Coach Dashboard. 2. View "Member Status" card.,,Pending,3/17/2026,
+EMPLOYEE,Filing Center,Auto-detect Coach/Cluster,1. Go to "My Filing Center". 2. Open a "Dispute" or "OT" form.,,Pending,3/17/2026,
+ALL,Request,Agreement Confirmation,1. Fill out a request form. 2. Attempt to submit without checking "Agreement".,,Pending,3/17/2026,
+EMPLOYEE,ATTENDANCE,Late Tag Calculation,"1. Set schedule to 9:00 AM. 2. Perform ""Time In"" at 9:16 AM.",,Pending,3/17/2026,
+COACH,Team Request,CORS Policy Check,1. Log in as Coach. 2. Navigate to "Team Request".,,Pending,3/17/2026,
+EMPLOYEE,ATTENDANCE,Constraint: Overlapping Logs,"1. Perform ""Time In"". 2. Try to trigger ""Time In"" again (e.g., via API or UI glitch).",,Pending,3/17/2026,

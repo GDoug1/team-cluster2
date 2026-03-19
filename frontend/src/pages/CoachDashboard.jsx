@@ -14,7 +14,7 @@ import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import usePermissions from "../hooks/usePermissions";
 import { normalizeSchedule as normalizeAttendanceSchedule, parseDateValue, resolveAttendanceMainTag } from "../utils/attendanceTags";
-
+import { logout } from "../utils/logout";
 
 const attendanceSortOptions = {
   newestAttendanceFirst: "newestAttendanceFirst",
@@ -32,6 +32,64 @@ const getTodayDateInputValue = () => {
   const month = `${now.getMonth() + 1}`.padStart(2, "0");
   const day = `${now.getDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
+};
+
+const parseDateTimeValue = value => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+
+  const raw = String(value).trim();
+  const sqlMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (sqlMatch) {
+    const [, year, month, day, hour = "00", minute = "00", second = "00"] = sqlMatch;
+    const parsedDate = new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second)
+    );
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+  }
+
+  const fallbackDate = new Date(raw);
+  return Number.isNaN(fallbackDate.getTime()) ? null : fallbackDate;
+};
+
+const toDateInputValue = value => {
+  if (!value) return "";
+  const date = parseDateTimeValue(value);
+  if (!date) return "";
+
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const toDateTimeLocalValue = value => {
+  if (!value) return "";
+  const date = parseDateTimeValue(value);
+  if (!date) return "";
+
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  const hours = `${date.getHours()}`.padStart(2, "0");
+  const minutes = `${date.getMinutes()}`.padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+const toSqlDateTimeValue = value => {
+  if (!value) return null;
+  return `${value.replace("T", " ")}:00`;
+};
+
+const formatDateTimeLabel = value => {
+  if (!value) return "—";
+  const parsedDate = parseDateTimeValue(value);
+  return parsedDate ? parsedDate.toLocaleString() : value;
 };
 
 export default function CoachDashboard() {
@@ -89,13 +147,6 @@ export default function CoachDashboard() {
   const [attendanceLog, setAttendanceLog] = useState({ timeInAt: null, timeOutAt: null, tag: null });
   const [coachAttendanceHistory, setCoachAttendanceHistory] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
-  const [teamMemberAttendanceFilter, setTeamMemberAttendanceFilter] = useState("");
-  const [teamAttendanceDateStartFilter, setTeamAttendanceDateStartFilter] = useState("");
-  const [teamAttendanceDateEndFilter, setTeamAttendanceDateEndFilter] = useState("");
-  const [editingTeamAttendance, setEditingTeamAttendance] = useState(null);
-  const [teamAttendanceEditForm, setTeamAttendanceEditForm] = useState({ timeInAt: "", timeOutAt: "", tag: "", note: "" });
-  const [teamAttendanceEditError, setTeamAttendanceEditError] = useState("");
-  const [isSavingTeamAttendanceEdit, setIsSavingTeamAttendanceEdit] = useState(false);
   const [attendanceRows, setAttendanceRows] = useState([]);
   const [attendanceQuery, setAttendanceQuery] = useState("");
   const [attendanceSort, setAttendanceSort] = useState(attendanceSortOptions.newestAttendanceFirst);
@@ -191,63 +242,6 @@ export default function CoachDashboard() {
     return schedule;
   };
 
-  const parseDateTimeValue = value => {
-    if (!value) return null;
-    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-
-    const raw = String(value).trim();
-    const sqlMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
-    if (sqlMatch) {
-      const [, year, month, day, hour = "00", minute = "00", second = "00"] = sqlMatch;
-      const parsedDate = new Date(
-        Number(year),
-        Number(month) - 1,
-        Number(day),
-        Number(hour),
-        Number(minute),
-        Number(second)
-      );
-      return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
-    }
-
-    const fallbackDate = new Date(raw);
-    return Number.isNaN(fallbackDate.getTime()) ? null : fallbackDate;
-  };
-
-  const toDateInputValue = value => {
-    if (!value) return "";
-    const date = parseDateTimeValue(value);
-    if (!date) return "";
-
-    const year = date.getFullYear();
-    const month = `${date.getMonth() + 1}`.padStart(2, "0");
-    const day = `${date.getDate()}`.padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const toDateTimeLocalValue = value => {
-    if (!value) return "";
-    const date = parseDateTimeValue(value);
-    if (!date) return "";
-
-    const year = date.getFullYear();
-    const month = `${date.getMonth() + 1}`.padStart(2, "0");
-    const day = `${date.getDate()}`.padStart(2, "0");
-    const hours = `${date.getHours()}`.padStart(2, "0");
-    const minutes = `${date.getMinutes()}`.padStart(2, "0");
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
-
-  const toSqlDateTimeValue = value => {
-    if (!value) return null;
-    return `${value.replace("T", " ")}:00`;
-  };
-
-  const formatDateTimeLabel = value => {
-    if (!value) return "—";
-    const parsedDate = parseDateTimeValue(value);
-    return parsedDate ? parsedDate.toLocaleString() : value;
-  };
 
   const createDaySchedules = (days = [], baseSchedule = {}) => {
     const daySchedules = {};
@@ -720,16 +714,16 @@ export default function CoachDashboard() {
     availabilityLabel: dashboardCluster ? "Available" : "Not available"
   }), [dashboardCluster, coachAttendanceTag, todayCoachSchedule]);
 
-  const handleLogout = async () => {
-    try {
-      await apiFetch("auth/logout.php", { method: "POST" });
-    } catch {
-      console.error("Logout failed", error);
-    } finally {
-      localStorage.removeItem("teamClusterUser");
-      window.location.href = "/login";
-    }
-  };
+  // const handleLogout = async () => {
+  //   try {
+  //     await apiFetch("auth/logout.php", { method: "POST" });
+  //   } catch {
+  //     console.error("Logout failed", error);
+  //   } finally {
+  //     localStorage.removeItem("teamClusterUser");
+  //     window.location.href = "/login";
+  //   }
+  // };
 
   const handleChange = event => {
     const { name, value } = event.target;
@@ -1217,7 +1211,6 @@ export default function CoachDashboard() {
     setConfirmState(null);
   };
 
-  const isMyAttendanceView = activeNav === "Attendance" || activeNav === "My Attendance";
   const isTeamClusterAttendanceView = activeNav === "Team Cluster Attendance";
   const isMyRequestsView = activeNav === "My Requests";
   const isTeamRequestView = activeNav === "Team Request";
@@ -1468,7 +1461,7 @@ export default function CoachDashboard() {
         roleLabel="Team Coach"
         userName={user?.fullname}
         navItems={navItems}
-        onLogout={handleLogout}
+        onLogout={logout}
       />
 
       <main className="main">

@@ -3,20 +3,23 @@ import { Search, Calendar, Clock, CheckCircle2, AlertCircle, ArrowUpRight, Loade
 import { useAttendanceHistory } from '../hooks/useAttendanceHistory';
 import '../styles/AttendanceModule.css';
 
-const StatCard = ({ title, value, delta, icon: Icon, colorClass, isOffline }) => (
-  <div className="am-stat-card">
-    <div className="am-stat-header">
-      <span className="am-stat-title">{title}</span>
-      <div className="am-stat-icon-wrapper" style={{ backgroundColor: colorClass }}>
-        <Icon />
+const StatCard = ({ title, value, delta, icon, colorClass, isOffline }) => {
+  const IconComponent = icon;
+  return (
+    <div className="am-stat-card">
+      <div className="am-stat-header">
+        <span className="am-stat-title">{title}</span>
+        <div className="am-stat-icon-wrapper" style={{ backgroundColor: colorClass }}>
+          <IconComponent />
+        </div>
       </div>
+      <div className="am-stat-value" style={{ color: isOffline ? '#cbd5e1' : undefined }}>
+        {isOffline ? "--" : value}
+      </div>
+      <div className="am-stat-delta">{isOffline ? "N/A" : delta}</div>
     </div>
-    <div className="am-stat-value" style={{ color: isOffline ? '#cbd5e1' : undefined }}>
-      {isOffline ? "--" : value}
-    </div>
-    <div className="am-stat-delta">{isOffline ? "N/A" : delta}</div>
-  </div>
-);
+  );
+};
 
 const getStatusColor = (status) => {
   const s = String(status).toLowerCase();
