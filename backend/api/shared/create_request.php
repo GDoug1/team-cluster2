@@ -2,7 +2,7 @@
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
 include __DIR__ . "/../utils/logger.php";
-requireRole(["admin", "coach", "employee"]);
+requirePermission($conn, "View Attendance");
 
 function hasColumn(mysqli $conn, string $table, string $column): bool {
     $safeTable = $conn->real_escape_string($table);

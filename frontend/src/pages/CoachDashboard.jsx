@@ -14,6 +14,7 @@ import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import usePermissions from "../hooks/usePermissions";
 import { normalizeSchedule as normalizeAttendanceSchedule, parseDateValue, resolveAttendanceMainTag } from "../utils/attendanceTags";
+import { getFeatureAccess } from "../utils/featureAccess";
 import { logout } from "../utils/logout";
 
 const attendanceSortOptions = {
@@ -175,19 +176,22 @@ export default function CoachDashboard() {
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
   const { hasPermission } = usePermissions();
-  const canAccessControlPanel = hasPermission("Access Control Panel");
-  const canViewEmployeeList = hasPermission("View Employee List");
-  const canAddEmployee = hasPermission("Add Employee");
-  const canEditEmployee = hasPermission("Edit Employee");
-  const canDeleteEmployee = hasPermission("Delete Employee");
-  const canAccessEmployeesTab = canViewEmployeeList || canAddEmployee || canEditEmployee || canDeleteEmployee;
+  const {
+    canViewDashboard,
+    canViewTeam,
+    canViewAttendance,
+    canSetAttendance,
+    canEditAttendance,
+    canAccessControlPanel,
+    canAccessEmployeesTab
+  } = getFeatureAccess(hasPermission);
   const attendanceNavItems = ["My Attendance", "Team Cluster Attendance", "My Requests", "My Filing Center", "Team Request"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
   const navItems = [
-    { label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") },
-    { label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") },
-    {
+    ...(canViewDashboard ? [{ label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") }] : []),
+    ...(canViewTeam ? [{ label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") }] : []),
+    ...(canViewAttendance ? [{
       label: "Attendance",
       active: isAttendanceView,
       expanded: attendanceExpanded,
@@ -197,8 +201,8 @@ export default function CoachDashboard() {
         active: (label === "My Attendance" && activeNav === "Attendance") || activeNav === label,
         onClick: () => setActiveNav(label === "My Attendance" ? "Attendance" : label)
       }))
-    },
-    { label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") },
+    }] : []),
+    ...(canViewTeam ? [{ label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") }] : []),
     ...(canAccessEmployeesTab ? [{ label: "Employees", active: activeNav === "Employees", onClick: () => setActiveNav("Employees") }] : []),
     ...(canAccessControlPanel ? [{ label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }] : [])
   ];
@@ -206,16 +210,42 @@ export default function CoachDashboard() {
 
 
   useEffect(() => {
-    if (!canAccessControlPanel && activeNav === "Control Panel") {
-      setActiveNav("Dashboard");
-    }
-  }, [activeNav, canAccessControlPanel]);
+    const canAccessActiveNav = (
+      (activeNav === "Dashboard" && canViewDashboard)
+      || ((activeNav === "Team" || activeNav === "Schedule") && canViewTeam)
+      || ((activeNav === "Attendance" || attendanceNavItems.includes(activeNav)) && canViewAttendance)
+      || (activeNav === "Employees" && canAccessEmployeesTab)
+      || (activeNav === "Control Panel" && canAccessControlPanel)
+    );
 
-  useEffect(() => {
-    if (!canAccessEmployeesTab && activeNav === "Employees") {
-      setActiveNav("Dashboard");
+    if (canAccessActiveNav) {
+      return;
     }
-  }, [activeNav, canAccessEmployeesTab]);
+
+    if (canViewDashboard) {
+      setActiveNav("Dashboard");
+      return;
+    }
+
+    if (canViewTeam) {
+      setActiveNav("Team");
+      return;
+    }
+
+    if (canViewAttendance) {
+      setActiveNav("Attendance");
+      return;
+    }
+
+    if (canAccessEmployeesTab) {
+      setActiveNav("Employees");
+      return;
+    }
+
+    if (canAccessControlPanel) {
+      setActiveNav("Control Panel");
+    }
+  }, [activeNav, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
 
   useEffect(() => {
     if (window.location.pathname === "/coach/attendance") {
@@ -225,10 +255,15 @@ export default function CoachDashboard() {
   }, []);
 
   useEffect(() => {
+    if (!canViewAttendance) {
+      setMyRequests([]);
+      return;
+    }
+
     fetchMyRequests().then(response => {
       setMyRequests(Array.isArray(response) ? response : []);
     }).catch(() => setMyRequests([]));
-  }, []);
+  }, [canViewAttendance]);
 
   const normalizeSchedule = schedule => {
     if (!schedule) return schedule;
@@ -571,14 +606,27 @@ export default function CoachDashboard() {
   );
 
   useEffect(() => {
+    if (!canViewTeam) {
+      setClusters([]);
+      return;
+    }
+
     apiFetch("api/coach/coach_clusters.php")
       .then(setClusters)
       .catch(err => {
         setError(err?.error ?? "Unable to load team clusters.");
       });
-  }, []);
+  }, [canViewTeam]);
 
   useEffect(() => {
+    if (!canViewTeam) {
+      setActiveMembers([]);
+      setAttendanceRows([]);
+      setActiveMembersError("");
+      setActiveMembersLoading(false);
+      return;
+    }
+
     const active = clusters.find(cluster => cluster.status === "active");
     if (!active) {
       setActiveMembers([]);
@@ -606,10 +654,10 @@ export default function CoachDashboard() {
       .finally(() => {
         setActiveMembersLoading(false);
       });
-  }, [attendanceDateFilter, clusters]);
+  }, [attendanceDateFilter, canViewTeam, clusters]);
 
   useEffect(() => {
-    if (!activeCluster) return;
+    if (!canViewTeam || !activeCluster) return;
     setMemberLoading(true);
     setEmployeeLoading(true);
     setMemberError("");
@@ -642,9 +690,15 @@ export default function CoachDashboard() {
         setMemberLoading(false);
         setEmployeeLoading(false);
       });
-  }, [activeCluster]);
+  }, [activeCluster, canViewTeam]);
 
   useEffect(() => {
+    if (!canViewAttendance) {
+      setCoachAttendanceHistory([]);
+      setAttendanceLog({ timeInAt: null, timeOutAt: null, tag: null });
+      return;
+    }
+
     const loadCoachAttendance = async () => {
       try {
         const history = await apiFetch("api/coach/coach_attendance_history.php");
@@ -663,7 +717,7 @@ export default function CoachDashboard() {
     };
 
     loadCoachAttendance();
-  }, []);
+  }, [canViewAttendance]);
 
   const persistAttendance = async nextAttendance => {
     if (!dashboardCluster?.id) return;
@@ -674,17 +728,19 @@ export default function CoachDashboard() {
     });
 
     setAttendanceLog(savedAttendance);
-    const history = await apiFetch("api/coach/coach_attendance_history.php");
-    setCoachAttendanceHistory(Array.isArray(history) ? history : []);
+    if (canViewAttendance) {
+      const history = await apiFetch("api/coach/coach_attendance_history.php");
+      setCoachAttendanceHistory(Array.isArray(history) ? history : []);
+    }
   };
 
   const handleCoachTimeIn = async () => {
-    if (!dashboardCluster?.id || (attendanceLog.timeInAt && !attendanceLog.timeOutAt)) return;
+    if (!canSetAttendance || !dashboardCluster?.id || (attendanceLog.timeInAt && !attendanceLog.timeOutAt)) return;
     await persistAttendance({ timeInAt: new Date(), timeOutAt: null, tag: "On Time" });
   };
 
   const handleCoachTimeOut = async () => {
-    if (!dashboardCluster?.id || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
+    if (!canSetAttendance || !dashboardCluster?.id || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
     await persistAttendance({ ...attendanceLog, timeOutAt: new Date() });
   };
 
@@ -1465,7 +1521,7 @@ export default function CoachDashboard() {
       />
 
       <main className="main">
-        {activeNav === "Dashboard" ? (
+        {activeNav === "Dashboard" && canViewDashboard ? (
           <section className="content">
             <MainDashboard
               showMemberStatusCard
@@ -1473,8 +1529,8 @@ export default function CoachDashboard() {
               attendanceControls={{
                 timeInAt: attendanceLog.timeInAt,
                 timeOutAt: attendanceLog.timeOutAt,
-                canClickTimeIn: Boolean(dashboardCluster?.id) && !hasActiveTimeIn,
-                canClickTimeOut: hasActiveTimeIn,
+                canClickTimeIn: canSetAttendance && Boolean(dashboardCluster?.id) && !hasActiveTimeIn,
+                canClickTimeOut: canSetAttendance && hasActiveTimeIn,
                 hasCompletedShift,
                 onTimeIn: handleCoachTimeIn,
                 onTimeOut: handleCoachTimeOut
@@ -1482,7 +1538,7 @@ export default function CoachDashboard() {
               dashboardMeta={coachDashboardMeta}
             />
           </section>
-        ) : isAttendanceView ? (
+        ) : isAttendanceView && canViewAttendance ? (
           <section className="content">
             {isFilingCenterView ? (
               <FilingCenterPanel onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
@@ -1634,7 +1690,7 @@ export default function CoachDashboard() {
                                     type="button"
                                     className="employee-attendance-history-row attendance-row-button"
                                     role="row"
-                                    onClick={() => openAttendanceEditModal(entry)}
+                                    onClick={() => canEditAttendance && openAttendanceEditModal(entry)}
                                   >
                                     <span role="cell">{formatDateTimeLabel(entry.time_in_at ?? entry.time_out_at)}</span>
                                     <span role="cell">{dashboardCluster?.name ?? "—"}</span>
@@ -1642,7 +1698,7 @@ export default function CoachDashboard() {
                                     <span role="cell">{formatDateTimeLabel(entry.time_out_at)}</span>
                                     <span role="cell" className="attendance-tag-cell">
                                       <span className={`member-status-tag ${historyTag ? "is-active" : ""}`}>{historyTag}</span>
-                                      <span className="btn attendance-tag-edit-button">Edit</span>
+                                      <span className="btn attendance-tag-edit-button">{canEditAttendance ? "Edit" : "View"}</span>
                                     </span>
                                   </button>
                                 );

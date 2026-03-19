@@ -141,6 +141,18 @@ function currentUserHasPermission(mysqli $conn, string $permission): bool {
     return isset($permissionMap[$permissionName]);
 }
 
+function requirePermission(mysqli $conn, $permission): void {
+    $permissionsToCheck = is_array($permission) ? $permission : [$permission];
+    foreach ($permissionsToCheck as $permissionName) {
+        if (currentUserHasPermission($conn, (string)$permissionName)) {
+            return;
+        }
+    }
+
+    http_response_code(403);
+    exit(json_encode(["error" => "Forbidden"]));
+}
+
 function requireRoleOrPermission($role, mysqli $conn, $permission): void {
     if (currentUserHasAnyRole($role)) {
         return;

@@ -33,17 +33,8 @@ export default function useCurrentUser() {
 
     fetchUser();
 
-    const handlePageRestore = () => {
-      fetchUser();
-    };
-
-    window.addEventListener("pageshow", handlePageRestore);
-    window.addEventListener("focus", handlePageRestore);
-
     return () => {
       isActive = false;
-      window.removeEventListener("pageshow", handlePageRestore);
-      window.removeEventListener("focus", handlePageRestore);
     };
   }, [location.pathname]);
 

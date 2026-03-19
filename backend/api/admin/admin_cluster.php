@@ -1,7 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
-requireRole(["admin", "super admin"]);
+requirePermission($conn, "View Team");
 
 header("Content-Type: application/json");
 

@@ -5,68 +5,123 @@ include __DIR__ . "/../../utils/logger.php";
 
 requireRoleOrPermission(["super admin", "admin"], $conn, "Access Control Panel");
 
-function ensureUserPermissionsSchema(mysqli $conn): void {
+function getUserPermissionsIndexes(mysqli $conn): array {
     $indexes = [];
     $result = $conn->query("SHOW INDEX FROM user_permissions");
-    if ($result) {
-        while ($row = $result->fetch_assoc()) {
-            $keyName = (string)($row['Key_name'] ?? '');
-            $columnName = (string)($row['Column_name'] ?? '');
-            if ($keyName === '') {
-                continue;
-            }
+    if (!$result) {
+        return $indexes;
+    }
 
-            if (!isset($indexes[$keyName])) {
-                $indexes[$keyName] = [];
-            }
+    while ($row = $result->fetch_assoc()) {
+        $keyName = (string)($row['Key_name'] ?? '');
+        $columnName = (string)($row['Column_name'] ?? '');
+        $seqInIndex = (int)($row['Seq_in_index'] ?? 0);
+        $nonUnique = (int)($row['Non_unique'] ?? 1) === 1;
+        if ($keyName === '' || $columnName === '' || $seqInIndex <= 0) {
+            continue;
+        }
 
-            $indexes[$keyName][] = $columnName;
+        if (!isset($indexes[$keyName])) {
+            $indexes[$keyName] = [
+                'columns' => [],
+                'non_unique' => $nonUnique
+            ];
+        }
+
+        $indexes[$keyName]['columns'][$seqInIndex] = $columnName;
+    }
+
+    foreach ($indexes as &$index) {
+        ksort($index['columns']);
+        $index['columns'] = array_values($index['columns']);
+    }
+    unset($index);
+
+    return $indexes;
+}
+
+function hasIndex(array $indexes, array $columns, bool $isUnique): bool {
+    foreach ($indexes as $index) {
+        $indexColumns = $index['columns'] ?? [];
+        $indexIsUnique = !($index['non_unique'] ?? true);
+        if ($indexColumns === $columns && $indexIsUnique === $isUnique) {
+            return true;
         }
     }
 
-    $needsFix = isset($indexes['user_id']) || isset($indexes['permission_id']);
-    $hasComposite = false;
+    return false;
+}
 
-    foreach ($indexes as $columns) {
-        if (count($columns) === 2 && $columns[0] === 'user_id' && $columns[1] === 'permission_id') {
-            $hasComposite = true;
-            break;
-        }
+function userPermissionsIdIsAutoIncrement(mysqli $conn): bool {
+    $sql = "SELECT EXTRA
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'user_permissions'
+              AND COLUMN_NAME = 'Id'
+            LIMIT 1";
+    $result = $conn->query($sql);
+    if (!$result) {
+        return false;
     }
 
-    if (!$needsFix && $hasComposite) {
+    $row = $result->fetch_assoc();
+    $extra = strtolower(trim((string)($row['EXTRA'] ?? '')));
+    return $extra === 'auto_increment';
+}
+
+function ensureUserPermissionsSchema(mysqli $conn): void {
+    $indexes = getUserPermissionsIndexes($conn);
+    $hasLegacyUserIndex = isset($indexes['user_id']) && ($indexes['user_id']['columns'] ?? []) === ['user_id'];
+    $hasLegacyPermissionIndex = isset($indexes['permission_id']) && ($indexes['permission_id']['columns'] ?? []) === ['permission_id'];
+    $hasComposite = hasIndex($indexes, ['user_id', 'permission_id'], true);
+    $hasPermissionLookupIndex = hasIndex($indexes, ['permission_id'], false);
+    $hasAutoIncrementId = userPermissionsIdIsAutoIncrement($conn);
+
+    if (!$hasLegacyUserIndex && !$hasLegacyPermissionIndex && $hasComposite && $hasPermissionLookupIndex && $hasAutoIncrementId) {
         return;
     }
 
-    $conn->begin_transaction();
-
-    try {
-        if (isset($indexes['user_id'])) {
-            if (!$conn->query("ALTER TABLE user_permissions DROP INDEX user_id")) {
-                throw new Exception('Failed to drop invalid user_permissions.user_id index');
-            }
+    if (!$hasComposite) {
+        if (!$conn->query("ALTER TABLE user_permissions ADD UNIQUE KEY uniq_user_permission (user_id, permission_id)")) {
+            throw new Exception('Failed to create user_permissions composite unique index');
         }
+    }
 
-        if (isset($indexes['permission_id'])) {
-            if (!$conn->query("ALTER TABLE user_permissions DROP INDEX permission_id")) {
-                throw new Exception('Failed to drop invalid user_permissions.permission_id index');
-            }
+    if (!$hasPermissionLookupIndex) {
+        if (!$conn->query("ALTER TABLE user_permissions ADD KEY idx_user_permissions_permission_id (permission_id)")) {
+            throw new Exception('Failed to create user_permissions.permission_id lookup index');
         }
+    }
 
-        if (!$hasComposite) {
-            if (!$conn->query("ALTER TABLE user_permissions ADD UNIQUE KEY uniq_user_permission (user_id, permission_id)")) {
-                throw new Exception('Failed to create user_permissions composite unique index');
-            }
+    if ($hasLegacyUserIndex) {
+        if (!$conn->query("ALTER TABLE user_permissions DROP INDEX user_id")) {
+            throw new Exception('Failed to drop invalid user_permissions.user_id index');
         }
+    }
 
-        $conn->commit();
-    } catch (Throwable $error) {
-        $conn->rollback();
-        throw $error;
+    if ($hasLegacyPermissionIndex) {
+        if (!$conn->query("ALTER TABLE user_permissions DROP INDEX permission_id")) {
+            throw new Exception('Failed to drop invalid user_permissions.permission_id index');
+        }
+    }
+
+    if (!$hasAutoIncrementId) {
+        if (!$conn->query("ALTER TABLE user_permissions MODIFY `Id` int(11) NOT NULL AUTO_INCREMENT")) {
+            throw new Exception('Failed to enable AUTO_INCREMENT for user_permissions.Id');
+        }
     }
 }
 
-ensureUserPermissionsSchema($conn);
+try {
+    ensureUserPermissionsSchema($conn);
+} catch (Throwable $error) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => $error->getMessage()
+    ]);
+    exit;
+}
 
 function normalizeRoleName(string $roleName): string {
     return strtolower(trim($roleName));

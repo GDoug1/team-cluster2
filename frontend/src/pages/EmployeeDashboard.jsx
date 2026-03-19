@@ -16,18 +16,27 @@ import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import usePermissions from "../hooks/usePermissions";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
+import { getFeatureAccess } from "../utils/featureAccess";
 import { logout } from "../utils/logout";
 
 export default function EmployeeDashboard() {
   const { user } = useCurrentUser();
   const { hasPermission } = usePermissions();
-  const canAccessControlPanel = hasPermission("Access Control Panel");
-  const canViewEmployeeList = hasPermission("View Employee List");
-  const canAddEmployee = hasPermission("Add Employee");
-  const canEditEmployee = hasPermission("Edit Employee");
-  const canDeleteEmployee = hasPermission("Delete Employee");
-  const canAccessEmployeesTab = canViewEmployeeList || canAddEmployee || canEditEmployee || canDeleteEmployee;
-  const navItems = ["Dashboard", "Team", "Attendance", "Schedule", ...(canAccessEmployeesTab ? ["Employees"] : []), ...(canAccessControlPanel ? ["Control Panel"] : [])];
+  const {
+    canViewDashboard,
+    canViewTeam,
+    canViewAttendance,
+    canSetAttendance,
+    canAccessControlPanel,
+    canAccessEmployeesTab
+  } = getFeatureAccess(hasPermission);
+  const navItems = [
+    ...(canViewDashboard ? ["Dashboard"] : []),
+    ...(canViewTeam ? ["Team", "Schedule"] : []),
+    ...(canViewAttendance ? ["Attendance"] : []),
+    ...(canAccessEmployeesTab ? ["Employees"] : []),
+    ...(canAccessControlPanel ? ["Control Panel"] : [])
+  ];
   const attendanceNavItems = ["My Attendance", "My Requests", "My Filing Center"];
   const [data, setData] = useState([]);
   const [activeNav, setActiveNav] = useState("Dashboard");
@@ -65,16 +74,42 @@ export default function EmployeeDashboard() {
 
 
   useEffect(() => {
-    if (!canAccessControlPanel && activeNav === "Control Panel") {
-      setActiveNav("Dashboard");
-    }
-  }, [activeNav, canAccessControlPanel]);
+    const canAccessActiveNav = (
+      (activeNav === "Dashboard" && canViewDashboard)
+      || ((activeNav === "Team" || activeNav === "Schedule") && canViewTeam)
+      || (attendanceNavItems.includes(activeNav) && canViewAttendance)
+      || (activeNav === "Employees" && canAccessEmployeesTab)
+      || (activeNav === "Control Panel" && canAccessControlPanel)
+    );
 
-  useEffect(() => {
-    if (!canAccessEmployeesTab && activeNav === "Employees") {
-      setActiveNav("Dashboard");
+    if (canAccessActiveNav) {
+      return;
     }
-  }, [activeNav, canAccessEmployeesTab]);
+
+    if (canViewDashboard) {
+      setActiveNav("Dashboard");
+      return;
+    }
+
+    if (canViewTeam) {
+      setActiveNav("Team");
+      return;
+    }
+
+    if (canViewAttendance) {
+      setActiveNav("My Attendance");
+      return;
+    }
+
+    if (canAccessEmployeesTab) {
+      setActiveNav("Employees");
+      return;
+    }
+
+    if (canAccessControlPanel) {
+      setActiveNav("Control Panel");
+    }
+  }, [activeNav, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
 
   const normalizeSchedule = schedule => {
     if (!schedule) return schedule;
@@ -352,7 +387,7 @@ export default function EmployeeDashboard() {
   });
   const hasActiveTimeIn = Boolean(attendanceLog.timeInAt && !attendanceLog.timeOutAt);
   const hasTeamCluster = Boolean(activeCluster?.cluster_id);
-  const canUseAttendanceControls = hasTeamCluster && hasScheduleToday;
+  const canUseAttendanceControls = canSetAttendance && hasTeamCluster && hasScheduleToday;
   const hasTimedOutToday = isSameCalendarDay(attendanceLog.timeOutAt, new Date());
   const hasCompletedShift = hasTimedOutToday && !hasActiveTimeIn;
   const canClickTimeIn = canUseAttendanceControls && !hasActiveTimeIn && !hasTimedOutToday;
@@ -367,26 +402,36 @@ export default function EmployeeDashboard() {
     : "—";
 
   useEffect(() => {
-    apiFetch("api/employee/employee_clusters.php").then(response => {
-      const normalized = response.map(cluster => ({
-        ...cluster,
-        schedule: normalizeSchedule(cluster.schedule)
-      }));
-      setData(normalized);
-      const active = normalized[0];
-      if (active) {
-        setAttendanceLog({
-          timeInAt: parseSqlDateTime(active.time_in_at),
-          timeOutAt: parseSqlDateTime(active.time_out_at),
-          tag: active.attendance_tag ?? null
-        });
-      }
-    });
+    if (canViewTeam) {
+      apiFetch("api/employee/employee_clusters.php").then(response => {
+        const normalized = response.map(cluster => ({
+          ...cluster,
+          schedule: normalizeSchedule(cluster.schedule)
+        }));
+        setData(normalized);
+        const active = normalized[0];
+        if (active) {
+          setAttendanceLog({
+            timeInAt: parseSqlDateTime(active.time_in_at),
+            timeOutAt: parseSqlDateTime(active.time_out_at),
+            tag: active.attendance_tag ?? null
+          });
+        }
+      }).catch(() => {
+        setData([]);
+      });
+    } else {
+      setData([]);
+    }
 
-    fetchMyRequests().then(response => {
-      setMyRequests(Array.isArray(response) ? response : []);
-    }).catch(() => setMyRequests([]));
-  }, []);
+    if (canViewAttendance) {
+      fetchMyRequests().then(response => {
+        setMyRequests(Array.isArray(response) ? response : []);
+      }).catch(() => setMyRequests([]));
+    } else {
+      setMyRequests([]);
+    }
+  }, [canViewAttendance, canViewTeam]);
 
 
   const myRequestHighlights = buildRequestHighlights(myRequests);
@@ -432,7 +477,7 @@ export default function EmployeeDashboard() {
         </header>
 
         <section className="content content-muted">
-            {activeNav === "Dashboard" && (
+            {activeNav === "Dashboard" && canViewDashboard && (
             <MainDashboard
               attendanceControls={{
                 timeInAt: attendanceLog.timeInAt,
@@ -493,7 +538,7 @@ export default function EmployeeDashboard() {
                 <ControlPanelSection />
               )}
 
-              {!isAttendanceView && activeNav !== "Control Panel" && activeNav !== "Employees" && (
+              {!isAttendanceView && activeNav !== "Control Panel" && activeNav !== "Employees" && canViewTeam && (
                 <>
               <div className="employee-card">
                 <div className="employee-card-header">

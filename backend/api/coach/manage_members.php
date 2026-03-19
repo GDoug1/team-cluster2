@@ -1,7 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
-requireRole("coach");
+requirePermission($conn, "View Team");
 
 $cluster_id = isset($_GET['cluster_id']) ? (int)$_GET['cluster_id'] : 0;
 if ($cluster_id <= 0) {

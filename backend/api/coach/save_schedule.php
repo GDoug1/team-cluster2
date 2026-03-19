@@ -2,7 +2,7 @@
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
 include __DIR__ . "/../utils/logger.php";
-requireRole(["coach", "admin"]);
+requirePermission($conn, "View Team");
 
 $data = json_decode(file_get_contents("php://input"), true);
 

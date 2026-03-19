@@ -6,6 +6,7 @@ import MainDashboard from "./MainDashboard";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import usePermissions from "../hooks/usePermissions";
+import { getFeatureAccess } from "../utils/featureAccess";
 import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
 import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
@@ -82,19 +83,21 @@ export default function SuperAdminDashboard() {
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
   const { hasPermission } = usePermissions();
-  const canAccessControlPanel = hasPermission("Access Control Panel");
-  const canViewEmployeeList = hasPermission("View Employee List");
-  const canAddEmployee = hasPermission("Add Employee");
-  const canEditEmployee = hasPermission("Edit Employee");
-  const canDeleteEmployee = hasPermission("Delete Employee");
-  const canAccessEmployeesTab = canViewEmployeeList || canAddEmployee || canEditEmployee || canDeleteEmployee;
+  const {
+    canViewDashboard,
+    canViewTeam,
+    canViewAttendance,
+    canEditAttendance,
+    canAccessControlPanel,
+    canAccessEmployeesTab
+  } = getFeatureAccess(hasPermission);
   const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "Team Request"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
   const navItems = [
-    { label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") },
-    { label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") },
-    {
+    ...(canViewDashboard ? [{ label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") }] : []),
+    ...(canViewTeam ? [{ label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") }] : []),
+    ...(canViewAttendance ? [{
       label: "Attendance",
       active: isAttendanceView,
       expanded: attendanceExpanded,
@@ -104,23 +107,49 @@ export default function SuperAdminDashboard() {
         active: (label === "My Attendance" && activeNav === "Attendance") || activeNav === label,
         onClick: () => setActiveNav(label === "My Attendance" ? "Attendance" : label)
       }))
-    },
-    { label: "Team Coach Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") },
+    }] : []),
+    ...(canViewTeam ? [{ label: "Team Coach Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") }] : []),
     ...(canAccessEmployeesTab ? [{ label: "Employees", active: activeNav === "Employees", onClick: () => setActiveNav("Employees") }] : []),
     ...(canAccessControlPanel ? [{ label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }] : [])
   ];
 
   useEffect(() => {
-    if (!canAccessControlPanel && activeNav === "Control Panel") {
-      setActiveNav("Dashboard");
-    }
-  }, [activeNav, canAccessControlPanel]);
+    const canAccessActiveNav = (
+      (activeNav === "Dashboard" && canViewDashboard)
+      || ((activeNav === "Team" || activeNav === "Schedule") && canViewTeam)
+      || ((activeNav === "Attendance" || attendanceNavItems.includes(activeNav)) && canViewAttendance)
+      || (activeNav === "Employees" && canAccessEmployeesTab)
+      || (activeNav === "Control Panel" && canAccessControlPanel)
+    );
 
-  useEffect(() => {
-    if (!canAccessEmployeesTab && activeNav === "Employees") {
-      setActiveNav("Dashboard");
+    if (canAccessActiveNav) {
+      return;
     }
-  }, [activeNav, canAccessEmployeesTab]);
+
+    if (canViewDashboard) {
+      setActiveNav("Dashboard");
+      return;
+    }
+
+    if (canViewTeam) {
+      setActiveNav("Team");
+      return;
+    }
+
+    if (canViewAttendance) {
+      setActiveNav("Attendance");
+      return;
+    }
+
+    if (canAccessEmployeesTab) {
+      setActiveNav("Employees");
+      return;
+    }
+
+    if (canAccessControlPanel) {
+      setActiveNav("Control Panel");
+    }
+  }, [activeNav, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
   const formatTimeRange = daySchedule => {
     if (!daySchedule || typeof daySchedule !== "object") return "—";
     return FIXED_SHIFT_LABEL;
@@ -238,16 +267,26 @@ export default function SuperAdminDashboard() {
   }, []);
 
   useEffect(() => {
+    if (!canViewTeam) {
+      setClusters([]);
+      return undefined;
+    }
+
     fetchClusters();
     const interval = setInterval(fetchClusters, 5000);
     return () => clearInterval(interval);
-  }, [fetchClusters]);
+  }, [canViewTeam, fetchClusters]);
 
   useEffect(() => {
+    if (!canViewAttendance) {
+      setMyRequests([]);
+      return;
+    }
+
     fetchMyRequests().then(response => {
       setMyRequests(Array.isArray(response) ? response : []);
     }).catch(() => setMyRequests([]));
-  }, []);
+  }, [canViewAttendance]);
 
   useEffect(() => {
     if (activeNav !== "Team Request") return;
@@ -551,7 +590,7 @@ const handleOpenRejectModal = cluster => {
       />
 
       <main className="main">
-        {activeNav === "Dashboard" ? (
+        {activeNav === "Dashboard" && canViewDashboard ? (
           <section className="content">
             <MainDashboard
               showMemberStatusCard
@@ -562,7 +601,7 @@ const handleOpenRejectModal = cluster => {
               }}
             />
           </section>
-        ) : activeNav === "Team" ? (
+        ) : activeNav === "Team" && canViewTeam ? (
           <>
             <header className="topbar">
               <div>
@@ -625,7 +664,7 @@ const handleOpenRejectModal = cluster => {
               )}
           </section>
           </>
-        ) : activeNav === "Attendance" ? (
+        ) : activeNav === "Attendance" && canViewAttendance ? (
           <section className="content">
             <div className="section-title">My Attendance</div>
             <AttendanceHistoryHighlights />
@@ -636,7 +675,7 @@ const handleOpenRejectModal = cluster => {
               onExternalDateFilterChange={setAttendanceDate}
             />
           </section>
-          ) : activeNav === "All Attendance" ? (
+          ) : activeNav === "All Attendance" && canViewAttendance ? (
           <section className="content">
             <div className="section-title">All Attendance</div>
             <AttendanceHistoryHighlights />
@@ -645,22 +684,22 @@ const handleOpenRejectModal = cluster => {
               records={allAttendance}
               personField="employee_name"
               personLabel="Employee"
-              onEditRow={openAttendanceEdit}
+              onEditRow={canEditAttendance ? openAttendanceEdit : undefined}
               externalDateFilter={attendanceDate}
               onExternalDateFilterChange={setAttendanceDate}
             />
           </section>
-        ) : activeNav === "My Requests" ? (
+        ) : activeNav === "My Requests" && canViewAttendance ? (
           <section className="content">
             <div className="section-title">My Requests</div>
             <AttendanceHistoryHighlights highlights={myRequestHighlights} />
             <DataPanel type="requests" records={myRequests} />
           </section>
-        ) : activeNav === "My Filing Center" ? (
+        ) : activeNav === "My Filing Center" && canViewAttendance ? (
           <section className="content">
             <FilingCenterPanel onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
           </section>
-        ) : activeNav === "Team Request" ? (
+        ) : activeNav === "Team Request" && canViewAttendance ? (
           <section className="content">
             <div className="section-title">Team Requests</div>
             <p className="table-subtitle">Endorsed team requests waiting for final super admin approval or rejection.</p>
@@ -677,9 +716,9 @@ const handleOpenRejectModal = cluster => {
               ]}
             />
           </section>
-          ) : activeNav === "Employees" ? (
+          ) : activeNav === "Employees" && canAccessEmployeesTab ? (
           <EmployeesSection />
-          ) : canAccessControlPanel && activeNav === "Control Panel" ? (
+        ) : canAccessControlPanel && activeNav === "Control Panel" ? (
           <ControlPanelSection />
         ) : (
           <section className="content">

@@ -1,11 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
-if (!in_array($_SESSION["user"]["role"] ?? "", ["employee", "coach"], true)) {
-    http_response_code(403);
-    echo json_encode(["error" => "Forbidden"]);
-    exit;
-}
+requirePermission($conn, "Set Attendance");
 
 function getColumns(mysqli $conn, string $table): array {
     $columns = [];

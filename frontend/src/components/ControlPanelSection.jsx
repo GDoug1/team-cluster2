@@ -275,6 +275,7 @@ export default function ControlPanelSection() {
         permissionIds: Array.isArray(item.permissionIds) ? item.permissionIds : [],
         permissions: Array.isArray(item.permissions) ? item.permissions : []
       })));
+      window.dispatchEvent(new Event("permissions-updated"));
     } finally {
       setEditingRoleId("");
     }
@@ -302,6 +303,7 @@ export default function ControlPanelSection() {
         email: item.email,
         permissions: Array.isArray(item.permissions) ? item.permissions : []
       })));
+      window.dispatchEvent(new Event("permissions-updated"));
       setEditingUserId("");
     } catch (error) {
       setUserSaveError(error?.error ?? "Unable to save user permissions.");
@@ -355,7 +357,7 @@ export default function ControlPanelSection() {
           : showUserArchives
             ? "Search archived user, email, or position..."
             : showLogs
-              ? "Search logs by user, action, or target..."
+              ? "Search logs by user, action, or details..."
               : "Search user, role, or permission..."}
       />
 
@@ -392,7 +394,7 @@ export default function ControlPanelSection() {
           {loadingLogs ? <p className="team-empty-note">Loading logs...</p> : filteredLogs.length === 0 ? <p className="team-empty-note">No logs found.</p> : (
             <div className="control-panel-table-wrap" role="table" aria-label="Control panel logs table">
               <div className="control-panel-table-header" role="row">
-                <span role="columnheader">ID</span><span role="columnheader">User</span><span role="columnheader">Action</span><span role="columnheader">Target</span><span role="columnheader">Date</span>
+                <span role="columnheader">ID</span><span role="columnheader">User</span><span role="columnheader">Action</span><span role="columnheader">Details</span><span role="columnheader">Date</span>
               </div>
               {filteredLogs.map(logItem => (
                 <div key={logItem.id} className="control-panel-table-row" role="row">
