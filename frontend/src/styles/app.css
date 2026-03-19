@@ -531,11 +531,11 @@ body {
 
 .employee-list-header,
 .employee-list-row {
-  grid-template-columns: 0.4fr 1.2fr 1fr 1fr 0.8fr 0.8fr 0.8fr 1.1fr 1fr;
+  grid-template-columns: 0.4fr 1.2fr 1fr 1fr 0.8fr 0.8fr 0.8fr 0.22fr 1fr;
 }
 
 .employee-actions-cell {
-  justify-self: end;
+  justify-self: center;
 }
 
 .employee-actions {

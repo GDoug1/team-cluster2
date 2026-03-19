@@ -441,14 +441,10 @@ export default function EmployeesSection() {
                   View full employee details
                 </div>
               </div>
-              <button
-                className="btn link modal-close-btn"
-                type="button"
-                onClick={handleCloseInfoModal}
-              >
-                Close
-              </button>
             </div>
+
+            <hr />
+            <br />
 
             <div className="modal-body">
               <div className="add-employee-grid">
@@ -475,6 +471,8 @@ export default function EmployeesSection() {
 
               </div>
             </div>
+
+            <br />
 
             <div className="add-employee-footer-actions">
               <button className="btn primary" onClick={handleCloseInfoModal}>
@@ -588,7 +586,6 @@ export default function EmployeesSection() {
                 <div id="edit-employee-title" className="modal-title">Edit Employee</div>
                 <div className="modal-subtitle">Update employee profile details.</div>
               </div>
-              <button className="btn link modal-close-btn" type="button" onClick={handleCloseEditEmployeeModal}>Close</button>
             </div>
             <form className="modal-body add-employee-management-form" onSubmit={handleSubmitEditEmployee}>
               <div className="add-employee-tabs" role="tablist" aria-label="Edit employee sections">
