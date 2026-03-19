@@ -879,6 +879,80 @@ body {
   gap: 10px;
 }
 
+.feedback-dialog-message {
+  white-space: pre-wrap;
+}
+
+.toast-stack {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  display: grid;
+  gap: 12px;
+  width: min(360px, calc(100vw - 24px));
+  z-index: 40;
+}
+
+.toast-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #dbe3ee;
+  background: #ffffff;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.16);
+}
+
+.toast-card.is-success {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.toast-card.is-error {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.toast-card.is-info {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.toast-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.toast-message {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #334155;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.toast-close-btn {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px;
+}
+
+.toast-close-btn:hover {
+  color: #0f172a;
+}
+
 .btn.confirm-cancel-btn {
   border: 1px solid #d6d3d1;
   background: #ffffff;

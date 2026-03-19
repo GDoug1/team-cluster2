@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
+import { useFeedback } from "./FeedbackProvider";
 
 const RESTRICTED_PERMISSIONS_BY_ROLE = {
   employee: new Set([
@@ -128,6 +129,7 @@ function LogDetailsModal({ log, onClose }) {
 }
 
 export default function ControlPanelSection() {
+  const { confirm, showToast } = useFeedback();
   const [activeTab, setActiveTab] = useState("role");
   const [searchTerm, setSearchTerm] = useState("");
   const [permissionOptions, setPermissionOptions] = useState([]);
@@ -305,6 +307,13 @@ export default function ControlPanelSection() {
     const role = rolePermissions.find(item => item.id === editingRoleId);
     if (!role) return;
 
+    const shouldSave = await confirm({
+      title: "Save role permissions?",
+      message: `Update permissions for the ${role.role} role?`,
+      confirmLabel: "Save"
+    });
+    if (!shouldSave) return;
+
     try {
       const response = await apiFetch("api/admin/control_panel/permissions.php", {
         method: "POST",
@@ -321,14 +330,31 @@ export default function ControlPanelSection() {
         permissions: Array.isArray(item.permissions) ? item.permissions : []
       })));
       window.dispatchEvent(new Event("permissions-updated"));
-    } finally {
       setEditingRoleId("");
+      showToast({
+        title: "Permissions updated",
+        message: `${role.role} role permissions were saved successfully.`,
+        type: "success"
+      });
+    } catch (error) {
+      showToast({
+        title: "Save failed",
+        message: error?.error ?? error?.message ?? "Unable to save role permissions.",
+        type: "error"
+      });
     }
   };
 
   const handleSaveUserPermissions = async permissionIds => {
     const user = userPermissions.find(item => item.id === editingUserId);
     if (!user) return;
+
+    const shouldSave = await confirm({
+      title: "Save user permissions?",
+      message: `Update permissions for ${user.name}?`,
+      confirmLabel: "Save"
+    });
+    if (!shouldSave) return;
 
     setSavingUserPermissions(true);
     setUserSaveError("");
@@ -350,15 +376,32 @@ export default function ControlPanelSection() {
       })));
       window.dispatchEvent(new Event("permissions-updated"));
       setEditingUserId("");
+      showToast({
+        title: "Permissions updated",
+        message: `${user.name}'s permissions were saved successfully.`,
+        type: "success"
+      });
     } catch (error) {
-      setUserSaveError(error?.error ?? "Unable to save user permissions.");
+      const message = error?.error ?? "Unable to save user permissions.";
+      setUserSaveError(message);
+      showToast({
+        title: "Save failed",
+        message,
+        type: "error"
+      });
     } finally {
       setSavingUserPermissions(false);
     }
   };
 
   const handleArchiveAction = async (employeeId, endpointName, confirmMessage) => {
-    if (!window.confirm(confirmMessage)) return;
+    const shouldProceed = await confirm({
+      title: endpointName === "restore_user" ? "Restore archived user?" : "Delete archived user?",
+      message: confirmMessage,
+      confirmLabel: endpointName === "restore_user" ? "Restore" : "Delete",
+      variant: endpointName === "restore_user" ? "primary" : "danger"
+    });
+    if (!shouldProceed) return;
 
     setArchiveActionEmployeeId(employeeId);
     setArchivedUsersError("");
@@ -371,8 +414,21 @@ export default function ControlPanelSection() {
 
       setArchivedUsers(current => current.filter(item => item.id !== employeeId));
       await fetchLogs();
+      showToast({
+        title: endpointName === "restore_user" ? "User restored" : "User deleted",
+        message: endpointName === "restore_user"
+          ? "The archived user was restored successfully."
+          : "The archived user was deleted permanently.",
+        type: "success"
+      });
     } catch (error) {
-      setArchivedUsersError(error?.error ?? error?.message ?? "Unable to update archived user.");
+      const message = error?.error ?? error?.message ?? "Unable to update archived user.";
+      setArchivedUsersError(message);
+      showToast({
+        title: "Action failed",
+        message,
+        type: "error"
+      });
     } finally {
       setArchiveActionEmployeeId(null);
     }

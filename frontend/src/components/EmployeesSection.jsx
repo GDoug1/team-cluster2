@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "../api/api";
+import { useFeedback } from "./FeedbackProvider";
 import usePermissions from "../hooks/usePermissions";
 
 const initialEmployeeForm = {
@@ -138,6 +139,7 @@ const mapEmployeeToForm = employee => ({
 
 export default function EmployeesSection() {
   const { hasPermission } = usePermissions();
+  const { confirm, showMessage, showToast } = useFeedback();
   const canViewEmployeeList = hasPermission("View Employee List");
   const canAddEmployee = hasPermission("Add Employee");
   const canEditEmployee = hasPermission("Edit Employee");
@@ -252,6 +254,18 @@ export default function EmployeesSection() {
       setAddEmployeeError("Contact number must start with 09 and be exactly 11 digits.");
       return;
     }
+
+    const employeeName = [addEmployeeForm.first_name, addEmployeeForm.middle_name, addEmployeeForm.last_name]
+      .map(value => value.trim())
+      .filter(Boolean)
+      .join(" ");
+    const shouldCreate = await confirm({
+      title: "Create employee?",
+      message: `Create ${employeeName || addEmployeeForm.work_email || "this employee"}?`,
+      confirmLabel: "Create"
+    });
+    if (!shouldCreate) return;
+
     setIsAddingEmployee(true);
     setAddEmployeeError("");
     try {
@@ -266,14 +280,28 @@ export default function EmployeesSection() {
 
       const generatedEmail = response?.generated_account?.email;
       const generatedPassword = response?.generated_account?.password;
+      showToast({
+        title: "Employee created",
+        message: `${employeeName || generatedEmail || "The employee"} was added successfully.`,
+        type: "success"
+      });
       if (generatedEmail && generatedPassword) {
-        window.alert(`Employee created.\nEmail: ${generatedEmail}\nPassword: ${generatedPassword}`);
+        await showMessage({
+          title: "Employee created",
+          message: `Email: ${generatedEmail}\nPassword: ${generatedPassword}`
+        });
       }
 
       handleCloseAddEmployeeModal();
       await fetchEmployees();
     } catch (error) {
-      setAddEmployeeError(error?.error ?? error?.message ?? "Unable to add employee.");
+      const message = error?.error ?? error?.message ?? "Unable to add employee.";
+      setAddEmployeeError(message);
+      showToast({
+        title: "Create failed",
+        message,
+        type: "error"
+      });
     } finally {
       setIsAddingEmployee(false);
     }
@@ -333,6 +361,17 @@ export default function EmployeesSection() {
       return;
     }
 
+    const employeeName = [editEmployeeForm.first_name, editEmployeeForm.middle_name, editEmployeeForm.last_name]
+      .map(value => value.trim())
+      .filter(Boolean)
+      .join(" ");
+    const shouldUpdate = await confirm({
+      title: "Save employee changes?",
+      message: `Update ${employeeName || editEmployeeForm.work_email || "this employee"}?`,
+      confirmLabel: "Save"
+    });
+    if (!shouldUpdate) return;
+
     setIsSavingEditEmployee(true);
     setEditEmployeeError("");
 
@@ -349,8 +388,19 @@ export default function EmployeesSection() {
 
       handleCloseEditEmployeeModal();
       await fetchEmployees();
+      showToast({
+        title: "Employee updated",
+        message: `${employeeName || editEmployeeForm.work_email || "The employee"} was updated successfully.`,
+        type: "success"
+      });
     } catch (error) {
-      setEditEmployeeError(error?.error ?? error?.message ?? "Unable to update employee.");
+      const message = error?.error ?? error?.message ?? "Unable to update employee.";
+      setEditEmployeeError(message);
+      showToast({
+        title: "Update failed",
+        message,
+        type: "error"
+      });
     } finally {
       setIsSavingEditEmployee(false);
     }
@@ -359,7 +409,12 @@ export default function EmployeesSection() {
   const handleDeleteEmployee = async employee => {
     if (!canDeleteEmployee || deletingEmployeeId) return;
 
-    const shouldDelete = window.confirm(`Archive ${employee.fullname || employee.email || "this employee"}?`);
+    const shouldDelete = await confirm({
+      title: "Archive employee?",
+      message: `Archive ${employee.fullname || employee.email || "this employee"}?`,
+      confirmLabel: "Archive",
+      variant: "danger"
+    });
     if (!shouldDelete) return;
 
     setDeletingEmployeeId(employee.id);
@@ -370,8 +425,19 @@ export default function EmployeesSection() {
         body: JSON.stringify({ employee_id: employee.id })
       });
       await fetchEmployees();
+      showToast({
+        title: "Employee archived",
+        message: `${employee.fullname || employee.email || "The employee"} was archived successfully.`,
+        type: "success"
+      });
     } catch (error) {
-      setEmployeeError(error?.error ?? error?.message ?? "Unable to archive employee.");
+      const message = error?.error ?? error?.message ?? "Unable to archive employee.";
+      setEmployeeError(message);
+      showToast({
+        title: "Archive failed",
+        message,
+        type: "error"
+      });
     } finally {
       setDeletingEmployeeId(null);
     }
