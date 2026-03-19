@@ -1,7 +1,9 @@
 .dashboard {
   display: flex;
   min-height: 100vh;
-   background: transparent;
+  height: 100vh;
+  overflow: hidden;
+  background: transparent;
 }
 
 .main {
@@ -10,6 +12,10 @@
   display: flex;
   flex-direction: column;
   padding: 24px 32px;
+  min-height: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .topbar {
@@ -50,6 +56,9 @@
 @media (max-width: 900px) {
   .dashboard {
     flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
   }
 
   .sidebar {
@@ -67,6 +76,8 @@
 
   .main {
     padding: 16px;
+    height: auto;
+    overflow: visible;
   }
 
   .topbar {

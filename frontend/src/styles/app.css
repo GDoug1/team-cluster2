@@ -35,17 +35,25 @@ body {
   color: white;
   overflow-y: auto;
   max-height: 100vh;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
 }
 
 @media (max-width: 980px) {
   .sidebar {
     width: 100%;
-    max-height: auto;
+    max-height: none;
     border-right: none;
     border-bottom: 1px solid #e5e7eb;
     flex-direction: row;
     padding: 16px;
     gap: 24px;
+    position: static;
+    top: auto;
+    align-self: stretch;
+    height: auto;
   }
   
   .sidebar .brand {
@@ -205,6 +213,7 @@ body {
   display: flex;
   flex-direction: column;
   padding: 24px 32px;
+  min-height: 0;
   overflow-y: auto;
 }
 
