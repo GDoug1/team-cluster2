@@ -2,6 +2,7 @@
   box-sizing: border-box;
 }
 
+
 :root {
   --bg-gradient: radial-gradient(circle at top, #eef2ff 0%, #f8fafc 45%, #f1f5f9 100%);
   --panel-gradient: linear-gradient(155deg, #1f2a44 0%, #243b6b 52%, #1e1b4b 100%);
