@@ -26,7 +26,6 @@ export default function EmployeeDashboard() {
     canViewDashboard,
     canViewTeam,
     canViewAttendance,
-    canSetAttendance,
     canAccessControlPanel,
     canAccessEmployeesTab
   } = getFeatureAccess(hasPermission);
@@ -306,28 +305,18 @@ export default function EmployeeDashboard() {
   };
 
   const handleTimeIn = async () => {
-    if (!canUseAttendanceControls) return;
+    if (!hasTeamCluster || !hasScheduleToday) return;
     if (attendanceLog.timeInAt && !attendanceLog.timeOutAt) return;
 
     const now = new Date();
     const daySchedule = getTodaySchedule();
 
     if (!daySchedule) {
-      await persistAttendance({
-        timeInAt: now,
-        timeOutAt: null,
-        tag: "Late"
-      });
       return;
     }
 
     const scheduledStartMinutes = toMinutes(daySchedule.startTime, daySchedule.startPeriod);
     if (scheduledStartMinutes === null) {
-      await persistAttendance({
-        timeInAt: now,
-        timeOutAt: null,
-        tag: "Late"
-      });
       return;
     }
 
@@ -343,7 +332,7 @@ export default function EmployeeDashboard() {
   };
 
   const handleTimeOut = async () => {
-    if (!canUseAttendanceControls) return;
+    if (!hasTeamCluster || !hasScheduleToday) return;
     if (!attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
 
     const nextAttendance = {
@@ -387,11 +376,11 @@ export default function EmployeeDashboard() {
   });
   const hasActiveTimeIn = Boolean(attendanceLog.timeInAt && !attendanceLog.timeOutAt);
   const hasTeamCluster = Boolean(activeCluster?.cluster_id);
-  const canUseAttendanceControls = canSetAttendance && hasTeamCluster && hasScheduleToday;
+  const canUseAttendanceControls = hasTeamCluster && hasScheduleToday;
   const hasTimedOutToday = isSameCalendarDay(attendanceLog.timeOutAt, new Date());
   const hasCompletedShift = hasTimedOutToday && !hasActiveTimeIn;
-  const canClickTimeIn = canUseAttendanceControls && !hasActiveTimeIn && !hasTimedOutToday;
-  const canClickTimeOut = hasActiveTimeIn;
+  const canClickTimeIn = canUseAttendanceControls && !hasActiveTimeIn;
+  const canClickTimeOut = canUseAttendanceControls && hasActiveTimeIn;
   const breakTimeToday = todaySchedule
     ? formatBreakTimeRange(
         todaySchedule.breakStartTime,

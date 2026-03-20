@@ -254,9 +254,7 @@ export default function MainDashboard({
   const hasCompletedShift = Boolean(attendanceControls?.hasCompletedShift);
   const hasActiveTimeIn = Boolean(activeTimeIn && !activeTimeOut);
   const hasScheduleToday = Boolean(getTodayShiftSchedule(schedule));
-  const canToggleTimeIn = attendanceControls
-    ? Boolean(attendanceControls.canClickTimeIn || attendanceControls.canClickTimeOut) && hasScheduleToday
-    : hasScheduleToday;
+  const canToggleTimeIn = hasScheduleToday && !hasCompletedShift;
 
   const counterDisplay = useMemo(() => {
     if (!activeTimeIn) return "00:00:00";
@@ -319,14 +317,16 @@ export default function MainDashboard({
   };
 
   const onToggleTimeIn = () => {
+    if (!hasScheduleToday || hasCompletedShift) {
+      return;
+    }
+
     if (attendanceControls) {
-      if (attendanceControls.canClickTimeOut) {
+      if (hasActiveTimeIn) {
         setIsTimeOutConfirmOpen(true);
         return;
       }
-      if (attendanceControls.canClickTimeIn) {
-        attendanceControls.onTimeIn();
-      }
+      attendanceControls.onTimeIn();
       return;
     }
 

@@ -735,12 +735,12 @@ export default function CoachDashboard() {
   };
 
   const handleCoachTimeIn = async () => {
-    if (!canSetAttendance || !dashboardCluster?.id || (attendanceLog.timeInAt && !attendanceLog.timeOutAt)) return;
+    if (!canSetAttendance || !dashboardCluster?.id || !todayCoachSchedule || (attendanceLog.timeInAt && !attendanceLog.timeOutAt)) return;
     await persistAttendance({ timeInAt: new Date(), timeOutAt: null, tag: "On Time" });
   };
 
   const handleCoachTimeOut = async () => {
-    if (!canSetAttendance || !dashboardCluster?.id || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
+    if (!canSetAttendance || !dashboardCluster?.id || !todayCoachSchedule || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
     await persistAttendance({ ...attendanceLog, timeOutAt: new Date() });
   };
 
@@ -1529,8 +1529,8 @@ export default function CoachDashboard() {
               attendanceControls={{
                 timeInAt: attendanceLog.timeInAt,
                 timeOutAt: attendanceLog.timeOutAt,
-                canClickTimeIn: canSetAttendance && Boolean(dashboardCluster?.id) && !hasActiveTimeIn,
-                canClickTimeOut: canSetAttendance && hasActiveTimeIn,
+                canClickTimeIn: canSetAttendance && Boolean(dashboardCluster?.id) && Boolean(todayCoachSchedule) && !hasActiveTimeIn,
+                canClickTimeOut: canSetAttendance && Boolean(todayCoachSchedule) && hasActiveTimeIn,
                 hasCompletedShift,
                 onTimeIn: handleCoachTimeIn,
                 onTimeOut: handleCoachTimeOut
