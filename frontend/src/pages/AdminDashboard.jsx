@@ -17,6 +17,8 @@ import { logout } from "../utils/logout";
 import { parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 
+const attendanceTagOptions = ["On Time", "Late", "Scheduled", "Off Scheduled"];
+
 export default function AdminDashboard() {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const workSetupOptions = ["Onsite", "Work From Home (WFH)"];
@@ -913,20 +915,30 @@ const handleOpenRejectModal = cluster => {
       </main>
 
       {editingCoachAttendance && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-card reject-modal-card">
-            <div className="modal-header">
+        <div className="modal-overlay" role="presentation" onClick={() => setEditingCoachAttendance(null)}>
+          <section className="modal-card attendance-edit-modal" role="dialog" aria-modal="true" onClick={event => event.stopPropagation()}>
+            <header className="modal-header">
               <div className="modal-title">Edit Coach Attendance</div>
-              <button className="btn link modal-close-btn" type="button" onClick={() => setEditingCoachAttendance(null)}>Close</button>
-            </div>
+              <button className="btn secondary" type="button" onClick={() => setEditingCoachAttendance(null)}>Close</button>
+            </header>
             <div className="modal-body">
-              <label className="form-field">Time In<input type="datetime-local" value={editForm.timeInAt} onChange={event => setEditForm(curr => ({ ...curr, timeInAt: event.target.value }))} /></label>
-              <label className="form-field">Time Out<input type="datetime-local" value={editForm.timeOutAt} onChange={event => setEditForm(curr => ({ ...curr, timeOutAt: event.target.value }))} /></label>
-              <label className="form-field">Tag<input type="text" value={editForm.tag} onChange={event => setEditForm(curr => ({ ...curr, tag: event.target.value }))} /></label>
-              <label className="form-field">Note<input type="text" value={editForm.note} onChange={event => setEditForm(curr => ({ ...curr, note: event.target.value }))} /></label>
-              <div className="form-actions"><button className="btn" type="button" onClick={saveCoachAttendanceEdit}>Save</button></div>
+              <div className="attendance-history-range-filter" role="group" aria-label="Edit coach attendance values">
+                <label className="attendance-history-filter" htmlFor="admin-attendance-time-in"><span>Time In</span><input id="admin-attendance-time-in" type="datetime-local" value={editForm.timeInAt} onChange={event => setEditForm(curr => ({ ...curr, timeInAt: event.target.value }))} /></label>
+                <label className="attendance-history-filter" htmlFor="admin-attendance-time-out"><span>Time Out</span><input id="admin-attendance-time-out" type="datetime-local" value={editForm.timeOutAt} onChange={event => setEditForm(curr => ({ ...curr, timeOutAt: event.target.value }))} /></label>
+                <label className="attendance-history-filter" htmlFor="admin-attendance-tag">
+                  <span>Tag</span>
+                  <select id="admin-attendance-tag" value={editForm.tag} onChange={event => setEditForm(curr => ({ ...curr, tag: event.target.value }))}>
+                    <option value="">Select tag</option>
+                    {attendanceTagOptions.map(tag => <option key={tag} value={tag}>{tag}</option>)}
+                  </select>
+                </label>
+                <label className="attendance-history-filter" htmlFor="admin-attendance-note"><span>Note</span><input id="admin-attendance-note" type="text" value={editForm.note} onChange={event => setEditForm(curr => ({ ...curr, note: event.target.value }))} /></label>
+              </div>
+              <div className="attendance-edit-actions">
+                <button className="btn primary" type="button" onClick={saveCoachAttendanceEdit}>Save Attendance</button>
+              </div>
             </div>
-          </div>
+          </section>
         </div>
       )}
 
