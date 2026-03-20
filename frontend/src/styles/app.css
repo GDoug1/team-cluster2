@@ -2288,14 +2288,24 @@ body {
   overflow: hidden;
 }
 
+.employee-attendance-history-scroll {
+  overflow-x: auto;
+}
+
 .employee-attendance-history-header,
 .employee-attendance-history-row {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr 1fr 0.8fr;
+  grid-template-columns: minmax(170px, 1.2fr) minmax(140px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(130px, 0.8fr);
   gap: 10px;
-  align-items: center;
+  align-items: start;
   padding: 10px 12px;
   font-size: 13px;
+}
+
+.employee-attendance-history-header-actions,
+.employee-attendance-history-row-actions {
+  grid-template-columns: minmax(170px, 1.2fr) minmax(140px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(130px, 0.8fr) minmax(190px, 1fr);
+  min-width: 990px;
 }
 
 .employee-attendance-history-header {
@@ -2307,6 +2317,29 @@ body {
 .employee-attendance-history-row {
   border-top: 1px solid #e5e7eb;
   color: #1f2937;
+}
+
+
+.employee-attendance-history-header > span,
+.employee-attendance-history-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.employee-request-actions-cell {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.employee-request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.employee-request-actions .btn,
+.employee-request-actions button {
+  flex: 0 0 auto;
 }
 
 .employee-attendance-summary-row {

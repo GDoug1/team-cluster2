@@ -184,25 +184,33 @@ export default function DataPanel({
           </label>
         </div>
 
-        <div className="employee-attendance-history-header" role="row">
-          <span role="columnheader">Date Filed</span>
-          <span role="columnheader">Request Type</span>
-          <span role="columnheader">Details</span>
-          <span role="columnheader">Schedule / Period</span>
-          <span role="columnheader">Status</span>
-          {onRequestAction && <span role="columnheader">Actions</span>}
-        </div>
+        <div className="employee-attendance-history-scroll">
+          <div
+            className={`employee-attendance-history-header ${onRequestAction ? "employee-attendance-history-header-actions" : ""}`.trim()}
+            role="row"
+          >
+            <span role="columnheader">Date Filed</span>
+            <span role="columnheader">Request Type</span>
+            <span role="columnheader">Details</span>
+            <span role="columnheader">Schedule / Period</span>
+            <span role="columnheader">Status</span>
+            {onRequestAction && <span role="columnheader">Actions</span>}
+          </div>
 
-        {filteredRecords.length > 0 ? filteredRecords.map(item => (
-          <div key={item.id} className="employee-attendance-history-row" role="row">
+          {filteredRecords.length > 0 ? filteredRecords.map(item => (
+            <div
+              key={item.id}
+              className={`employee-attendance-history-row ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
+              role="row"
+            >
             <span role="cell">{formatDateTimeLabel(item.date_filed)}</span>
             <span role="cell">{item.request_type ?? "—"}</span>
             <span role="cell">{item.details ?? "—"}</span>
             <span role="cell">{item.schedule_period ?? "—"}</span>
             <span role="cell">{item.status ?? "Pending"}</span>
             {onRequestAction && (
-              <span role="cell">
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <span role="cell" className="employee-request-actions-cell">
+                <div className="employee-request-actions" role="group" aria-label={`Actions for request ${item.id}`}>
                   {resolvedRequestActions.map(action => {
                     const currentStatus = String(item.status ?? "").toLowerCase();
                     const allowedStatuses = Array.isArray(action.allowedStatuses)
@@ -226,10 +234,11 @@ export default function DataPanel({
                 </div>
               </span>
             )}
-          </div>
-        )) : (
-          <div className="empty-state">No requests found.</div>
-        )}
+            </div>
+          )) : (
+            <div className="empty-state">No requests found.</div>
+          )}
+        </div>
       </div>
     );
   }
