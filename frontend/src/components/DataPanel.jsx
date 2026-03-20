@@ -53,6 +53,7 @@ export default function DataPanel({
   onRequestAction = null,
   requestActionLoadingId = "",
   requestActions = null,
+  enableRequestFilters = false,
 }) {
   const config = panelConfig[type] ?? panelConfig.attendance;
   const resolvedRequestActions = Array.isArray(requestActions) && requestActions.length > 0
@@ -64,10 +65,28 @@ export default function DataPanel({
   const [searchQuery, setSearchQuery] = useState("");
   const [dateStartFilter, setDateStartFilter] = useState("");
   const [dateEndFilter, setDateEndFilter] = useState("");
+  const [requestTypeFilter, setRequestTypeFilter] = useState("all");
+  const [requestStatusFilter, setRequestStatusFilter] = useState("all");
+
+  const requestTypeOptions = useMemo(() => ([
+    "all",
+    ...new Set(records.map(item => String(item.request_type ?? "").trim()).filter(Boolean))
+  ]), [records]);
+
+  const requestStatusOptions = useMemo(() => ([
+    "all",
+    ...new Set(records.map(item => String(item.status ?? "").trim()).filter(Boolean))
+  ]), [records]);
 
   const filteredRecords = useMemo(() => {
     if (type === "requests") {
       return records.filter(item => {
+        const normalizedRequestType = String(item.request_type ?? "").trim().toLowerCase();
+        const normalizedStatus = String(item.status ?? "").trim().toLowerCase();
+
+        if (enableRequestFilters && requestTypeFilter !== "all" && normalizedRequestType !== requestTypeFilter.toLowerCase()) return false;
+        if (enableRequestFilters && requestStatusFilter !== "all" && normalizedStatus !== requestStatusFilter.toLowerCase()) return false;
+
         const haystack = [item.request_type, item.details, item.status, item.schedule_period]
           .filter(Boolean)
           .join(" ")
@@ -98,7 +117,7 @@ export default function DataPanel({
       if (searchQuery && !haystack.includes(searchQuery.toLowerCase())) return false;
       return true;
     });
-  }, [type, records, dateStartFilter, dateEndFilter, searchQuery, personField]);
+  }, [type, records, dateStartFilter, dateEndFilter, searchQuery, personField, enableRequestFilters, requestTypeFilter, requestStatusFilter]);
 
   if (type === "attendance") {
     const attendanceColumnCount = 6 + (personField ? 1 : 0) + (onEditRow ? 1 : 0);
@@ -173,6 +192,30 @@ export default function DataPanel({
     return (
       <div className="employee-attendance-history-table" role="table" aria-label={config.title}>
         <div className="attendance-history-range-filter" role="group" aria-label="Filter requests">
+          {enableRequestFilters && (
+            <>
+              <label className="attendance-history-filter">
+                <span>Request Type</span>
+                <select value={requestTypeFilter} onChange={event => setRequestTypeFilter(event.target.value)}>
+                  {requestTypeOptions.map(option => (
+                    <option key={option} value={option}>
+                      {option === "all" ? "All request types" : option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="attendance-history-filter">
+                <span>Status</span>
+                <select value={requestStatusFilter} onChange={event => setRequestStatusFilter(event.target.value)}>
+                  {requestStatusOptions.map(option => (
+                    <option key={option} value={option}>
+                      {option === "all" ? "All statuses" : option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
           <label className="attendance-history-filter" style={{ minWidth: "280px" }}>
             <span>Search</span>
             <input

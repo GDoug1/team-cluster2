@@ -1598,6 +1598,7 @@ export default function CoachDashboard() {
                         requestActions={[
                           { label: "Endorse to Admin", status: "Endorsed", variant: "btn", allowedStatuses: ["pending"] }
                         ]}
+                        enableRequestFilters
                       />
                     </>
                   ) : isTeamClusterAttendanceView ? (

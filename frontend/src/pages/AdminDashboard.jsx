@@ -911,6 +911,7 @@ const handleOpenRejectModal = cluster => {
                 { label: "Accept", status: "Approved", variant: "btn", allowedStatuses: ["endorsed"] },
                 { label: "Reject", status: "Denied", variant: "btn secondary", allowedStatuses: ["endorsed"] }
               ]}
+              enableRequestFilters
             />
           </section>
         ) : activeNav === "Employees" && canAccessEmployeesTab ? (
