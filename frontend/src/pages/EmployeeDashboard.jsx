@@ -35,7 +35,7 @@ export default function EmployeeDashboard() {
 
   const navItems = [
     ...(canViewDashboard ? ["Dashboard"] : []),
-    ...(canViewTeam ? ["Team", "Schedule"] : []),
+    ...(canViewTeam ? ["Team"] : []),
     ...(canViewAttendance ? ["Attendance"] : []),
     ...(canAccessEmployeesTab ? ["Employees"] : []),
     ...(canAccessControlPanel ? ["Control Panel"] : [])
