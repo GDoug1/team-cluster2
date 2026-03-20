@@ -202,7 +202,7 @@ export default function CoachDashboard() {
         onClick: () => setActiveNav(label === "My Attendance" ? "Attendance" : label)
       }))
     }] : []),
-    ...(canViewTeam ? [{ label: "Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") }] : []),
+    ...(canViewTeam ? [{ label: "My Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") }] : []),
     ...(canAccessEmployeesTab ? [{ label: "Employees", active: activeNav === "Employees", onClick: () => setActiveNav("Employees") }] : []),
     ...(canAccessControlPanel ? [{ label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }] : [])
   ];
@@ -769,6 +769,27 @@ export default function CoachDashboard() {
       : "—",
     availabilityLabel: dashboardCluster ? "Available" : "Not available"
   }), [dashboardCluster, coachAttendanceTag, todayCoachSchedule]);
+
+  const coachScheduleDays = dayOptions.map(day => {
+    const isAssigned = Array.isArray(activeCoachSchedule?.days) && activeCoachSchedule.days.includes(day);
+    const daySchedule = isAssigned ? activeCoachSchedule?.daySchedules?.[day] ?? null : null;
+
+    return {
+      day,
+      shift: daySchedule ? formatShiftRange(daySchedule) : "—",
+      breakTime: daySchedule
+        ? formatBreakTimeRange(
+            daySchedule.breakStartTime,
+            daySchedule.breakStartPeriod,
+            daySchedule.breakEndTime,
+            daySchedule.breakEndPeriod
+          )
+        : "—",
+      workSetup: daySchedule?.workSetup ?? "—",
+      shiftType: daySchedule?.shiftType ?? "—",
+      status: isAssigned ? "Scheduled" : "Rest day"
+    };
+  });
 
   // const handleLogout = async () => {
   //   try {
@@ -1749,6 +1770,60 @@ export default function CoachDashboard() {
               </div>
             )}
           </section>
+        ) : activeNav === "Schedule" ? (
+          <>
+            <header className="topbar">
+              <div>
+                <h2>MY SCHEDULE</h2>
+                <div className="nav-item">Team Coach Schedule</div>
+              </div>
+              <div className="toolbar">
+                <span className="datetime">{dateTimeLabel}</span>
+              </div>
+            </header>
+
+            <section className="content">
+              <div className="card coach-schedule-card">
+                <div className="section-title">My schedule</div>
+                <p className="coach-schedule-note">
+                  View the schedule assigned to you by the admin or super admin for your active cluster.
+                </p>
+
+                {!dashboardCluster ? (
+                  <div className="empty-state">No active cluster is assigned to you yet.</div>
+                ) : !activeCoachSchedule || !Array.isArray(activeCoachSchedule.days) || activeCoachSchedule.days.length === 0 ? (
+                  <div className="empty-state">No schedule has been assigned to you yet.</div>
+                ) : (
+                  <>
+                    <div className="coach-schedule-summary">
+                      <div><strong>Cluster:</strong> {dashboardCluster.name}</div>
+                      <div><strong>Today:</strong> {todayCoachSchedule ? formatShiftRange(todayCoachSchedule) : "No schedule today"}</div>
+                    </div>
+                    <div className="coach-schedule-grid" role="table" aria-label="My assigned schedule">
+                      <div className="coach-schedule-grid-header" role="row">
+                        <span role="columnheader">Day</span>
+                        <span role="columnheader">Shift</span>
+                        <span role="columnheader">Break</span>
+                        <span role="columnheader">Work Setup</span>
+                        <span role="columnheader">Shift Type</span>
+                        <span role="columnheader">Status</span>
+                      </div>
+                      {coachScheduleDays.map(day => (
+                        <div key={day.day} className="coach-schedule-grid-row" role="row">
+                          <span role="cell">{day.day}</span>
+                          <span role="cell">{day.shift}</span>
+                          <span role="cell">{day.breakTime}</span>
+                          <span role="cell">{day.workSetup}</span>
+                          <span role="cell">{day.shiftType}</span>
+                          <span role="cell">{day.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
+          </>
         ) : activeNav === "Employees" ? (
           <EmployeesSection />
         ) : canAccessControlPanel && activeNav === "Control Panel" ? (
