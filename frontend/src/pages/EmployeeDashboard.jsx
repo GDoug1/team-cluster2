@@ -522,7 +522,7 @@ export default function EmployeeDashboard() {
                   </div>
                   <div className="employee-card-body">
                     <AttendanceHistoryHighlights highlights={myRequestHighlights} />
-                    <DataPanel type="requests" records={myRequests} />
+                    <DataPanel type="requests" records={myRequests} enableRequestFilters />
                   </div>
                 </div>
               )}

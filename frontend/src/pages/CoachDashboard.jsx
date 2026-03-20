@@ -1584,7 +1584,7 @@ export default function CoachDashboard() {
                   {isMyRequestsView ? (
                     <>
                       <AttendanceHistoryHighlights highlights={myRequestHighlights} />
-                      <DataPanel type="requests" records={myRequests} />
+                      <DataPanel type="requests" records={myRequests} enableRequestFilters />
                     </>
                   ) : isTeamRequestView ? (
                     <>
