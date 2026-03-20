@@ -637,6 +637,54 @@ body {
   margin-bottom: 14px;
 }
 
+.employee-list-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.employee-search-field,
+.employee-rows-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.employee-search-field {
+  flex: 1 1 320px;
+}
+
+.employee-rows-field {
+  flex: 0 0 140px;
+}
+
+.employee-control-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.employee-search-field input,
+.employee-rows-field input {
+  height: 40px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 0 12px;
+  font-size: 14px;
+  color: #111827;
+  background: #ffffff;
+}
+
+.employee-search-field input:focus,
+.employee-rows-field input:focus,
+.employee-sort-button:focus {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
 .employee-list-count {
   font-size: 14px;
   color: #374151;
@@ -644,9 +692,34 @@ body {
   margin-bottom: 10px;
 }
 
+.employee-table-card {
+  overflow-x: auto;
+}
+
 .employee-list-header,
 .employee-list-row {
   grid-template-columns: 0.4fr 1.2fr 1fr 1fr 0.8fr 0.8fr 0.8fr 0.22fr 1fr;
+}
+
+.employee-sort-button {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.employee-sort-indicator {
+  min-width: 10px;
+  text-align: center;
+  color: #4b5563;
 }
 
 .employee-actions-cell {
@@ -665,6 +738,30 @@ body {
 
 .table-cell.muted {
   color: #6b7280;
+}
+
+.employee-table-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+  flex-wrap: wrap;
+}
+
+.employee-pagination-summary,
+.employee-pagination-page {
+  font-size: 13px;
+  color: #374151;
+}
+
+.employee-pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .badge {
@@ -708,6 +805,13 @@ body {
   place-items: center;
   padding: 24px;
   z-index: 20;
+}
+
+@media (max-width: 900px) {
+  .employee-list-header,
+  .employee-list-row {
+    min-width: 980px;
+  }
 }
 
 .modal-card {

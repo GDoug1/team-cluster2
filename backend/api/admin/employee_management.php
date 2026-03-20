@@ -100,6 +100,59 @@ function validateEmployeeNameFields(string $firstName, string $middleName, strin
     return null;
 }
 
+function validateEmployeeRequiredFields(
+    string $firstName,
+    string $lastName,
+    string $address,
+    string $birthdate,
+    string $civilStatus,
+    string $email,
+    string $personalEmail,
+    string $position,
+    string $account,
+    string $contactNumber,
+    string $employeeType
+): ?string {
+    $requiredFields = [
+        "First name" => $firstName,
+        "Last name" => $lastName,
+        "Address" => $address,
+        "Birthdate" => $birthdate,
+        "Contact number" => $contactNumber,
+        "Civil status" => $civilStatus,
+        "Personal email" => $personalEmail,
+        "Work email" => $email,
+        "Position" => $position,
+        "Account" => $account,
+        "Employee type" => $employeeType
+    ];
+
+    $missingFields = [];
+    foreach ($requiredFields as $label => $value) {
+        if (trim($value) === '') {
+            $missingFields[] = $label;
+        }
+    }
+
+    if (!empty($missingFields)) {
+        return "Please complete all required employee fields: " . implode(", ", $missingFields) . ".";
+    }
+
+    if (preg_match('/^09\d{9}$/', $contactNumber) !== 1) {
+        return "Contact number must start with 09 and be exactly 11 digits.";
+    }
+
+    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        return "Work email must be a valid email address.";
+    }
+
+    if (filter_var($personalEmail, FILTER_VALIDATE_EMAIL) === false) {
+        return "Personal email must be a valid email address.";
+    }
+
+    return null;
+}
+
 $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($requestMethod === 'GET') {
@@ -273,6 +326,24 @@ if ($requestMethod === 'PUT') {
     if ($nameValidationError !== null) {
         http_response_code(400);
         exit(json_encode(["success" => false, "message" => $nameValidationError]));
+    }
+
+    $requiredFieldsValidationError = validateEmployeeRequiredFields(
+        $firstName,
+        $lastName,
+        $address,
+        $birthdate,
+        $civilStatus,
+        $email,
+        $personalEmail,
+        $position,
+        $account,
+        $contactNumber,
+        $employeeType
+    );
+    if ($requiredFieldsValidationError !== null) {
+        http_response_code(400);
+        exit(json_encode(["success" => false, "message" => $requiredFieldsValidationError]));
     }
 
     $conn->begin_transaction();
@@ -456,6 +527,24 @@ $nameValidationError = validateEmployeeNameFields($firstName, $middleName, $last
 if ($nameValidationError !== null) {
     http_response_code(400);
     exit(json_encode(["success" => false, "message" => $nameValidationError]));
+}
+
+$requiredFieldsValidationError = validateEmployeeRequiredFields(
+    $firstName,
+    $lastName,
+    $address,
+    $birthdate,
+    $civilStatus,
+    $email,
+    $personalEmail,
+    $position,
+    $account,
+    $contactNumber,
+    $employeeType
+);
+if ($requiredFieldsValidationError !== null) {
+    http_response_code(400);
+    exit(json_encode(["success" => false, "message" => $requiredFieldsValidationError]));
 }
 
 $employeeRoleId = resolveEmployeeRoleId($conn);
