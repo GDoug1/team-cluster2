@@ -539,11 +539,29 @@ export default function AdminDashboard() {
     setScheduleForm(current => {
       const currentDay = current.daySchedules[day] ?? { ...defaultDaySchedule };
       const nextDay = { ...currentDay };
-      if (["startTime", "endTime", "breakStart", "breakEnd"].includes(field)) {
-        return current;
-      }
+      const [time, period] = String(value).split("|");
 
-      nextDay[field] = value;
+      if (["endTime", "breakStart", "breakEnd"].includes(field)) {
+        if (field === "endTime") {
+          nextDay.endTime = time ?? currentDay.endTime;
+          nextDay.endPeriod = period ?? currentDay.endPeriod;
+        }
+
+        if (field === "breakStart") {
+          nextDay.breakStartTime = time ?? currentDay.breakStartTime;
+          nextDay.breakStartPeriod = period ?? currentDay.breakStartPeriod;
+        }
+
+        if (field === "breakEnd") {
+          nextDay.breakEndTime = time ?? currentDay.breakEndTime;
+          nextDay.breakEndPeriod = period ?? currentDay.breakEndPeriod;
+        }
+      } else if (field === "startTime") {
+        nextDay.startTime = time ?? currentDay.startTime;
+        nextDay.startPeriod = period ?? currentDay.startPeriod;
+      } else {
+        nextDay[field] = value;
+      }
 
       const endTimeOptions = getEndTimeOptions(nextDay.startTime, nextDay.startPeriod);
       const hasSelectedEndTime = endTimeOptions.some(
