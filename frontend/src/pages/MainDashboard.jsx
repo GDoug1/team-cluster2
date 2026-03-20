@@ -14,6 +14,7 @@ function TimeCard({
   hasActiveTimeIn,
   onToggleTimeIn,
   canToggleTimeIn,
+  isButtonDisabled = false,
   hasScheduleToday = true,
   hasCompletedShift = false,
 }) {
@@ -31,7 +32,7 @@ function TimeCard({
             type="button"
             className="time-in-btn"
             onClick={onToggleTimeIn}
-            disabled={!canToggleTimeIn}
+            disabled={isButtonDisabled}
           >
             {hasActiveTimeIn ? "Time Out" : "Time In"}
           </button>
@@ -254,7 +255,9 @@ export default function MainDashboard({
   const hasCompletedShift = Boolean(attendanceControls?.hasCompletedShift);
   const hasActiveTimeIn = Boolean(activeTimeIn && !activeTimeOut);
   const hasScheduleToday = Boolean(getTodayShiftSchedule(schedule));
-  const canToggleTimeIn = hasScheduleToday && !hasCompletedShift;
+  const canClickTimeIn = attendanceControls?.canClickTimeIn ?? (hasScheduleToday && !hasActiveTimeIn && !hasCompletedShift);
+  const canClickTimeOut = attendanceControls?.canClickTimeOut ?? (hasScheduleToday && hasActiveTimeIn && !hasCompletedShift);
+  const canToggleTimeIn = hasActiveTimeIn ? canClickTimeOut : canClickTimeIn;
 
   const counterDisplay = useMemo(() => {
     if (!activeTimeIn) return "00:00:00";
@@ -360,6 +363,7 @@ export default function MainDashboard({
           hasActiveTimeIn={hasActiveTimeIn}
           onToggleTimeIn={onToggleTimeIn}
           canToggleTimeIn={canToggleTimeIn}
+          isButtonDisabled={!canToggleTimeIn}
           hasScheduleToday={hasScheduleToday}
           hasCompletedShift={hasCompletedShift}
         />
