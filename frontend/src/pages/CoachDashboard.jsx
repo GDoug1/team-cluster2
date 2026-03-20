@@ -1291,7 +1291,7 @@ export default function CoachDashboard() {
 
   const isTeamClusterAttendanceView = activeNav === "Team Cluster Attendance";
   const isMyRequestsView = activeNav === "My Requests";
-  const isTeamRequestView = activeNav === "Team Request";
+  const isTeamRequestView = activeNav === "File Request";
   const myRequestHighlights = buildRequestHighlights(myRequests);
   const teamRequestHighlights = buildRequestHighlights(teamRequests);
   const isFilingCenterView = activeNav === "My Filing Center";
@@ -1499,7 +1499,7 @@ export default function CoachDashboard() {
 
 
   useEffect(() => {
-    if (!canViewAttendance || !["Dashboard", "Team Request"].includes(activeNav)) return;
+    if (!canViewAttendance || !["Dashboard", "File Request"].includes(activeNav)) return;
 
     fetchTeamRequests()
       .then(response => {
@@ -1508,7 +1508,7 @@ export default function CoachDashboard() {
       })
       .catch(() => {
         setTeamRequests([]);
-        setTeamRequestsError("Unable to load team requests.");
+        setTeamRequestsError("Unable to load file requests.");
       });
   }, [activeNav, canViewAttendance]);
 
@@ -1526,7 +1526,7 @@ export default function CoachDashboard() {
 
       setTeamRequests(prev => prev.map(item => (item.id === request.id ? { ...item, status } : item)));
     } catch (error) {
-      setTeamRequestsError(error?.error ?? "Unable to update team request status.");
+      setTeamRequestsError(error?.error ?? "Unable to update file request status.");
     } finally {
       setRequestActionLoadingId("");
     }
@@ -1548,7 +1548,7 @@ export default function CoachDashboard() {
             <MainDashboard
               showMemberStatusCard
               fileRequests={teamRequests}
-              onViewFileRequests={() => setActiveNav("Team Request")}
+              onViewFileRequests={() => setActiveNav("File Request")}
               schedule={activeCoachSchedule}
               attendanceControls={{
                 timeInAt: attendanceLog.timeInAt,
@@ -1570,7 +1570,7 @@ export default function CoachDashboard() {
               <div className="employee-card employee-attendance-history-card">
                 <div className="employee-card-header">
                   <div>
-                    <div className="employee-card-title">{isMyRequestsView ? "My Requests" : isTeamRequestView ? "Team Request" : attendanceViewTitle}</div>
+                    <div className="employee-card-title">{isMyRequestsView ? "My Requests" : isTeamRequestView ? "File Request" : attendanceViewTitle}</div>
                     <p className="employee-card-subtitle">
                       {isTeamClusterAttendanceView
                         ? "Review and edit your team members' attendance history."

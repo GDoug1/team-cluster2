@@ -299,7 +299,7 @@ export default function AdminDashboard() {
   }, [canViewAttendance]);
 
   useEffect(() => {
-    if (!canViewAttendance || !["Dashboard", "Team Request"].includes(activeNav)) return;
+    if (!canViewAttendance || !["Dashboard", "File Request"].includes(activeNav)) return;
 
     fetchAdminTeamRequests()
       .then(response => {
@@ -308,7 +308,7 @@ export default function AdminDashboard() {
       })
       .catch(() => {
         setTeamRequests([]);
-        setTeamRequestsError("Unable to load endorsed team requests.");
+        setTeamRequestsError("Unable to load endorsed file requests.");
       });
   }, [activeNav, canViewAttendance]);
 
@@ -397,7 +397,7 @@ export default function AdminDashboard() {
 
       setTeamRequests(prev => prev.map(item => (item.id === request.id ? { ...item, status } : item)));
     } catch (error) {
-      setTeamRequestsError(error?.error ?? "Unable to finalize team request status.");
+      setTeamRequestsError(error?.error ?? "Unable to finalize file request status.");
     } finally {
       setRequestActionLoadingId("");
     }
@@ -729,7 +729,7 @@ const handleOpenRejectModal = cluster => {
             <MainDashboard
               showMemberStatusCard
               fileRequests={teamRequests}
-              onViewFileRequests={() => setActiveNav("Team Request")}
+              onViewFileRequests={() => setActiveNav("File Request")}
               attendanceControls={{
                 timeInAt: attendanceLog.timeInAt,
                 timeOutAt: attendanceLog.timeOutAt,
@@ -850,10 +850,10 @@ const handleOpenRejectModal = cluster => {
           <section className="content">
             <FilingCenterPanel onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
           </section>
-        ) : activeNav === "Team Request" && canViewAttendance ? (
+        ) : activeNav === "File Request" && canViewAttendance ? (
           <section className="content">
-            <div className="section-title">Team Requests</div>
-            <p className="table-subtitle">Endorsed team requests waiting for final admin approval or rejection.</p>
+            <div className="section-title">File Requests</div>
+            <p className="table-subtitle">Endorsed file requests waiting for final admin approval or rejection.</p>
             <AttendanceHistoryHighlights highlights={teamRequestHighlights} />
             {teamRequestsError && <div className="error">{teamRequestsError}</div>}
             <DataPanel
@@ -1096,7 +1096,7 @@ const handleOpenRejectModal = cluster => {
           <div className="modal-card reject-modal-card">
             <div className="modal-header">
               <div>
-                <div id="reject-modal-title" className="modal-title reject-modal-title">Reject Team Request</div>
+                <div id="reject-modal-title" className="modal-title reject-modal-title">Reject File Request</div>
                 <div className="modal-subtitle">{rejectingCluster.name}</div>
               </div>
               <button className="btn link modal-close-btn" type="button" onClick={handleCloseRejectModal}>
