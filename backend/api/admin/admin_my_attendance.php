@@ -30,6 +30,7 @@ $clusterIdColumn = in_array('id', $clusterColumns, true) ? 'id' : 'cluster_id';
 $userIdColumn = in_array('id', $userColumns, true) ? 'id' : 'user_id';
 $attendanceUserColumn = in_array('employee_id', $attendanceColumns, true) ? 'employee_id' : (in_array('user_id', $attendanceColumns, true) ? 'user_id' : null);
 $attendancePrimaryKey = in_array('attendance_id', $attendanceColumns, true) ? 'attendance_id' : (in_array('id', $attendanceColumns, true) ? 'id' : null);
+$attendanceOwnerExpr = $attendanceUserColumn === 'employee_id' ? 'e.employee_id' : "u.$userIdColumn";
 
 $hasLegacyAttendance = in_array('id', $attendanceColumns, true)
     && in_array('time_in_at', $attendanceColumns, true)
@@ -59,7 +60,7 @@ if ($hasLegacyAttendance) {
         ON al.id = (
             SELECT al2.id
             FROM attendance_logs al2
-            WHERE al2.$attendanceUserColumn = u.$userIdColumn
+            WHERE al2.$attendanceUserColumn = $attendanceOwnerExpr
               AND DATE(COALESCE(al2.time_in_at, al2.updated_at)) = $escapedDate
             ORDER BY COALESCE(al2.time_in_at, al2.updated_at) DESC, al2.id DESC
             LIMIT 1
@@ -71,7 +72,7 @@ if ($hasLegacyAttendance) {
         ON al.attendance_id = (
             SELECT al2.attendance_id
             FROM attendance_logs al2
-            WHERE al2.$attendanceUserColumn = u.$userIdColumn
+            WHERE al2.$attendanceUserColumn = $attendanceOwnerExpr
               AND al2.attendance_date = $escapedDate
             ORDER BY al2.updated_at DESC, al2.attendance_id DESC
             LIMIT 1

@@ -14,6 +14,8 @@ import ControlPanelSection from "../components/ControlPanelSection";
 import EmployeesSection from "../components/EmployeesSection";
 import { buildRequestHighlights, fetchAdminTeamRequests, fetchMyRequests, updateAdminTeamRequestStatus } from "../api/requests";
 import { logout } from "../utils/logout";
+import { parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
+import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 
 export default function SuperAdminDashboard() {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -80,6 +82,8 @@ export default function SuperAdminDashboard() {
   const [attendanceDate, setAttendanceDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [editingCoachAttendance, setEditingCoachAttendance] = useState(null);
   const [editForm, setEditForm] = useState({ timeInAt: "", timeOutAt: "", tag: "", note: "" });
+  const [attendanceLog, setAttendanceLog] = useState({ timeInAt: null, timeOutAt: null, tag: null });
+  const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
   const { hasPermission } = usePermissions();
@@ -303,6 +307,77 @@ export default function SuperAdminDashboard() {
   }, [activeNav]);
 
 
+  const isSameCalendarDay = (firstDate, secondDate) => {
+    if (!(firstDate instanceof Date) || Number.isNaN(firstDate.getTime())) return false;
+    if (!(secondDate instanceof Date) || Number.isNaN(secondDate.getTime())) return false;
+
+    return (
+      firstDate.getFullYear() === secondDate.getFullYear()
+      && firstDate.getMonth() === secondDate.getMonth()
+      && firstDate.getDate() === secondDate.getDate()
+    );
+  };
+
+  const persistAttendance = async nextAttendance => {
+    setIsSavingAttendance(true);
+
+    try {
+      const response = await apiFetch("api/admin/save_attendance.php", {
+        method: "POST",
+        body: JSON.stringify({
+          ...nextAttendance,
+          timeInAt: nextAttendance.timeInAt ? toLocalSqlDateTime(nextAttendance.timeInAt) : null,
+          timeOutAt: nextAttendance.timeOutAt ? toLocalSqlDateTime(nextAttendance.timeOutAt) : null,
+        })
+      });
+
+      const savedAttendance = {
+        timeInAt: parseSqlDateTime(response?.attendance?.timeInAt ?? null),
+        timeOutAt: parseSqlDateTime(response?.attendance?.timeOutAt ?? null),
+        tag: response?.attendance?.tag ?? null,
+      };
+
+      setAttendanceLog(savedAttendance);
+      return savedAttendance;
+    } finally {
+      setIsSavingAttendance(false);
+    }
+  };
+
+  const handleTimeIn = async () => {
+    if (isSavingAttendance || (attendanceLog.timeInAt && !attendanceLog.timeOutAt)) return;
+
+    const now = new Date();
+    const scheduledStartMinutes = 9 * 60;
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const tag = nowMinutes <= scheduledStartMinutes + 15 ? "On Time" : "Late";
+
+    await persistAttendance({
+      timeInAt: now,
+      timeOutAt: null,
+      tag
+    });
+
+    if (activeNav === "Attendance") {
+      const refreshed = await apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${attendanceDate}`);
+      setCoachAttendance(Array.isArray(refreshed) ? refreshed : []);
+    }
+  };
+
+  const handleTimeOut = async () => {
+    if (isSavingAttendance || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
+
+    await persistAttendance({
+      ...attendanceLog,
+      timeOutAt: new Date()
+    });
+
+    if (activeNav === "Attendance") {
+      const refreshed = await apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${attendanceDate}`);
+      setCoachAttendance(Array.isArray(refreshed) ? refreshed : []);
+    }
+  };
+
   const handleAdminTeamRequestAction = async (request, status) => {
     if (!request?.id || !request?.request_source) return;
 
@@ -325,10 +400,38 @@ export default function SuperAdminDashboard() {
 
 
   useEffect(() => {
+    if (!canViewAttendance || activeNav !== "Dashboard") return;
+
+    const today = new Date().toISOString().slice(0, 10);
+    apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${today}`)
+      .then(data => {
+        const currentAttendance = Array.isArray(data) ? data[0] ?? null : null;
+        setAttendanceLog({
+          timeInAt: parseSqlDateTime(currentAttendance?.time_in_at ?? null),
+          timeOutAt: parseSqlDateTime(currentAttendance?.time_out_at ?? null),
+          tag: currentAttendance?.attendance_tag ?? null
+        });
+      })
+      .catch(() => setAttendanceLog({ timeInAt: null, timeOutAt: null, tag: null }));
+  }, [activeNav, canViewAttendance]);
+
+  useEffect(() => {
     if (activeNav !== "Attendance") return;
     apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${attendanceDate}`)
-      .then(data => setCoachAttendance(Array.isArray(data) ? data : []))
-      .catch(() => setCoachAttendance([]));
+      .then(data => {
+        const rows = Array.isArray(data) ? data : [];
+        setCoachAttendance(rows);
+        const currentAttendance = rows[0] ?? null;
+        setAttendanceLog({
+          timeInAt: parseSqlDateTime(currentAttendance?.time_in_at ?? null),
+          timeOutAt: parseSqlDateTime(currentAttendance?.time_out_at ?? null),
+          tag: currentAttendance?.attendance_tag ?? null
+        });
+      })
+      .catch(() => {
+        setCoachAttendance([]);
+        setAttendanceLog({ timeInAt: null, timeOutAt: null, tag: null });
+      });
   }, [activeNav, attendanceDate]);
 
   useEffect(() => {
@@ -594,10 +697,27 @@ const handleOpenRejectModal = cluster => {
           <section className="content">
             <MainDashboard
               showMemberStatusCard
+              attendanceControls={{
+                timeInAt: attendanceLog.timeInAt,
+                timeOutAt: attendanceLog.timeOutAt,
+                canClickTimeIn: !isSavingAttendance && !(attendanceLog.timeInAt && !attendanceLog.timeOutAt),
+                canClickTimeOut: !isSavingAttendance && Boolean(attendanceLog.timeInAt && !attendanceLog.timeOutAt),
+                hasCompletedShift: isSameCalendarDay(attendanceLog.timeOutAt, new Date()) && !(attendanceLog.timeInAt && !attendanceLog.timeOutAt),
+                onTimeIn: handleTimeIn,
+                onTimeOut: handleTimeOut
+              }}
               schedule={adminMainDashboardSchedule}
               dashboardMeta={{
+                attendanceTag: resolveAttendanceMainTag({
+                  attendanceTag: attendanceLog.tag,
+                  schedule: adminMainDashboardSchedule,
+                  timeInAt: attendanceLog.timeInAt,
+                  fallbackTag: attendanceLog.timeInAt ? "Present" : "Scheduled"
+                }),
                 scheduleTag: "Fixed schedule",
-                breakTime: FIXED_BREAK_LABEL
+                breakTag: "Break inactive",
+                breakTime: FIXED_BREAK_LABEL,
+                availabilityLabel: attendanceLog.timeInAt && !attendanceLog.timeOutAt ? "Available" : "Not available"
               }}
             />
           </section>
