@@ -106,7 +106,7 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
             LEFT JOIN clusters c ON (c.$clusterIdColumn = cm.cluster_id OR c.$clusterOwnerColumn = req.employee_id)
                 AND c.status = 'active'
             $userJoinSql
-            WHERE LOWER(COALESCE(req.status, '')) = 'endorsed'
+            WHERE LOWER(COALESCE(req.status, '')) <> 'cancelled'
               AND $excludeRequesterCondition";
 
     $res = $conn->query($sql);
