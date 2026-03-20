@@ -57,6 +57,16 @@ export default function AdminDashboard() {
     return `${hour}:${minute.toString().padStart(2, "0")}`;
   });
   const MAX_SHIFT_MINUTES = 9 * 60;
+  const createDefaultScheduleForm = () => ({
+    days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+    daySchedules: {
+      Mon: { ...defaultDaySchedule },
+      Tue: { ...defaultDaySchedule },
+      Wed: { ...defaultDaySchedule },
+      Thu: { ...defaultDaySchedule },
+      Fri: { ...defaultDaySchedule }
+    }
+  });
   const [clusters, setClusters] = useState([]);
   const [rejectingCluster, setRejectingCluster] = useState(null);
   const [activeNav, setActiveNav] = useState("Dashboard");
@@ -72,16 +82,7 @@ export default function AdminDashboard() {
   const [requestActionLoadingId, setRequestActionLoadingId] = useState("");
   const [scheduleModalMessage, setScheduleModalMessage] = useState("");
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState({
-    days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
-    daySchedules: {
-      Mon: { ...defaultDaySchedule },
-      Tue: { ...defaultDaySchedule },
-      Wed: { ...defaultDaySchedule },
-      Thu: { ...defaultDaySchedule },
-      Fri: { ...defaultDaySchedule }
-    }
-  });
+  const [scheduleForm, setScheduleForm] = useState(() => createDefaultScheduleForm());
   const [attendanceDate, setAttendanceDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [editingCoachAttendance, setEditingCoachAttendance] = useState(null);
   const [editForm, setEditForm] = useState({ timeInAt: "", timeOutAt: "", tag: "", note: "" });
@@ -160,9 +161,38 @@ export default function AdminDashboard() {
     }
   }, [activeNav, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
 
+  const normalizeScheduleForm = coachSchedule => {
+    const nextForm = createDefaultScheduleForm();
+    const assignedDays = Array.isArray(coachSchedule?.days)
+      ? coachSchedule.days.filter(day => dayOptions.includes(day))
+      : [];
+
+    if (assignedDays.length > 0) {
+      nextForm.days = assignedDays;
+    }
+
+    assignedDays.forEach(day => {
+      nextForm.daySchedules[day] = {
+        ...defaultDaySchedule,
+        ...(coachSchedule?.daySchedules?.[day] ?? {})
+      };
+    });
+
+    return nextForm;
+  };
+
   const formatTimeRange = daySchedule => {
     if (!daySchedule || typeof daySchedule !== "object") return "—";
-    return FIXED_SHIFT_LABEL;
+
+    const {
+      startTime,
+      startPeriod,
+      endTime,
+      endPeriod
+    } = daySchedule;
+
+    if (!startTime || !startPeriod || !endTime || !endPeriod) return "Schedule set";
+    return `${startTime} ${startPeriod} - ${endTime} ${endPeriod}`;
   };
 
 
@@ -615,11 +645,13 @@ export default function AdminDashboard() {
 
   const handleOpenScheduleModal = cluster => {
     setManagingScheduleCluster(cluster);
+    setScheduleForm(normalizeScheduleForm(cluster?.coach_schedule));
     setScheduleModalMessage("");
   };
 
   const handleCloseScheduleModal = () => {
     setManagingScheduleCluster(null);
+    setScheduleForm(createDefaultScheduleForm());
     setScheduleModalMessage("");
   };
 
@@ -636,21 +668,17 @@ export default function AdminDashboard() {
     setScheduleModalMessage("");
 
     const normalizedSchedule = {
-      ...scheduleForm,
+      days: scheduleForm.days.filter(day => dayOptions.includes(day)),
       daySchedules: Object.fromEntries(
         Object.entries(scheduleForm.daySchedules).map(([day, daySchedule]) => [
           day,
           {
+            ...defaultDaySchedule,
             ...daySchedule,
-            shiftType: "Morning Shift",
-            startTime: FIXED_SHIFT_START.time,
-            startPeriod: FIXED_SHIFT_START.period,
-            endTime: FIXED_SHIFT_END.time,
-            endPeriod: FIXED_SHIFT_END.period,
-            breakStartTime: FIXED_BREAK_START.time,
-            breakStartPeriod: FIXED_BREAK_START.period,
-            breakEndTime: FIXED_BREAK_END.time,
-            breakEndPeriod: FIXED_BREAK_END.period
+            shiftType: getAutomaticShiftType(
+              daySchedule?.startTime ?? defaultDaySchedule.startTime,
+              daySchedule?.startPeriod ?? defaultDaySchedule.startPeriod
+            )
           }
         ])
       )
