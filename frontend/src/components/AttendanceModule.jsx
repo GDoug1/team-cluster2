@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Calendar, Clock, CheckCircle2, AlertCircle, ArrowUpRight, Loader2, ListTodo } from 'lucide-react';
 import { useAttendanceHistory } from '../hooks/useAttendanceHistory';
+import { normalizeAttendanceHistoryRecords } from '../api/attendance';
 import '../styles/AttendanceModule.css';
 
 const StatCard = ({ title, value, delta, icon, colorClass, isOffline }) => {
@@ -30,9 +31,18 @@ const getStatusColor = (status) => {
   return '#cbd5e1';
 };
 
-export default function AttendanceModule() {
-  const { data, loading, error } = useAttendanceHistory();
+export default function AttendanceModule({
+  records = null,
+  loading: loadingProp = false,
+  error: errorProp = null,
+}) {
+  const historyState = useAttendanceHistory();
   const [searchQuery, setSearchQuery] = useState('');
+  const isControlled = Array.isArray(records);
+  const rawData = isControlled ? records : historyState.data;
+  const data = useMemo(() => normalizeAttendanceHistoryRecords(rawData), [rawData]);
+  const loading = isControlled ? loadingProp : historyState.loading;
+  const error = isControlled ? errorProp : historyState.error;
 
   const stats = useMemo(() => {
     if (!data.length) return { hours: '0.00', present: 0, late: 0, ot: '0.00' };
