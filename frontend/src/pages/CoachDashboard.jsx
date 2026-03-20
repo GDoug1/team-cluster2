@@ -1499,7 +1499,7 @@ export default function CoachDashboard() {
 
 
   useEffect(() => {
-    if (!isTeamRequestView) return;
+    if (!canViewAttendance || !["Dashboard", "Team Request"].includes(activeNav)) return;
 
     fetchTeamRequests()
       .then(response => {
@@ -1510,7 +1510,7 @@ export default function CoachDashboard() {
         setTeamRequests([]);
         setTeamRequestsError("Unable to load team requests.");
       });
-  }, [isTeamRequestView]);
+  }, [activeNav, canViewAttendance]);
 
   const handleTeamRequestAction = async (request, status) => {
     if (!request?.id || !request?.request_source) return;
@@ -1547,6 +1547,8 @@ export default function CoachDashboard() {
           <section className="content">
             <MainDashboard
               showMemberStatusCard
+              fileRequests={teamRequests}
+              onViewFileRequests={() => setActiveNav("Team Request")}
               schedule={activeCoachSchedule}
               attendanceControls={{
                 timeInAt: attendanceLog.timeInAt,

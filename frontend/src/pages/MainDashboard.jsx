@@ -14,7 +14,6 @@ function TimeCard({
   counterDisplay,
   hasActiveTimeIn,
   onToggleTimeIn,
-  canToggleTimeIn,
   isButtonDisabled = false,
   hasScheduleToday = true,
   hasCompletedShift = false,
@@ -249,16 +248,27 @@ function SummaryCard({ timeInStart, totalHours, hasScheduleToday = true, dashboa
   );
 }
 
-function MemberStatusCard() {
+function FileRequestCard({ requests = [], onViewRequest = null }) {
+  const visibleRequests = Array.isArray(requests) ? requests.slice(0, 3) : [];
+
   return (
     <div className="card member-card">
-      <div className="member-title">Member Status</div>
-      <div className="request-list" aria-label="No member status updates yet">
-        <div className="request-row">
-          <span>Kim Santos</span>
-          <span className="requesting">Requesting OT</span>
-          <button type="button" className="view-btn">View</button>
-        </div>
+      <div className="member-title">File Request</div>
+      <div
+        className="request-list"
+        aria-label={visibleRequests.length > 0 ? "Employee file requests" : "No file requests yet"}
+      >
+        {visibleRequests.length > 0 ? visibleRequests.map(request => (
+          <div key={request.id} className="request-row">
+            <span>{request.employee_name ?? "Employee"}</span>
+            <span className="requesting">{request.request_type ?? "Request"}</span>
+            <button type="button" className="view-btn" onClick={() => onViewRequest?.(request)}>
+              View
+            </button>
+          </div>
+        )) : (
+          <div className="empty-state">No file requests yet.</div>
+        )}
       </div>
     </div>
   );
@@ -281,6 +291,8 @@ export default function MainDashboard({
   schedule = null,
   canEditCards = true,
   dashboardMeta = null,
+  fileRequests = [],
+  onViewFileRequests = null,
 }) {
   const [timeInStart, setTimeInStart] = useState(null);
   const [now, setNow] = useState(new Date());
@@ -480,7 +492,6 @@ export default function MainDashboard({
           counterDisplay={counterDisplay}
           hasActiveTimeIn={hasActiveTimeIn}
           onToggleTimeIn={onToggleTimeIn}
-          canToggleTimeIn={canToggleTimeIn}
           isButtonDisabled={!canToggleTimeIn}
           hasScheduleToday={hasScheduleToday}
           hasCompletedShift={hasCompletedShift}
@@ -505,7 +516,7 @@ export default function MainDashboard({
           hasScheduleToday={hasScheduleToday}
           dashboardMeta={dashboardMeta}
         />
-        {showMemberStatusCard ? <MemberStatusCard /> : null}
+        {showMemberStatusCard ? <FileRequestCard requests={fileRequests} onViewRequest={onViewFileRequests} /> : null}
       </div>
 
       {isTimeOutConfirmOpen ? (

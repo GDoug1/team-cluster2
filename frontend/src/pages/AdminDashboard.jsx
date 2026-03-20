@@ -299,7 +299,7 @@ export default function AdminDashboard() {
   }, [canViewAttendance]);
 
   useEffect(() => {
-    if (activeNav !== "Team Request") return;
+    if (!canViewAttendance || !["Dashboard", "Team Request"].includes(activeNav)) return;
 
     fetchAdminTeamRequests()
       .then(response => {
@@ -310,7 +310,7 @@ export default function AdminDashboard() {
         setTeamRequests([]);
         setTeamRequestsError("Unable to load endorsed team requests.");
       });
-  }, [activeNav]);
+  }, [activeNav, canViewAttendance]);
 
   const isSameCalendarDay = (firstDate, secondDate) => {
     if (!(firstDate instanceof Date) || Number.isNaN(firstDate.getTime())) return false;
@@ -728,6 +728,8 @@ const handleOpenRejectModal = cluster => {
           <section className="content">
             <MainDashboard
               showMemberStatusCard
+              fileRequests={teamRequests}
+              onViewFileRequests={() => setActiveNav("Team Request")}
               attendanceControls={{
                 timeInAt: attendanceLog.timeInAt,
                 timeOutAt: attendanceLog.timeOutAt,
