@@ -17,6 +17,8 @@ import { logout } from "../utils/logout";
 import { parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 
+const attendanceTagOptions = ["On Time", "Late", "Scheduled", "Off Scheduled"];
+
 export default function AdminDashboard() {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const workSetupOptions = ["Onsite", "Work From Home (WFH)"];
@@ -82,6 +84,8 @@ export default function AdminDashboard() {
   const [attendanceDate, setAttendanceDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [editingCoachAttendance, setEditingCoachAttendance] = useState(null);
   const [editForm, setEditForm] = useState({ timeInAt: "", timeOutAt: "", tag: "", note: "" });
+  const [editAttendanceMessage, setEditAttendanceMessage] = useState("");
+  const [isSavingEditAttendance, setIsSavingEditAttendance] = useState(false);
   const [attendanceLog, setAttendanceLog] = useState({ timeInAt: null, timeOutAt: null, tag: null });
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const dateTimeLabel = useLiveDateTime();
@@ -461,23 +465,61 @@ export default function AdminDashboard() {
       tag: row.attendance_tag ?? "",
       note: row.attendance_note ?? ""
     });
+    setEditAttendanceMessage("");
+  };
+
+  const handleCloseAttendanceEdit = () => {
+    setEditingCoachAttendance(null);
+    setEditAttendanceMessage("");
   };
 
   const saveCoachAttendanceEdit = async () => {
-    if (!editingCoachAttendance?.attendance_id) return;
-    await apiFetch("api/admin/admin_update_coach_attendance.php", {
-      method: "POST",
-      body: JSON.stringify({
-        attendance_id: editingCoachAttendance.attendance_id,
-        timeInAt: editForm.timeInAt ? `${editForm.timeInAt.replace("T", " ")}:00` : null,
-        timeOutAt: editForm.timeOutAt ? `${editForm.timeOutAt.replace("T", " ")}:00` : null,
-        tag: editForm.tag,
-        note: editForm.note
-      })
-    });
-    setEditingCoachAttendance(null);
-    const refreshed = await apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${attendanceDate}`);
-    setCoachAttendance(Array.isArray(refreshed) ? refreshed : []);
+    if (!editingCoachAttendance?.attendance_id || isSavingEditAttendance) return;
+
+    setIsSavingEditAttendance(true);
+    setEditAttendanceMessage("");
+
+    try {
+      const updatedAttendance = await apiFetch("api/admin/admin_update_coach_attendance.php", {
+        method: "POST",
+        body: JSON.stringify({
+          attendance_id: editingCoachAttendance.attendance_id,
+          employee_id: editingCoachAttendance.user_id ?? null,
+          timeInAt: editForm.timeInAt ? `${editForm.timeInAt.replace("T", " ")}:00` : null,
+          timeOutAt: editForm.timeOutAt ? `${editForm.timeOutAt.replace("T", " ")}:00` : null,
+          tag: editForm.tag.trim() || null,
+          note: editForm.note
+        })
+      });
+
+      const refreshed = await apiFetch(`api/admin/admin_all_attendance.php?attendance_date=${attendanceDate}`);
+      const normalizedAttendance = Array.isArray(refreshed) ? refreshed : [];
+      setAllAttendance(normalizedAttendance);
+
+      const refreshedRow = normalizedAttendance.find(row => Number(row.attendance_id) === Number(editingCoachAttendance.attendance_id));
+      if (refreshedRow) {
+        setEditingCoachAttendance(refreshedRow);
+        setEditForm({
+          timeInAt: toDateTimeLocalValue(refreshedRow.time_in_at),
+          timeOutAt: toDateTimeLocalValue(refreshedRow.time_out_at),
+          tag: refreshedRow.attendance_tag ?? "",
+          note: refreshedRow.attendance_note ?? ""
+        });
+      } else if (updatedAttendance?.attendance) {
+        setEditForm({
+          timeInAt: toDateTimeLocalValue(updatedAttendance.attendance.time_in_at),
+          timeOutAt: toDateTimeLocalValue(updatedAttendance.attendance.time_out_at),
+          tag: updatedAttendance.attendance.attendance_tag ?? updatedAttendance.attendance.tag ?? "",
+          note: updatedAttendance.attendance.attendance_note ?? updatedAttendance.attendance.note ?? ""
+        });
+      }
+
+      setEditAttendanceMessage("Attendance updated successfully.");
+    } catch (error) {
+      setEditAttendanceMessage(error?.error ?? "Unable to update attendance record.");
+    } finally {
+      setIsSavingEditAttendance(false);
+    }
   };
 
   const handleToggleScheduleDay = day => {
@@ -913,20 +955,31 @@ const handleOpenRejectModal = cluster => {
       </main>
 
       {editingCoachAttendance && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-card reject-modal-card">
-            <div className="modal-header">
+        <div className="modal-overlay" role="presentation" onClick={handleCloseAttendanceEdit}>
+          <section className="modal-card attendance-edit-modal" role="dialog" aria-modal="true" onClick={event => event.stopPropagation()}>
+            <header className="modal-header">
               <div className="modal-title">Edit Coach Attendance</div>
-              <button className="btn link modal-close-btn" type="button" onClick={() => setEditingCoachAttendance(null)}>Close</button>
-            </div>
+              <button className="btn secondary" type="button" onClick={handleCloseAttendanceEdit}>Close</button>
+            </header>
             <div className="modal-body">
-              <label className="form-field">Time In<input type="datetime-local" value={editForm.timeInAt} onChange={event => setEditForm(curr => ({ ...curr, timeInAt: event.target.value }))} /></label>
-              <label className="form-field">Time Out<input type="datetime-local" value={editForm.timeOutAt} onChange={event => setEditForm(curr => ({ ...curr, timeOutAt: event.target.value }))} /></label>
-              <label className="form-field">Tag<input type="text" value={editForm.tag} onChange={event => setEditForm(curr => ({ ...curr, tag: event.target.value }))} /></label>
-              <label className="form-field">Note<input type="text" value={editForm.note} onChange={event => setEditForm(curr => ({ ...curr, note: event.target.value }))} /></label>
-              <div className="form-actions"><button className="btn" type="button" onClick={saveCoachAttendanceEdit}>Save</button></div>
+              <div className="attendance-history-range-filter" role="group" aria-label="Edit coach attendance values">
+                <label className="attendance-history-filter" htmlFor="admin-attendance-time-in"><span>Time In</span><input id="admin-attendance-time-in" type="datetime-local" value={editForm.timeInAt} onChange={event => setEditForm(curr => ({ ...curr, timeInAt: event.target.value }))} /></label>
+                <label className="attendance-history-filter" htmlFor="admin-attendance-time-out"><span>Time Out</span><input id="admin-attendance-time-out" type="datetime-local" value={editForm.timeOutAt} onChange={event => setEditForm(curr => ({ ...curr, timeOutAt: event.target.value }))} /></label>
+                <label className="attendance-history-filter" htmlFor="admin-attendance-tag">
+                  <span>Tag</span>
+                  <select id="admin-attendance-tag" value={editForm.tag} onChange={event => setEditForm(curr => ({ ...curr, tag: event.target.value }))}>
+                    <option value="">Select tag</option>
+                    {attendanceTagOptions.map(tag => <option key={tag} value={tag}>{tag}</option>)}
+                  </select>
+                </label>
+                <label className="attendance-history-filter" htmlFor="admin-attendance-note"><span>Note</span><input id="admin-attendance-note" type="text" value={editForm.note} onChange={event => setEditForm(curr => ({ ...curr, note: event.target.value }))} /></label>
+              </div>
+              <div className="attendance-edit-actions">
+                <button className="btn primary" type="button" disabled={isSavingEditAttendance} onClick={saveCoachAttendanceEdit}>{isSavingEditAttendance ? "Saving..." : "Save Attendance"}</button>
+                {editAttendanceMessage && <span className="attendance-detail-value">{editAttendanceMessage}</span>}
+              </div>
             </div>
-          </div>
+          </section>
         </div>
       )}
 
