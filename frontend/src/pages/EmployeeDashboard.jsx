@@ -30,6 +30,9 @@ export default function EmployeeDashboard() {
     canAccessControlPanel,
     canAccessEmployeesTab
   } = getFeatureAccess(hasPermission);
+  const normalizedUserRole = String(user?.role ?? "").trim().toLowerCase();
+  const canManageOwnAttendance = normalizedUserRole === "employee" || canSetAttendance;
+
   const navItems = [
     ...(canViewDashboard ? ["Dashboard"] : []),
     ...(canViewTeam ? ["Team", "Schedule"] : []),
@@ -314,7 +317,7 @@ export default function EmployeeDashboard() {
   };
 
   const handleTimeIn = async () => {
-    if (!canSetAttendance || !hasTeamCluster || !hasScheduleToday || isSavingAttendance) return;
+    if (!canManageOwnAttendance || !hasTeamCluster || !hasScheduleToday || isSavingAttendance) return;
     if (attendanceLog.timeInAt && !attendanceLog.timeOutAt) return;
 
     const now = new Date();
@@ -341,7 +344,7 @@ export default function EmployeeDashboard() {
   };
 
   const handleTimeOut = async () => {
-    if (!canSetAttendance || !hasTeamCluster || !hasScheduleToday || isSavingAttendance) return;
+    if (!canManageOwnAttendance || !hasTeamCluster || !hasScheduleToday || isSavingAttendance) return;
     if (!attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
 
     const nextAttendance = {
@@ -388,8 +391,8 @@ export default function EmployeeDashboard() {
   const canUseAttendanceControls = hasTeamCluster && hasScheduleToday;
   const hasTimedOutToday = isSameCalendarDay(attendanceLog.timeOutAt, new Date());
   const hasCompletedShift = hasTimedOutToday && !hasActiveTimeIn;
-  const canClickTimeIn = canSetAttendance && canUseAttendanceControls && !hasActiveTimeIn && !isSavingAttendance;
-  const canClickTimeOut = canSetAttendance && canUseAttendanceControls && hasActiveTimeIn && !isSavingAttendance;
+  const canClickTimeIn = canManageOwnAttendance && canUseAttendanceControls && !hasActiveTimeIn && !isSavingAttendance;
+  const canClickTimeOut = canManageOwnAttendance && canUseAttendanceControls && hasActiveTimeIn && !isSavingAttendance;
   const breakTimeToday = todaySchedule
     ? formatBreakTimeRange(
         todaySchedule.breakStartTime,
