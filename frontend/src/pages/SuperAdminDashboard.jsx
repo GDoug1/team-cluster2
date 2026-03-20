@@ -100,7 +100,7 @@ export default function AdminDashboard() {
     canAccessControlPanel,
     canAccessEmployeesTab
   } = getFeatureAccess(hasPermission);
-  const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "Team Request"];
+  const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "File Request"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
   const navItems = [

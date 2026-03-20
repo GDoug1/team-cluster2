@@ -100,7 +100,7 @@ export default function AdminDashboard() {
     canAccessControlPanel,
     canAccessEmployeesTab
   } = getFeatureAccess(hasPermission);
-  const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "Team Request"];
+  const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "File Request"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
   const navItems = [
@@ -852,7 +852,7 @@ const handleOpenRejectModal = cluster => {
           </section>
         ) : activeNav === "Team Request" && canViewAttendance ? (
           <section className="content">
-            <div className="section-title">Team Requests</div>
+            <div className="section-title">File Requests</div>
             <p className="table-subtitle">Endorsed team requests waiting for final admin approval or rejection.</p>
             <AttendanceHistoryHighlights highlights={teamRequestHighlights} />
             {teamRequestsError && <div className="error">{teamRequestsError}</div>}
