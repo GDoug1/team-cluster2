@@ -12,6 +12,7 @@ import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
 import ControlPanelSection from "../components/ControlPanelSection";
 import EmployeesSection from "../components/EmployeesSection";
+import AttendanceModule from "../components/AttendanceModule";
 import { buildRequestHighlights, fetchAdminTeamRequests, fetchMyRequests, updateAdminTeamRequestStatus } from "../api/requests";
 import { logout } from "../utils/logout";
 import { parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
@@ -817,13 +818,11 @@ const handleOpenRejectModal = cluster => {
         ) : activeNav === "Attendance" && canViewAttendance ? (
           <section className="content">
             <div className="section-title">My Attendance</div>
-            <AttendanceHistoryHighlights />
-            <DataPanel
-              type="attendance"
-              records={coachAttendance}
-              externalDateFilter={attendanceDate}
-              onExternalDateFilterChange={setAttendanceDate}
-            />
+            <div className="employee-card">
+              <div className="employee-card-body employee-card-body-flush">
+                <AttendanceModule records={coachAttendance} />
+              </div>
+            </div>
           </section>
           ) : activeNav === "All Attendance" && canViewAttendance ? (
           <section className="content">

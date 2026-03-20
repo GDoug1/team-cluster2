@@ -24,6 +24,70 @@ export const fetchAttendanceHistory = async () => {
   return await apiFetch("api/employee/employee_attendance_history.php");
 };
 
+const toDisplayTime = value => {
+  if (!value) return "--";
+
+  if (/^\d{1,2}:\d{2}\s?(AM|PM)$/i.test(String(value).trim())) {
+    return value;
+  }
+
+  const parsed = parseSqlDateTime(value);
+  if (!parsed) return "--";
+
+  return parsed.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+};
+
+const toDisplayDate = value => {
+  if (!value) return new Date().toISOString().slice(0, 10);
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())) {
+    return value;
+  }
+
+  const parsed = parseSqlDateTime(value);
+  if (!parsed) return new Date().toISOString().slice(0, 10);
+  return parsed.toISOString().slice(0, 10);
+};
+
+const toTotalHours = (timeInAt, timeOutAt, fallbackValue = null) => {
+  if (fallbackValue !== null && fallbackValue !== undefined && fallbackValue !== "") {
+    const total = Number.parseFloat(fallbackValue);
+    return Number.isFinite(total) ? total.toFixed(2) : "0.00";
+  }
+
+  const timeIn = parseSqlDateTime(timeInAt);
+  const timeOut = parseSqlDateTime(timeOutAt);
+  if (!timeIn || !timeOut) return "0.00";
+
+  const diffHours = (timeOut.getTime() - timeIn.getTime()) / (1000 * 60 * 60);
+  return diffHours > 0 ? diffHours.toFixed(2) : "0.00";
+};
+
+export const normalizeAttendanceHistoryRecord = record => {
+  const timeInAt = record?.time_in_at ?? null;
+  const timeOutAt = record?.time_out_at ?? null;
+  const sourceDate = record?.date ?? timeInAt ?? timeOutAt ?? record?.updated_at ?? null;
+  const status = record?.status ?? record?.attendance_tag ?? record?.tag ?? "pending";
+
+  return {
+    date: toDisplayDate(sourceDate),
+    time_in: record?.time_in ?? toDisplayTime(timeInAt),
+    time_out: record?.time_out ?? toDisplayTime(timeOutAt),
+    break_in: record?.break_in ?? "--",
+    break_out: record?.break_out ?? "--",
+    total_hours: toTotalHours(timeInAt, timeOutAt, record?.total_hours ?? null),
+    status: String(status).toLowerCase(),
+    raw: record,
+  };
+};
+
+export const normalizeAttendanceHistoryRecords = records => (
+  Array.isArray(records) ? records.map(normalizeAttendanceHistoryRecord) : []
+);
+
 export const saveDashboardAttendance = async ({ clusterId, nextAttendance }) => {
   const response = await apiFetch("api/employee/save_attendance.php", {
     method: "POST",

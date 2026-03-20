@@ -4,6 +4,7 @@ import { apiFetch } from "../api/api";
 import { parseSqlDateTime, saveDashboardAttendance } from "../api/attendance";
 import DashboardSidebar from "../components/DashboardSidebar";
 import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
+import AttendanceModule from "../components/AttendanceModule";
 import MainDashboard from "./MainDashboard";
 import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
@@ -1670,8 +1671,11 @@ export default function CoachDashboard() {
                     </>
                   ) : (
                     <>
-                      <AttendanceHistoryHighlights />
-                      <DataPanel type="attendance" records={coachAttendanceHistory} />
+                      <div className="employee-card">
+                        <div className="employee-card-body employee-card-body-flush">
+                          <AttendanceModule records={coachAttendanceHistory} />
+                        </div>
+                      </div>
                     </>
                   )}
                 </div>
