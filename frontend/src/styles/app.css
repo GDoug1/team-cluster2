@@ -595,11 +595,13 @@ body {
 }
 
 .table-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   overflow-x: auto;
   overflow-y: hidden;
   max-width: 100%;
+  background: #ffffff;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
 }
 
 .table-header,
@@ -614,11 +616,11 @@ body {
 }
 
 .table-header {
-  background: #e5e7e9;
-  font-weight: 600;
-  font-size: 13.5px;
-  color: #000000;
-  border-bottom: 1px solid #e5e7eb;
+  background: #eceff1;
+  font-weight: 500;
+  font-size: 14px;
+  color: rgba(0,0,0,0.85);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
 }
 
 .table-row {
@@ -1965,8 +1967,28 @@ body {
 .attendance-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.attendance-summary-grid .overview-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+}
+
+.attendance-summary-grid .overview-label {
+  text-transform: none;
+  letter-spacing: -0.02em;
+  font-size: 14px;
+  color: #020617;
+}
+
+.attendance-summary-grid .overview-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #020617;
 }
 
 .attendance-table .table-cell {
@@ -1974,9 +1996,14 @@ body {
 }
 .attendance-controls {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  align-items: end;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid #f1f5f9;
+  border-radius: 8px;
+  background: #fafafa;
 }
 
 .attendance-search,
@@ -1986,17 +2013,18 @@ body {
   gap: 6px;
   font-size: 12px;
   color: #334155;
+  flex: 1 1 220px;
 }
 
 .attendance-search input,
 .attendance-date input,
 .attendance-sort select {
-  width: min(360px, 76vw);
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 13px;
-  background: #f8fafc;
+  width: 100%;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  padding: 8px 12px;
+  font-size: 14px;
+  background: #ffffff;
 }
 
 .attendance-header,
@@ -2077,15 +2105,19 @@ body {
 .attendance-history-filter {
   display: grid;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 0;
   max-width: 220px;
+  flex: 1 1 180px;
 }
 
 .attendance-history-range-filter {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 0;
+  padding: 16px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fafafa;
 }
 
 .attendance-history-filter span {
@@ -2094,18 +2126,18 @@ body {
 }
 
 .attendance-history-filter input {
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  padding: 8px 12px;
+  font-size: 14px;
   background: #ffffff;
 }
 
 .attendance-history-filter select {
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  padding: 8px 12px;
+  font-size: 14px;
   background: #ffffff;
 }
 
@@ -2179,9 +2211,15 @@ body {
   border-radius: 999px;
 }
 .employee-attendance-history-table {
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+}
+
+.employee-attendance-history-scroll {
+  overflow-x: auto;
 }
 
 .employee-attendance-history-header,
@@ -2190,19 +2228,24 @@ body {
   grid-template-columns: 1.2fr 1fr 1fr 1fr 0.8fr;
   gap: 10px;
   align-items: center;
-  padding: 10px 12px;
-  font-size: 13px;
+  padding: 14px 16px;
+  font-size: 14px;
 }
 
 .employee-attendance-history-header {
-  background: #f8fafc;
-  font-weight: 600;
-  color: #334155;
+  background: #eceff1;
+  font-weight: 500;
+  color: rgba(0,0,0,0.85);
 }
 
 .employee-attendance-history-row {
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid rgba(0,0,0,0.06);
   color: #1f2937;
+  transition: background-color 0.2s ease;
+}
+
+.employee-attendance-history-row:hover {
+  background: #f5f5f5;
 }
 
 .employee-attendance-summary-row {
