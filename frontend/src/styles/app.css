@@ -2357,6 +2357,10 @@ body {
   color: #1f2937;
 }
 
+.employee-attendance-total-hours-cell {
+  font-weight: 700;
+  color: #0f172a;
+}
 
 .employee-attendance-history-header > span,
 .employee-attendance-history-row > span {
