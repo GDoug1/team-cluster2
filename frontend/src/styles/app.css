@@ -2342,6 +2342,80 @@ body {
   flex: 0 0 auto;
 }
 
+.employee-request-details-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.employee-request-details-text {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.request-details-overlay {
+  z-index: 40;
+}
+
+.request-details-modal {
+  width: min(640px, 92vw);
+  max-height: min(86vh, 720px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 24px;
+}
+
+.request-details-modal-header {
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.request-details-modal-heading {
+  display: grid;
+  gap: 6px;
+}
+
+.request-details-modal-title {
+  font-size: 24px;
+}
+
+.request-details-modal-subtitle {
+  font-style: normal;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.request-details-close-btn {
+  flex: 0 0 auto;
+}
+
+.request-details-modal-body {
+  min-height: 0;
+  padding: 18px 0;
+}
+
+.request-details-content {
+  max-height: 100%;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid #dbe4f0;
+  background: #f8fafc;
+  color: #1f2937;
+  line-height: 1.65;
+}
+
+.request-details-modal-actions {
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
 .employee-attendance-summary-row {
   cursor: pointer;
 }

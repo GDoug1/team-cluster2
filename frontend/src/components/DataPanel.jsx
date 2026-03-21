@@ -1,5 +1,16 @@
 import { useMemo, useState } from "react";
 
+const normalizeRequestDetails = value => {
+  const text = String(value ?? "").trim();
+  return text || "—";
+};
+
+const truncateRequestDetails = (value, maxLength = 72) => {
+  const details = normalizeRequestDetails(value);
+  if (details === "—" || details.length <= maxLength) return details;
+  return `${details.slice(0, maxLength).trimEnd()}…`;
+};
+
 const panelConfig = {
   attendance: {
     title: "My Attendance Logs",
@@ -67,6 +78,7 @@ export default function DataPanel({
   const [dateEndFilter, setDateEndFilter] = useState("");
   const [requestTypeFilter, setRequestTypeFilter] = useState("all");
   const [requestStatusFilter, setRequestStatusFilter] = useState("all");
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   const requestTypeOptions = useMemo(() => ([
     "all",
@@ -249,7 +261,18 @@ export default function DataPanel({
             >
             <span role="cell">{formatDateTimeLabel(item.date_filed)}</span>
             <span role="cell">{item.request_type ?? "—"}</span>
-            <span role="cell">{item.details ?? "—"}</span>
+            <span role="cell">
+              <div className="employee-request-details-cell">
+                <span className="employee-request-details-text" title={normalizeRequestDetails(item.details)}>{truncateRequestDetails(item.details)}</span>
+                <button
+                  className="btn secondary"
+                  type="button"
+                  onClick={() => setSelectedRequest(item)}
+                >
+                  View
+                </button>
+              </div>
+            </span>
             <span role="cell">{item.schedule_period ?? "—"}</span>
             <span role="cell">{item.status ?? "Pending"}</span>
             {onRequestAction && (
@@ -261,7 +284,7 @@ export default function DataPanel({
                       ? action.allowedStatuses.map(value => String(value).toLowerCase())
                       : ["pending"];
                     const canReview = item.can_review !== false;
-                    const isVisible = typeof action.isVisible === 'function' ? action.isVisible(item) : true;
+                    const isVisible = typeof action.isVisible === "function" ? action.isVisible(item) : true;
                     const isEnabled = isVisible && canReview && allowedStatuses.some(status => currentStatus.includes(status));
 
                     if (!isVisible) {
@@ -288,6 +311,36 @@ export default function DataPanel({
             <div className="empty-state">No requests found.</div>
           )}
         </div>
+
+        {selectedRequest && (
+          <div className="modal-overlay request-details-overlay" role="presentation" onClick={() => setSelectedRequest(null)}>
+            <div
+              className="modal-card request-details-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="request-details-modal-title"
+              onClick={event => event.stopPropagation()}
+            >
+              <div className="modal-header request-details-modal-header">
+                <div className="request-details-modal-heading">
+                  <div id="request-details-modal-title" className="modal-title request-details-modal-title">Request Details</div>
+                  <p className="modal-text request-details-modal-subtitle">
+                    {selectedRequest.request_type ?? "Request"} filed on {formatDateTimeLabel(selectedRequest.date_filed)}
+                  </p>
+                </div>
+                <button className="icon-btn request-details-close-btn" type="button" aria-label="Close request details" onClick={() => setSelectedRequest(null)}>✕</button>
+              </div>
+              <div className="request-details-modal-body">
+                <div className="request-details-content">
+                  {normalizeRequestDetails(selectedRequest.details)}
+                </div>
+              </div>
+              <div className="modal-actions request-details-modal-actions">
+                <button className="btn" type="button" onClick={() => setSelectedRequest(null)}>Close</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
