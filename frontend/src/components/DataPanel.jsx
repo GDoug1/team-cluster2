@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { normalizeAttendanceHistoryRecord, parseSqlDateTime } from "../api/attendance";
 
 const normalizeRequestDetails = value => {
   const text = String(value ?? "").trim();
@@ -38,6 +39,27 @@ const formatDateTimeLabel = value => {
     year: "numeric",
     month: "short",
     day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+};
+
+const formatAttendanceDate = value => {
+  if (!value) return "—";
+  const parsed = parseSqlDateTime(value) ?? new Date(String(value).replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return parsed.toLocaleDateString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  });
+};
+
+const formatAttendanceTime = value => {
+  if (!value) return "—";
+  const parsed = parseSqlDateTime(value) ?? new Date(String(value).replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return parsed.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit"
   });
@@ -166,7 +188,7 @@ export default function DataPanel({
   }, [type, records, dateStartFilter, dateEndFilter, externalDateFilter, searchQuery, personField, enableRequestFilters, requestTypeFilter, requestStatusFilter]);
 
   if (type === "attendance") {
-    const attendanceColumnCount = 6 + (personField ? 1 : 0) + (onEditRow ? 1 : 0);
+    const attendanceColumnCount = 7 + (personField ? 1 : 0) + (onEditRow ? 1 : 0);
     const attendanceGridStyle = {
       gridTemplateColumns: `repeat(${attendanceColumnCount}, minmax(140px, 1fr))`,
       minWidth: `${attendanceColumnCount * 140}px`
@@ -200,38 +222,45 @@ export default function DataPanel({
             <span role="columnheader">Date</span>
             <span role="columnheader">Time In</span>
             <span role="columnheader">Time Out</span>
+            <span role="columnheader">Total Hours</span>
             <span role="columnheader">Status</span>
             <span role="columnheader">Cluster</span>
             <span role="columnheader">Note</span>
             {personField && <span role="columnheader">{personLabel}</span>}
             {onEditRow && <span role="columnheader">Action</span>}
           </div>
-        {filteredRecords.length > 0 ? filteredRecords.map(item => (
-            <div
-              key={`${item.id ?? item.attendance_id}-${item.updated_at ?? item.attendance_updated_at ?? item.time_in_at ?? "entry"}`}
-              className="employee-attendance-history-row"
-              role="row"
-              style={attendanceGridStyle}
-            >
-              <span role="cell">{formatDateTimeLabel(item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at)}</span>
-              <span role="cell">{formatDateTimeLabel(item.time_in_at)}</span>
-              <span role="cell">{formatDateTimeLabel(item.time_out_at)}</span>
-              <span role="cell">{item.attendance_tag ?? item.tag ?? "Pending"}</span>
-              <span role="cell">{item.cluster_name ?? "—"}</span>
-              <span role="cell">{item.attendance_note ?? item.note ?? "—"}</span>
-              {personField && (
-                <span role="cell" className="team-attendance-employee-cell">
-                  <span>{getPersonPrimaryValue(item, personField)}</span>
-                  {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
-                </span>
-              )}
-              {onEditRow && (
-                <span role="cell">
-                  <button className="btn" type="button" onClick={() => onEditRow(item)}>Edit</button>
-                </span>
-              )}
-            </div>
-          )) : (
+          {filteredRecords.length > 0 ? filteredRecords.map(item => {
+            const normalizedAttendance = normalizeAttendanceHistoryRecord(item);
+            const attendanceDateValue = item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at;
+
+            return (
+              <div
+                key={`${item.id ?? item.attendance_id}-${item.updated_at ?? item.attendance_updated_at ?? item.time_in_at ?? "entry"}`}
+                className="employee-attendance-history-row"
+                role="row"
+                style={attendanceGridStyle}
+              >
+                <span role="cell">{formatAttendanceDate(attendanceDateValue)}</span>
+                <span role="cell">{formatAttendanceTime(item.time_in_at)}</span>
+                <span role="cell">{formatAttendanceTime(item.time_out_at)}</span>
+                <span role="cell" className="employee-attendance-total-hours-cell">{normalizedAttendance.total_hours}h</span>
+                <span role="cell">{item.attendance_tag ?? item.tag ?? "Pending"}</span>
+                <span role="cell">{item.cluster_name ?? "—"}</span>
+                <span role="cell">{item.attendance_note ?? item.note ?? "—"}</span>
+                {personField && (
+                  <span role="cell" className="team-attendance-employee-cell">
+                    <span>{getPersonPrimaryValue(item, personField)}</span>
+                    {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
+                  </span>
+                )}
+                {onEditRow && (
+                  <span role="cell">
+                    <button className="btn" type="button" onClick={() => onEditRow(item)}>Edit</button>
+                  </span>
+                )}
+              </div>
+            );
+          }) : (
             <div className="empty-state">No attendance records match the selected filters.</div>
           )}
         </div>
