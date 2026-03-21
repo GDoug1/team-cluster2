@@ -394,7 +394,7 @@ export default function AdminDashboard() {
     });
 
     if (activeNav === "Attendance") {
-      const refreshed = await apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${attendanceDate}`);
+      const refreshed = await apiFetch("api/admin/admin_my_attendance_history.php");
       setCoachAttendance(Array.isArray(refreshed) ? refreshed : []);
     }
   };
@@ -408,7 +408,7 @@ export default function AdminDashboard() {
     });
 
     if (activeNav === "Attendance") {
-      const refreshed = await apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${attendanceDate}`);
+      const refreshed = await apiFetch("api/admin/admin_my_attendance_history.php");
       setCoachAttendance(Array.isArray(refreshed) ? refreshed : []);
     }
   };
@@ -452,29 +452,17 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (activeNav !== "Attendance") return;
-    apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${attendanceDate}`)
-      .then(data => {
-        const rows = Array.isArray(data) ? data : [];
-        setCoachAttendance(rows);
-        const currentAttendance = rows[0] ?? null;
-        setAttendanceLog({
-          timeInAt: parseSqlDateTime(currentAttendance?.time_in_at ?? null),
-          timeOutAt: parseSqlDateTime(currentAttendance?.time_out_at ?? null),
-          tag: currentAttendance?.attendance_tag ?? null
-        });
-      })
-      .catch(() => {
-        setCoachAttendance([]);
-        setAttendanceLog({ timeInAt: null, timeOutAt: null, tag: null });
-      });
-  }, [activeNav, attendanceDate]);
+    apiFetch("api/admin/admin_my_attendance_history.php")
+      .then(data => setCoachAttendance(Array.isArray(data) ? data : []))
+      .catch(() => setCoachAttendance([]));
+  }, [activeNav]);
 
   useEffect(() => {
     if (activeNav !== "All Attendance") return;
-    apiFetch(`api/admin/admin_all_attendance.php?attendance_date=${attendanceDate}`)
+    apiFetch("api/admin/admin_all_attendance_history.php")
       .then(data => setAllAttendance(Array.isArray(data) ? data : []))
       .catch(() => setAllAttendance([]));
-  }, [activeNav, attendanceDate]);
+  }, [activeNav]);
 
   const toDateTimeLocalValue = value => {
     if (!value) return "";
@@ -523,7 +511,7 @@ export default function AdminDashboard() {
         })
       });
 
-      const refreshed = await apiFetch(`api/admin/admin_all_attendance.php?attendance_date=${attendanceDate}`);
+      const refreshed = await apiFetch("api/admin/admin_all_attendance_history.php");
       const normalizedAttendance = Array.isArray(refreshed) ? refreshed : [];
       setAllAttendance(normalizedAttendance);
 
@@ -880,7 +868,7 @@ const handleOpenRejectModal = cluster => {
               type="attendance"
               records={allAttendance}
               personField="employee_name"
-              personLabel="Employee"
+              personLabel="Employee / Coach"
               onEditRow={canEditAttendance ? openAttendanceEdit : undefined}
               externalDateFilter={attendanceDate}
               onExternalDateFilterChange={setAttendanceDate}

@@ -98,9 +98,10 @@ export default function DataPanel({
     if (type !== "attendance") return [];
 
     return records.filter(item => {
-      const entryDate = toDateInputValue(item.time_in_at ?? item.time_out_at ?? item.updated_at);
+      const entryDate = toDateInputValue(item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at);
       if (dateStartFilter && (!entryDate || entryDate < dateStartFilter)) return false;
       if (dateEndFilter && (!entryDate || entryDate > dateEndFilter)) return false;
+      if (externalDateFilter && (!entryDate || entryDate !== externalDateFilter)) return false;
 
       const haystack = [
         item.cluster_name,
@@ -117,7 +118,7 @@ export default function DataPanel({
       if (searchQuery && !haystack.includes(searchQuery.toLowerCase())) return false;
       return true;
     });
-  }, [type, records, dateStartFilter, dateEndFilter, searchQuery, personField, enableRequestFilters, requestTypeFilter, requestStatusFilter]);
+  }, [type, records, dateStartFilter, dateEndFilter, externalDateFilter, searchQuery, personField, enableRequestFilters, requestTypeFilter, requestStatusFilter]);
 
   if (type === "attendance") {
     const attendanceColumnCount = 6 + (personField ? 1 : 0) + (onEditRow ? 1 : 0);
@@ -162,12 +163,12 @@ export default function DataPanel({
           </div>
         {filteredRecords.length > 0 ? filteredRecords.map(item => (
             <div
-              key={`${item.id ?? item.attendance_id}-${item.updated_at ?? item.time_in_at ?? "entry"}`}
+              key={`${item.id ?? item.attendance_id}-${item.updated_at ?? item.attendance_updated_at ?? item.time_in_at ?? "entry"}`}
               className="employee-attendance-history-row"
               role="row"
               style={attendanceGridStyle}
             >
-              <span role="cell">{formatDateTimeLabel(item.time_in_at ?? item.time_out_at ?? item.updated_at)}</span>
+              <span role="cell">{formatDateTimeLabel(item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at)}</span>
               <span role="cell">{formatDateTimeLabel(item.time_in_at)}</span>
               <span role="cell">{formatDateTimeLabel(item.time_out_at)}</span>
               <span role="cell">{item.attendance_tag ?? item.tag ?? "Pending"}</span>
