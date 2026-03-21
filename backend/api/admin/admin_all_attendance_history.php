@@ -25,7 +25,16 @@ $clusterIdColumn = in_array('id', $clusterColumns, true) ? 'id' : 'cluster_id';
 $userIdColumn = in_array('id', $userColumns, true) ? 'id' : 'user_id';
 $attendanceUserColumn = in_array('employee_id', $attendanceColumns, true) ? 'employee_id' : (in_array('user_id', $attendanceColumns, true) ? 'user_id' : null);
 $attendancePrimaryKey = in_array('attendance_id', $attendanceColumns, true) ? 'attendance_id' : (in_array('id', $attendanceColumns, true) ? 'id' : null);
-$attendanceOwnerExpr = $attendanceUserColumn === 'employee_id' ? 'e.employee_id' : "u.$userIdColumn";
+$userRoleColumn = in_array('role', $userColumns, true) ? 'role' : (in_array('role_id', $userColumns, true) ? 'role_id' : null);
+$coachRoleExpr = '0=1';
+if ($userRoleColumn === 'role') {
+    $coachRoleExpr = "LOWER(COALESCE(u.role, '')) LIKE '%coach%'";
+} elseif ($userRoleColumn === 'role_id') {
+    $coachRoleExpr = "EXISTS (SELECT 1 FROM roles r WHERE r.role_id = u.role_id AND LOWER(r.role_name) LIKE '%coach%')";
+}
+$attendanceOwnerExpr = $attendanceUserColumn === 'employee_id'
+    ? "CASE WHEN $coachRoleExpr THEN u.$userIdColumn ELSE e.employee_id END"
+    : "u.$userIdColumn";
 
 $hasLegacyAttendance = in_array('id', $attendanceColumns, true)
     && in_array('time_in_at', $attendanceColumns, true)

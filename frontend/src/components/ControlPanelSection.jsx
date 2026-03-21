@@ -1,573 +1,317 @@
-import { useEffect, useMemo, useState } from "react";
-import { apiFetch } from "../api/api";
-import { useFeedback } from "./FeedbackProvider";
+import { useMemo, useState } from "react";
 
-const RESTRICTED_PERMISSIONS_BY_ROLE = {
-  employee: new Set([
-    "Access Control Panel",
-    "Add Employee",
-    "Edit Employee",
-    "Delete Employee",
-    "Set Attendance",
-    "Edit Attendance",
-    "View Employee List"
-  ]),
-  "team coach": new Set([
-    "Access Control Panel",
-    "Add Employee",
-    "Edit Employee",
-    "Delete Employee"
-  ]),
-  coach: new Set([
-    "Access Control Panel",
-    "Add Employee",
-    "Edit Employee",
-    "Delete Employee"
-  ])
+const panelConfig = {
+  attendance: {
+    title: "My Attendance Logs",
+    filterLabel: "Filter Dates",
+    searchPlaceholder: "Search...",
+    columns: ["Date", "Time In", "Time Out", "Break In", "Break Out", "Total Hours", "Status", "Actions"],
+    messageTitle: "Server Connection Lost",
+    messageSubtitle: "Attendance logs cannot be retrieved at this moment."
+  },
+  requests: {
+    title: "My Requests",
+    filterLabel: "Filter Type",
+    searchPlaceholder: "Search requests, reasons, status...",
+    columns: ["Date Filed", "Request Type", "Details", "Schedule / Period", "Status", "Actions"],
+    messageTitle: "Unable to load requests",
+    messageSubtitle: "Please try again in a few moments."
+  }
 };
 
-function getEditablePermissionOptions(roleName, permissionOptions) {
-  const normalizedRole = String(roleName ?? "").trim().toLowerCase();
-  const restrictedPermissions = RESTRICTED_PERMISSIONS_BY_ROLE[normalizedRole];
-  if (!restrictedPermissions) {
-    return permissionOptions;
+const formatDateTimeLabel = value => {
+  if (!value) return "—";
+  const date = new Date(String(value).replace(" ", "T"));
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+};
+
+const toDateInputValue = value => {
+  if (!value) return null;
+  const parsed = new Date(String(value).replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return null;
+  const year = parsed.getFullYear();
+  const month = `${parsed.getMonth() + 1}`.padStart(2, "0");
+  const day = `${parsed.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+export default function DataPanel({
+  type = "attendance",
+  records = [],
+  personField = null,
+  personLabel = "Person",
+  onEditRow = null,
+  externalDateFilter = null,
+  onExternalDateFilterChange = null,
+  onRequestAction = null,
+  requestActionLoadingId = "",
+  requestActions = null,
+  enableRequestFilters = false,
+}) {
+  const config = panelConfig[type] ?? panelConfig.attendance;
+  const resolvedRequestActions = Array.isArray(requestActions) && requestActions.length > 0
+    ? requestActions
+    : [
+      { label: "Endorse", status: "Approved", variant: "btn", allowedStatuses: ["pending"] },
+      { label: "Reject", status: "Rejected", variant: "btn secondary", allowedStatuses: ["pending"] }
+    ];
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateStartFilter, setDateStartFilter] = useState("");
+  const [dateEndFilter, setDateEndFilter] = useState("");
+  const [requestTypeFilter, setRequestTypeFilter] = useState("all");
+  const [requestStatusFilter, setRequestStatusFilter] = useState("all");
+
+  const requestTypeOptions = useMemo(() => ([
+    "all",
+    ...new Set(records.map(item => String(item.request_type ?? "").trim()).filter(Boolean))
+  ]), [records]);
+
+  const requestStatusOptions = useMemo(() => ([
+    "all",
+    ...new Set(records.map(item => String(item.status ?? "").trim()).filter(Boolean))
+  ]), [records]);
+
+  const filteredRecords = useMemo(() => {
+    if (type === "requests") {
+      return records.filter(item => {
+        const normalizedRequestType = String(item.request_type ?? "").trim().toLowerCase();
+        const normalizedStatus = String(item.status ?? "").trim().toLowerCase();
+
+        if (enableRequestFilters && requestTypeFilter !== "all" && normalizedRequestType !== requestTypeFilter.toLowerCase()) return false;
+        if (enableRequestFilters && requestStatusFilter !== "all" && normalizedStatus !== requestStatusFilter.toLowerCase()) return false;
+
+        const haystack = [item.request_type, item.details, item.status, item.schedule_period]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return !searchQuery || haystack.includes(searchQuery.toLowerCase());
+      });
+    }
+
+    if (type !== "attendance") return [];
+
+    return records.filter(item => {
+      const entryDate = toDateInputValue(item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at);
+      if (dateStartFilter && (!entryDate || entryDate < dateStartFilter)) return false;
+      if (dateEndFilter && (!entryDate || entryDate > dateEndFilter)) return false;
+      if (externalDateFilter && (!entryDate || entryDate !== externalDateFilter)) return false;
+
+      const haystack = [
+        item.cluster_name,
+        item.attendance_tag,
+        item.tag,
+        item.attendance_note,
+        item.note,
+        personField ? item[personField] : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      if (searchQuery && !haystack.includes(searchQuery.toLowerCase())) return false;
+      return true;
+    });
+  }, [type, records, dateStartFilter, dateEndFilter, externalDateFilter, searchQuery, personField, enableRequestFilters, requestTypeFilter, requestStatusFilter]);
+
+  if (type === "attendance") {
+    const attendanceColumnCount = 6 + (personField ? 1 : 0) + (onEditRow ? 1 : 0);
+    const attendanceGridStyle = {
+      gridTemplateColumns: `repeat(${attendanceColumnCount}, minmax(140px, 1fr))`,
+      minWidth: `${attendanceColumnCount * 140}px`
+    };
+
+    return (
+      <div className="employee-attendance-history-table" role="table" aria-label={config.title}>
+        <div className="attendance-history-range-filter" role="group" aria-label="Filter attendance history">
+          <label className="attendance-history-filter">
+            <span>From</span>
+            <input type="date" value={dateStartFilter} onChange={event => setDateStartFilter(event.target.value)} />
+          </label>
+          <label className="attendance-history-filter">
+            <span>To</span>
+            <input type="date" value={dateEndFilter} onChange={event => setDateEndFilter(event.target.value)} />
+          </label>
+          {typeof onExternalDateFilterChange === "function" && (
+            <label className="attendance-history-filter">
+              <span>Date</span>
+              <input type="date" value={externalDateFilter ?? ""} onChange={event => onExternalDateFilterChange(event.target.value)} />
+            </label>
+          )}
+          <label className="attendance-history-filter" style={{ minWidth: "260px" }}>
+            <span>Search</span>
+            <input type="text" value={searchQuery} placeholder={config.searchPlaceholder} onChange={event => setSearchQuery(event.target.value)} />
+          </label>
+        </div>
+
+        <div className="employee-attendance-history-scroll">
+          <div className="employee-attendance-history-header" role="row" style={attendanceGridStyle}>
+            <span role="columnheader">Date</span>
+            <span role="columnheader">Time In</span>
+            <span role="columnheader">Time Out</span>
+            <span role="columnheader">Status</span>
+            <span role="columnheader">Cluster</span>
+            <span role="columnheader">Note</span>
+            {personField && <span role="columnheader">{personLabel}</span>}
+            {onEditRow && <span role="columnheader">Action</span>}
+          </div>
+        {filteredRecords.length > 0 ? filteredRecords.map(item => (
+            <div
+              key={`${item.id ?? item.attendance_id}-${item.updated_at ?? item.attendance_updated_at ?? item.time_in_at ?? "entry"}`}
+              className="employee-attendance-history-row"
+              role="row"
+              style={attendanceGridStyle}
+            >
+              <span role="cell">{formatDateTimeLabel(item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at)}</span>
+              <span role="cell">{formatDateTimeLabel(item.time_in_at)}</span>
+              <span role="cell">{formatDateTimeLabel(item.time_out_at)}</span>
+              <span role="cell">{item.attendance_tag ?? item.tag ?? "Pending"}</span>
+              <span role="cell">{item.cluster_name ?? "—"}</span>
+              <span role="cell">{item.attendance_note ?? item.note ?? "—"}</span>
+              {personField && <span role="cell">{item[personField] ?? "—"}</span>}
+              {onEditRow && (
+                <span role="cell">
+                  <button className="btn" type="button" onClick={() => onEditRow(item)}>Edit</button>
+                </span>
+              )}
+            </div>
+          )) : (
+            <div className="empty-state">No attendance records match the selected filters.</div>
+          )}
+        </div>
+      </div>
+    );
   }
 
-  return permissionOptions.filter(permission => !restrictedPermissions.has(permission.name));
-}
+  if (type === "requests") {
+    return (
+      <div className="employee-attendance-history-table" role="table" aria-label={config.title}>
+        <div className="attendance-history-range-filter" role="group" aria-label="Filter requests">
+          {enableRequestFilters && (
+            <>
+              <label className="attendance-history-filter">
+                <span>Request Type</span>
+                <select value={requestTypeFilter} onChange={event => setRequestTypeFilter(event.target.value)}>
+                  {requestTypeOptions.map(option => (
+                    <option key={option} value={option}>
+                      {option === "all" ? "All request types" : option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="attendance-history-filter">
+                <span>Status</span>
+                <select value={requestStatusFilter} onChange={event => setRequestStatusFilter(event.target.value)}>
+                  {requestStatusOptions.map(option => (
+                    <option key={option} value={option}>
+                      {option === "all" ? "All statuses" : option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+          <label className="attendance-history-filter" style={{ minWidth: "280px" }}>
+            <span>Search</span>
+            <input
+              type="text"
+              value={searchQuery}
+              placeholder={config.searchPlaceholder}
+              onChange={event => setSearchQuery(event.target.value)}
+            />
+          </label>
+        </div>
 
-function PermissionEditorModal({ title, selectedPermissionIds, permissionOptions, onClose, onSave, isSaving = false, errorMessage = "" }) {
-  const [draftPermissionIds, setDraftPermissionIds] = useState(selectedPermissionIds);
-  const selectedPermissionKey = useMemo(
-    () => [...selectedPermissionIds].sort((a, b) => a - b).join(","),
-    [selectedPermissionIds]
-  );
+        <div className="employee-attendance-history-scroll">
+          <div
+            className={`employee-attendance-history-header ${onRequestAction ? "employee-attendance-history-header-actions" : ""}`.trim()}
+            role="row"
+          >
+            <span role="columnheader">Date Filed</span>
+            <span role="columnheader">Request Type</span>
+            <span role="columnheader">Details</span>
+            <span role="columnheader">Schedule / Period</span>
+            <span role="columnheader">Status</span>
+            {onRequestAction && <span role="columnheader">Actions</span>}
+          </div>
 
-  useEffect(() => {
-    setDraftPermissionIds(selectedPermissionIds);
-  }, [selectedPermissionKey]);
+          {filteredRecords.length > 0 ? filteredRecords.map(item => (
+            <div
+              key={item.id}
+              className={`employee-attendance-history-row ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
+              role="row"
+            >
+            <span role="cell">{formatDateTimeLabel(item.date_filed)}</span>
+            <span role="cell">{item.request_type ?? "—"}</span>
+            <span role="cell">{item.details ?? "—"}</span>
+            <span role="cell">{item.schedule_period ?? "—"}</span>
+            <span role="cell">{item.status ?? "Pending"}</span>
+            {onRequestAction && (
+              <span role="cell" className="employee-request-actions-cell">
+                <div className="employee-request-actions" role="group" aria-label={`Actions for request ${item.id}`}>
+                  {resolvedRequestActions.map(action => {
+                    const currentStatus = String(item.status ?? "").toLowerCase();
+                    const allowedStatuses = Array.isArray(action.allowedStatuses)
+                      ? action.allowedStatuses.map(value => String(value).toLowerCase())
+                      : ["pending"];
+                    const canReview = item.can_review !== false;
+                    const isEnabled = canReview && allowedStatuses.some(status => currentStatus.includes(status));
 
-  const togglePermission = permissionId => {
-    setDraftPermissionIds(current => {
-      if (current.includes(permissionId)) {
-        return current.filter(item => item !== permissionId);
-      }
-      return [...current, permissionId];
-    });
-  };
+                    return (
+                      <button
+                        key={`${item.id}-${action.status}`}
+                        className={action.variant ?? "btn"}
+                        type="button"
+                        disabled={requestActionLoadingId === item.id || !isEnabled}
+                        onClick={() => onRequestAction(item, action.status)}
+                      >
+                        {requestActionLoadingId === item.id ? "Saving..." : action.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </span>
+            )}
+            </div>
+          )) : (
+            <div className="empty-state">No requests found.</div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={`${title} permission editor`}>
-      <div className="modal-card permission-modal">
-        <h3 className="permission-modal-title">Edit Permission</h3>
-        <p className="modal-subtitle">{title}</p>
+    <div className="offline-data-panel" role="region" aria-label={`${config.title} offline view`}>
+      <div className="offline-data-panel-header">
+        <div className="offline-data-panel-title-wrap">
+          <h3 className="offline-data-panel-title">{config.title}</h3>
+          <span className="offline-pill">OFFLINE</span>
+        </div>
+        <div className="offline-data-panel-controls">
+          <button type="button" className="offline-control-btn" disabled>{config.filterLabel}</button>
+          <div className="offline-search-input" aria-hidden="true">{config.searchPlaceholder}</div>
+        </div>
+      </div>
 
-        <div className="permission-modal-list" role="group" aria-label="Permission options">
-          {permissionOptions.map(permission => (
-            <label key={permission.id} className="permission-modal-item">
-              <input type="checkbox" checked={draftPermissionIds.includes(permission.id)} onChange={() => togglePermission(permission.id)} />
-              <span>{permission.name}</span>
-            </label>
+      <div className={`offline-data-table offline-data-table-${type}`} role="table" aria-label={config.title}>
+        <div className="offline-data-table-header" role="row">
+          {config.columns.map(column => (
+            <span key={column} role="columnheader">{column}</span>
           ))}
         </div>
-
-        <div className="permission-modal-actions">
-          <button className="btn secondary" type="button" onClick={onClose} disabled={isSaving}>Cancel</button>
-          <button className="btn permission-save-btn" type="button" onClick={() => onSave(draftPermissionIds)} disabled={isSaving}>
-            {isSaving ? "Saving..." : "Save"}
-          </button>
+        <div className="offline-data-table-empty" role="row">
+          <div className="offline-data-empty-icon" aria-hidden="true">☰</div>
+          <p className="offline-data-empty-title">{config.messageTitle}</p>
+          <p className="offline-data-empty-subtitle">{config.messageSubtitle}</p>
         </div>
-
-        {errorMessage ? <p className="team-empty-note">{errorMessage}</p> : null}
       </div>
     </div>
   );
 }
-
-function LogDetailsModal({ log, onClose }) {
-  if (!log) return null;
-
-  useEffect(() => {
-    const handleKeyDown = event => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Log details" onClick={onClose}>
-      <div className="modal-card log-details-modal" onClick={event => event.stopPropagation()}>
-        <div className="modal-header">
-          <div>
-            <h3 className="permission-modal-title">Log Details</h3>
-            <p className="modal-subtitle">{log.action || "No action provided"}</p>
-          </div>
-          <button className="btn secondary" type="button" onClick={onClose}>Close</button>
-        </div>
-
-        <div className="log-details-grid">
-          <div className="log-detail-card">
-            <span className="log-detail-label">User</span>
-            <span className="log-detail-value">{log.user || "-"}</span>
-          </div>
-          <div className="log-detail-card">
-            <span className="log-detail-label">Date</span>
-            <span className="log-detail-value">{log.created_at || "-"}</span>
-          </div>
-          <div className="log-detail-card log-detail-card-full">
-            <span className="log-detail-label">Description</span>
-            <p className="log-detail-description">{log.target || "-"}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function ControlPanelSection() {
-  const { confirm, showToast } = useFeedback();
-  const [activeTab, setActiveTab] = useState("role");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [permissionOptions, setPermissionOptions] = useState([]);
-  const [rolePermissions, setRolePermissions] = useState([]);
-  const [userPermissions, setUserPermissions] = useState([]);
-  const [editingRoleId, setEditingRoleId] = useState("");
-  const [editingUserId, setEditingUserId] = useState("");
-  const [loadingRolePermissions, setLoadingRolePermissions] = useState(true);
-  const [savingUserPermissions, setSavingUserPermissions] = useState(false);
-  const [userSaveError, setUserSaveError] = useState("");
-
-  const [archivedUsers, setArchivedUsers] = useState([]);
-  const [loadingArchivedUsers, setLoadingArchivedUsers] = useState(false);
-  const [archivedUsersError, setArchivedUsersError] = useState("");
-  const [archiveActionEmployeeId, setArchiveActionEmployeeId] = useState(null);
-
-  const [logs, setLogs] = useState([]);
-  const [loadingLogs, setLoadingLogs] = useState(false);
-  const [logsError, setLogsError] = useState("");
-  const [selectedLog, setSelectedLog] = useState(null);
-
-  const showRolePermissions = activeTab === "role";
-  const showIndividualAccess = activeTab === "individual";
-  const showLogs = activeTab === "logs";
-  const showUserArchives = activeTab === "userArchives";
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadControlPanelPermissions = async () => {
-      try {
-        const response = await apiFetch("api/admin/control_panel/permissions.php");
-        if (!mounted) return;
-
-        const options = Array.isArray(response.permissionOptions) ? response.permissionOptions : [];
-        const roles = Array.isArray(response.rolePermissions) ? response.rolePermissions : [];
-        const users = Array.isArray(response.userPermissions) ? response.userPermissions : [];
-
-        setPermissionOptions(options.map(item => ({ id: item.id, name: item.name })));
-        setRolePermissions(roles.map(role => ({
-          id: String(role.id),
-          roleId: role.id,
-          role: role.role,
-          description: role.description,
-          permissionIds: Array.isArray(role.permissionIds) ? role.permissionIds : [],
-          permissions: Array.isArray(role.permissions) ? role.permissions : []
-        })));
-        setUserPermissions(users.map(user => ({
-          id: user.id,
-          userId: user.userId,
-          name: user.name,
-          role: user.role,
-          email: user.email,
-          permissions: Array.isArray(user.permissions) ? user.permissions : []
-        })));
-      } catch {
-        if (!mounted) return;
-        setPermissionOptions([]);
-        setRolePermissions([]);
-        setUserPermissions([]);
-      } finally {
-        if (mounted) setLoadingRolePermissions(false);
-      }
-    };
-
-    loadControlPanelPermissions();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const fetchArchivedUsers = async () => {
-    setLoadingArchivedUsers(true);
-    setArchivedUsersError("");
-    try {
-      const response = await apiFetch("api/admin/control_panel/get_archived_users.php");
-      setArchivedUsers(Array.isArray(response?.users) ? response.users : []);
-    } catch (error) {
-      setArchivedUsers([]);
-      setArchivedUsersError(error?.error ?? error?.message ?? "Unable to load archived users.");
-    } finally {
-      setLoadingArchivedUsers(false);
-    }
-  };
-
-  const fetchLogs = async () => {
-    setLoadingLogs(true);
-    setLogsError("");
-    try {
-      const response = await apiFetch("api/admin/control_panel/get_logs.php");
-      setLogs(Array.isArray(response?.logs) ? response.logs : []);
-    } catch (error) {
-      setLogs([]);
-      setLogsError(error?.error ?? error?.message ?? "Unable to load logs.");
-    } finally {
-      setLoadingLogs(false);
-    }
-  };
-
-  useEffect(() => {
-    if (showUserArchives) {
-      fetchArchivedUsers();
-    }
-  }, [showUserArchives]);
-
-  useEffect(() => {
-    if (showLogs) {
-      fetchLogs();
-    }
-  }, [showLogs]);
-
-  const filteredRoles = useMemo(() => {
-    const value = searchTerm.trim().toLowerCase();
-    if (!value) return rolePermissions;
-    return rolePermissions.filter(item => item.role.toLowerCase().includes(value)
-      || item.description.toLowerCase().includes(value)
-      || item.permissions.some(permission => permission.toLowerCase().includes(value)));
-  }, [rolePermissions, searchTerm]);
-
-  const filteredUsers = useMemo(() => {
-    const value = searchTerm.trim().toLowerCase();
-    if (!value) return userPermissions;
-    return userPermissions.filter(item => item.name.toLowerCase().includes(value)
-      || item.role.toLowerCase().includes(value)
-      || item.email.toLowerCase().includes(value)
-      || item.permissions.some(permission => permission.toLowerCase().includes(value)));
-  }, [userPermissions, searchTerm]);
-
-  const filteredArchivedUsers = useMemo(() => {
-    const value = searchTerm.trim().toLowerCase();
-    if (!value) return archivedUsers;
-    return archivedUsers.filter(item => {
-      const fullName = String(item.fullname ?? "").toLowerCase();
-      const email = String(item.email ?? "").toLowerCase();
-      const position = String(item.position ?? "").toLowerCase();
-      return fullName.includes(value)
-        || email.includes(value)
-        || position.includes(value)
-        || String(item.id ?? "").toLowerCase().includes(value);
-    });
-  }, [archivedUsers, searchTerm]);
-
-  const filteredLogs = useMemo(() => {
-    const value = searchTerm.trim().toLowerCase();
-    if (!value) return logs;
-    return logs.filter(item => String(item.user ?? "").toLowerCase().includes(value)
-      || String(item.action ?? "").toLowerCase().includes(value)
-      || String(item.target ?? "").toLowerCase().includes(value)
-      || String(item.created_at ?? "").toLowerCase().includes(value));
-  }, [logs, searchTerm]);
-
-  const editingRole = rolePermissions.find(item => item.id === editingRoleId);
-  const editingUser = userPermissions.find(item => item.id === editingUserId);
-  const editingRolePermissionIds = useMemo(
-    () => (editingRole?.permissionIds ?? []),
-    [editingRole]
-  );
-  const editingRolePermissionOptions = useMemo(
-    () => getEditablePermissionOptions(editingRole?.role, permissionOptions),
-    [editingRole, permissionOptions]
-  );
-  const editingUserPermissionIds = useMemo(() => {
-    if (!editingUser) return [];
-
-    return editingUser.permissions
-      .map(name => permissionOptions.find(option => option.name === name)?.id)
-      .filter(Boolean);
-  }, [editingUser, permissionOptions]);
-  const editingUserPermissionOptions = useMemo(
-    () => getEditablePermissionOptions(editingUser?.role, permissionOptions),
-    [editingUser, permissionOptions]
-  );
-
-  const handleSaveRolePermissions = async permissionIds => {
-    const role = rolePermissions.find(item => item.id === editingRoleId);
-    if (!role) return;
-
-    const shouldSave = await confirm({
-      title: "Save role permissions?",
-      message: `Update permissions for the ${role.role} role?`,
-      confirmLabel: "Save"
-    });
-    if (!shouldSave) return;
-
-    try {
-      const response = await apiFetch("api/admin/control_panel/permissions.php", {
-        method: "POST",
-        body: JSON.stringify({ role_id: role.roleId, permission_ids: permissionIds })
-      });
-
-      const roles = Array.isArray(response.rolePermissions) ? response.rolePermissions : [];
-      setRolePermissions(roles.map(item => ({
-        id: String(item.id),
-        roleId: item.id,
-        role: item.role,
-        description: item.description,
-        permissionIds: Array.isArray(item.permissionIds) ? item.permissionIds : [],
-        permissions: Array.isArray(item.permissions) ? item.permissions : []
-      })));
-      window.dispatchEvent(new Event("permissions-updated"));
-      setEditingRoleId("");
-      showToast({
-        title: "Permissions updated",
-        message: `${role.role} role permissions were saved successfully.`,
-        type: "success"
-      });
-    } catch (error) {
-      showToast({
-        title: "Save failed",
-        message: error?.error ?? error?.message ?? "Unable to save role permissions.",
-        type: "error"
-      });
-    }
-  };
-
-  const handleSaveUserPermissions = async permissionIds => {
-    const user = userPermissions.find(item => item.id === editingUserId);
-    if (!user) return;
-
-    const shouldSave = await confirm({
-      title: "Save user permissions?",
-      message: `Update permissions for ${user.name}?`,
-      confirmLabel: "Save"
-    });
-    if (!shouldSave) return;
-
-    setSavingUserPermissions(true);
-    setUserSaveError("");
-
-    try {
-      const response = await apiFetch("api/admin/control_panel/user_permissions.php", {
-        method: "POST",
-        body: JSON.stringify({ user_id: user.userId, permission_ids: permissionIds })
-      });
-
-      const users = Array.isArray(response.userPermissions) ? response.userPermissions : [];
-      setUserPermissions(users.map(item => ({
-        id: item.id,
-        userId: item.userId,
-        name: item.name,
-        role: item.role,
-        email: item.email,
-        permissions: Array.isArray(item.permissions) ? item.permissions : []
-      })));
-      window.dispatchEvent(new Event("permissions-updated"));
-      setEditingUserId("");
-      showToast({
-        title: "Permissions updated",
-        message: `${user.name}'s permissions were saved successfully.`,
-        type: "success"
-      });
-    } catch (error) {
-      const message = error?.error ?? "Unable to save user permissions.";
-      setUserSaveError(message);
-      showToast({
-        title: "Save failed",
-        message,
-        type: "error"
-      });
-    } finally {
-      setSavingUserPermissions(false);
-    }
-  };
-
-  const handleArchiveAction = async (employeeId, endpointName, confirmMessage) => {
-    const shouldProceed = await confirm({
-      title: endpointName === "restore_user" ? "Restore archived user?" : "Delete archived user?",
-      message: confirmMessage,
-      confirmLabel: endpointName === "restore_user" ? "Restore" : "Delete",
-      variant: endpointName === "restore_user" ? "primary" : "danger"
-    });
-    if (!shouldProceed) return;
-
-    setArchiveActionEmployeeId(employeeId);
-    setArchivedUsersError("");
-
-    try {
-      await apiFetch(`api/admin/control_panel/${endpointName}.php`, {
-        method: "POST",
-        body: JSON.stringify({ employee_id: employeeId })
-      });
-
-      setArchivedUsers(current => current.filter(item => item.id !== employeeId));
-      await fetchLogs();
-      showToast({
-        title: endpointName === "restore_user" ? "User restored" : "User deleted",
-        message: endpointName === "restore_user"
-          ? "The archived user was restored successfully."
-          : "The archived user was deleted permanently.",
-        type: "success"
-      });
-    } catch (error) {
-      const message = error?.error ?? error?.message ?? "Unable to update archived user.";
-      setArchivedUsersError(message);
-      showToast({
-        title: "Action failed",
-        message,
-        type: "error"
-      });
-    } finally {
-      setArchiveActionEmployeeId(null);
-    }
-  };
-
-  return (
-    <section className="control-panel-content" aria-label="Control panel permission editor">
-      <header className="control-panel-header">
-        <h2>Control Panel</h2>
-        <p>Manage access rights by role or assign custom permissions to a specific user.</p>
-      </header>
-
-      <div className="control-panel-tabs" role="tablist" aria-label="Permission view mode">
-        <button className={`control-panel-tab${showRolePermissions ? " active" : ""}`} type="button" role="tab" aria-selected={showRolePermissions} onClick={() => setActiveTab("role")}>By Role</button>
-        <button className={`control-panel-tab${showIndividualAccess ? " active" : ""}`} type="button" role="tab" aria-selected={showIndividualAccess} onClick={() => setActiveTab("individual")}>Individual Access</button>
-        <button className={`control-panel-tab${showLogs ? " active" : ""}`} type="button" role="tab" aria-selected={showLogs} onClick={() => setActiveTab("logs")}>Logs</button>
-        <button className={`control-panel-tab${showUserArchives ? " active" : ""}`} type="button" role="tab" aria-selected={showUserArchives} onClick={() => setActiveTab("userArchives")}>User Archives</button>
-      </div>
-
-      <input
-        className="control-panel-search"
-        type="search"
-        value={searchTerm}
-        onChange={event => setSearchTerm(event.target.value)}
-        placeholder={showRolePermissions
-          ? "Search role or permission..."
-          : showUserArchives
-            ? "Search archived user, email, or position..."
-            : showLogs
-              ? "Search logs by user, action, or details..."
-              : "Search user, role, or permission..."}
-      />
-
-      {showRolePermissions ? (
-        loadingRolePermissions ? <p className="team-empty-note">Loading role permissions...</p> : (
-          <div className="permission-card-grid">
-            {filteredRoles.map(roleItem => (
-              <article key={roleItem.id} className="permission-card">
-                <div className="permission-card-header">{roleItem.role}</div>
-                <div className="permission-card-body">
-                  <p className="permission-card-label">{roleItem.description}</p>
-                  <ul>{roleItem.permissions.map(permission => <li key={`${roleItem.id}-${permission}`}>{permission}</li>)}</ul>
-                  <button className="btn permission-edit-btn" type="button" onClick={() => setEditingRoleId(roleItem.id)}>Edit Permission</button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )
-      ) : showIndividualAccess ? (
-        <div className="control-panel-table-wrap" role="table" aria-label="Individual permission table">
-          <div className="control-panel-table-header" role="row">
-            <span role="columnheader">ID</span><span role="columnheader">User</span><span role="columnheader">Role</span><span role="columnheader">Permissions</span><span role="columnheader">Action</span>
-          </div>
-          {filteredUsers.map(userItem => (
-            <div key={userItem.id} className="control-panel-table-row" role="row">
-              <span role="cell" data-label="ID">{userItem.id}</span><span role="cell" data-label="User">{userItem.name}</span><span role="cell" data-label="Role">{userItem.role}</span><span role="cell" data-label="Permissions">{userItem.permissions.length}</span>
-              <span role="cell" data-label="Action"><button className="btn permission-edit-btn" type="button" onClick={() => { setUserSaveError(""); setEditingUserId(userItem.id); }}>Edit Permission</button></span>
-            </div>
-          ))}
-        </div>
-      ) : showLogs ? (
-        <>
-          {logsError ? <p className="team-empty-note">{logsError}</p> : null}
-          {loadingLogs ? <p className="team-empty-note">Loading logs...</p> : filteredLogs.length === 0 ? <p className="team-empty-note">No logs found.</p> : (
-            <div className="control-panel-table-wrap control-panel-logs-table" role="table" aria-label="Control panel logs table">
-              <div className="control-panel-table-header" role="row">
-                <span role="columnheader">ID</span><span role="columnheader">User</span><span role="columnheader">Action</span><span role="columnheader">View</span><span role="columnheader">Date</span>
-              </div>
-              {filteredLogs.map(logItem => (
-                <div key={logItem.id} className="control-panel-table-row" role="row">
-                  <span role="cell" data-label="ID">{logItem.id}</span>
-                  <span role="cell" data-label="User">{logItem.user}</span>
-                  <span role="cell" data-label="Action">{logItem.action || "-"}</span>
-                  <span role="cell" data-label="View">
-                    <button className="btn secondary log-view-btn" type="button" onClick={() => setSelectedLog(logItem)}>
-                      View
-                    </button>
-                  </span>
-                  <span role="cell" data-label="Date">{logItem.created_at || "-"}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          {archivedUsersError ? <p className="team-empty-note">{archivedUsersError}</p> : null}
-          {loadingArchivedUsers ? <p className="team-empty-note">Loading archived users...</p> : filteredArchivedUsers.length === 0 ? <p className="team-empty-note">No archived users found.</p> : (
-            <div className="control-panel-table-wrap" role="table" aria-label="User archives table">
-              <div className="control-panel-table-header" role="row">
-                <span role="columnheader">ID</span><span role="columnheader">User</span><span role="columnheader">Position</span><span role="columnheader">Action</span>
-              </div>
-              {filteredArchivedUsers.map(userItem => (
-                <div key={userItem.id} className="control-panel-table-row" role="row">
-                  <span role="cell" data-label="ID">{userItem.id}</span>
-                  <span role="cell" data-label="User">{userItem.fullname || userItem.email || `Employee #${userItem.id}`}</span>
-                  <span role="cell" data-label="Position">{userItem.position || "—"}</span>
-                  <span role="cell" data-label="Action" className="user-archive-actions">
-                    <button className="btn secondary" type="button" onClick={() => handleArchiveAction(userItem.id, "restore_user", "Restore this archived user?")} disabled={archiveActionEmployeeId === userItem.id}>
-                      {archiveActionEmployeeId === userItem.id ? "Updating..." : "Restore"}
-                    </button>
-                    <button className="btn danger" type="button" onClick={() => handleArchiveAction(userItem.id, "delete_user_permanently", "Permanently delete this archived user record? This cannot be undone.")} disabled={archiveActionEmployeeId === userItem.id}>
-                      Permanently Delete
-                    </button>
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {editingRole ? (
-        <PermissionEditorModal
-          title={`${editingRole.role} Role`}
-          selectedPermissionIds={editingRolePermissionIds}
-          permissionOptions={editingRolePermissionOptions}
-          onClose={() => setEditingRoleId("")}
-          onSave={handleSaveRolePermissions}
-        />
-      ) : null}
-
-      {editingUser ? (
-        <PermissionEditorModal
-          title={`${editingUser.name} (${editingUser.role})`}
-          selectedPermissionIds={editingUserPermissionIds}
-          permissionOptions={editingUserPermissionOptions}
-          onClose={() => setEditingUserId("")}
-          onSave={handleSaveUserPermissions}
-          isSaving={savingUserPermissions}
-          errorMessage={userSaveError}
-        />
-      ) : null}
-
-      {selectedLog ? (
-        <LogDetailsModal log={selectedLog} onClose={() => setSelectedLog(null)} />
-      ) : null}
-    </section>
-  );
-}
-
-

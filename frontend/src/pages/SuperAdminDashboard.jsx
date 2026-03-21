@@ -868,7 +868,7 @@ const handleOpenRejectModal = cluster => {
               type="attendance"
               records={allAttendance}
               personField="employee_name"
-              personLabel="Employee"
+              personLabel="Employee / Coach"
               onEditRow={canEditAttendance ? openAttendanceEdit : undefined}
               externalDateFilter={attendanceDate}
               onExternalDateFilterChange={setAttendanceDate}
