@@ -386,6 +386,11 @@ export default function EmployeeDashboard() {
     timeInAt: attendanceLog.timeInAt,
     fallbackTag: getStatusTag(currentStatus.label, hasScheduleToday)
   });
+  const hasAttendanceRecordToday = isSameCalendarDay(
+    attendanceLog.timeInAt ?? attendanceLog.timeOutAt,
+    new Date()
+  );
+  const visibleAttendanceTag = hasAttendanceRecordToday ? activeAttendanceTag : null;
   const hasActiveTimeIn = Boolean(attendanceLog.timeInAt && !attendanceLog.timeOutAt);
   const hasTeamCluster = Boolean(activeCluster?.cluster_id);
   const canUseAttendanceControls = hasTeamCluster && hasScheduleToday;
@@ -616,11 +621,13 @@ export default function EmployeeDashboard() {
                         <span className={`member-status-pill ${currentStatus.className}`}>
                           {currentStatus.label}
                         </span>
-                        <div className="member-status-tag-list" aria-label="Status tags">
-                          <span className="member-status-tag is-active">
-                            {activeAttendanceTag ?? "Pending"}
-                          </span>
-                        </div>
+                        {visibleAttendanceTag ? (
+                          <div className="member-status-tag-list" aria-label="Status tags">
+                            <span className="member-status-tag is-active">
+                              {visibleAttendanceTag}
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>
