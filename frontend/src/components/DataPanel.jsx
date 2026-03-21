@@ -261,7 +261,12 @@ export default function DataPanel({
                       ? action.allowedStatuses.map(value => String(value).toLowerCase())
                       : ["pending"];
                     const canReview = item.can_review !== false;
-                    const isEnabled = canReview && allowedStatuses.some(status => currentStatus.includes(status));
+                    const isVisible = typeof action.isVisible === 'function' ? action.isVisible(item) : true;
+                    const isEnabled = isVisible && canReview && allowedStatuses.some(status => currentStatus.includes(status));
+
+                    if (!isVisible) {
+                      return null;
+                    }
 
                     return (
                       <button

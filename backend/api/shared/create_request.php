@@ -28,7 +28,7 @@ if ($type === '' || $reason === '') {
 
 $sessionUserId = (int)($_SESSION['user']['id'] ?? 0);
 $currentUserRole = strtolower((string)($_SESSION['user']['role'] ?? ''));
-$initialStatus = in_array($currentUserRole, ['coach', 'admin'], true) ? 'Endorsed' : 'Pending';
+$initialStatus = in_array($currentUserRole, ['coach', 'admin', 'super admin'], true) ? 'Endorsed' : 'Pending';
 $employeeId = $sessionUserId;
 if (hasColumn($conn, 'employees', 'user_id') && hasColumn($conn, 'employees', 'employee_id')) {
     $stmt = $conn->prepare("SELECT employee_id FROM employees WHERE user_id = ? LIMIT 1");

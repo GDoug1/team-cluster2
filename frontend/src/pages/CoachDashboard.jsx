@@ -1597,7 +1597,9 @@ export default function CoachDashboard() {
                         onRequestAction={handleTeamRequestAction}
                         requestActionLoadingId={requestActionLoadingId}
                         requestActions={[
-                          { label: "Endorse to Admin", status: "Endorsed", variant: "btn", allowedStatuses: ["pending"] }
+                          { label: "Endorse to Admin", status: "Endorsed", variant: "btn", allowedStatuses: ["pending"], isVisible: item => item?.request_source !== 'dispute' },
+                          { label: "Accept", status: "Approved", variant: "btn", allowedStatuses: ["pending"], isVisible: item => item?.request_source === 'dispute' },
+                          { label: "Reject", status: "Denied", variant: "btn secondary", allowedStatuses: ["pending"], isVisible: item => item?.request_source === 'dispute' }
                         ]}
                         enableRequestFilters
                       />
