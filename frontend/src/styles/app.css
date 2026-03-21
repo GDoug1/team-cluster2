@@ -2328,6 +2328,18 @@ body {
   min-width: 990px;
 }
 
+.employee-attendance-history-header-person,
+.employee-attendance-history-row-person {
+  grid-template-columns: minmax(170px, 1.2fr) minmax(140px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(130px, 0.8fr) minmax(180px, 1fr);
+  min-width: 980px;
+}
+
+.employee-attendance-history-header-person.employee-attendance-history-header-actions,
+.employee-attendance-history-row-person.employee-attendance-history-row-actions {
+  grid-template-columns: minmax(170px, 1.2fr) minmax(140px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(130px, 0.8fr) minmax(180px, 1fr) minmax(190px, 1fr);
+  min-width: 1170px;
+}
+
 .employee-attendance-history-header {
   background: #f8fafc;
   font-weight: 600;

@@ -83,6 +83,7 @@ $clusterOwnerColumn = in_array('coach_id', $clusterColumns, true) ? 'coach_id' :
 
 $usersIdColumn = in_array('id', $userColumns, true) ? 'id' : (in_array('user_id', $userColumns, true) ? 'user_id' : null);
 $userDisplayColumn = in_array('fullname', $userColumns, true) ? 'fullname' : (in_array('username', $userColumns, true) ? 'username' : null);
+$userSecondaryColumn = in_array('username', $userColumns, true) ? 'username' : (in_array('email', $userColumns, true) ? 'email' : null);
 $canJoinEmployees = in_array('user_id', $employeeColumns, true) && in_array('employee_id', $employeeColumns, true);
 
 $requestEmployeeExpr = 'req.employee_id';
@@ -93,20 +94,27 @@ if ($requestEmployeeReference === 'users' && $canJoinEmployees) {
 }
 
 $employeeNameExpr = "CONCAT('Employee #', $requestEmployeeExpr)";
+$employeeSecondaryExpr = "''";
 $userJoinSql = '';
 if ($usersIdColumn !== null && $userDisplayColumn !== null) {
     if ($requestEmployeeReference === 'users') {
         $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = req.employee_id";
-        $employeeNameExpr = "COALESCE(requester.$userDisplayColumn, CONCAT('Employee #', $requestEmployeeExpr))";
+        $employeeNameExpr = "COALESCE(NULLIF(requester.$userDisplayColumn, ''), CONCAT('Employee #', $requestEmployeeExpr))";
+        if ($userSecondaryColumn !== null) {
+            $employeeSecondaryExpr = "COALESCE(NULLIF(requester.$userSecondaryColumn, ''), '')";
+        }
     } else {
         $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = $requestEmployeeExpr";
-        $employeeNameExpr = "COALESCE(requester.$userDisplayColumn, CONCAT('Employee #', $requestEmployeeExpr))";
+        $employeeNameExpr = "COALESCE(NULLIF(requester.$userDisplayColumn, ''), CONCAT('Employee #', $requestEmployeeExpr))";
+        if ($userSecondaryColumn !== null) {
+            $employeeSecondaryExpr = "COALESCE(NULLIF(requester.$userSecondaryColumn, ''), '')";
+        }
     }
 }
 
 $items = [];
 
-$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType, string $extraJoinSql = '', string $extraWhereSql = '') use ($conn, $coachId, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, &$items) {
+$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType, string $extraJoinSql = '', string $extraWhereSql = '') use ($conn, $coachId, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, $employeeSecondaryExpr, &$items) {
     $sql = "SELECT DISTINCT
                 req.$idColumn AS source_id,
                 req.created_at AS filed_at,
@@ -115,7 +123,8 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
                 $scheduleExpr AS schedule_period,
                 req.status,
                 $requestEmployeeExpr AS employee_id,
-                $employeeNameExpr AS employee_name
+                $employeeNameExpr AS employee_name,
+                $employeeSecondaryExpr AS employee_username
             FROM $table req
             $employeeJoinSql
             INNER JOIN cluster_members cm ON cm.employee_id = $requestEmployeeExpr
@@ -146,7 +155,8 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
             'schedule_period' => trim((string)$row['schedule_period']) ?: '—',
             'status' => $row['status'] ?: 'Pending',
             'employee_id' => (int)$row['employee_id'],
-            'employee_name' => $row['employee_name'] ?: 'Employee'
+            'employee_name' => $row['employee_name'] ?: 'Employee',
+            'employee_username' => trim((string)($row['employee_username'] ?? ''))
         ];
     }
 };

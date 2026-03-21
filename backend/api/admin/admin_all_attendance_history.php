@@ -90,7 +90,8 @@ if ($hasLegacyAttendance) {
 }
 
 $sql = "SELECT u.$userIdColumn AS user_id,
-               COALESCE(NULLIF(CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name), ''), u.email) AS employee_name,
+               COALESCE(NULLIF(CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name), ''), u.fullname, u.username, u.email) AS employee_name,
+               COALESCE(NULLIF(u.username, ''), u.email) AS employee_username,
                c.name AS cluster_name,
                $attendanceSelect
         FROM users u
