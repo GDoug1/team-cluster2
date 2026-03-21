@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { submitRequest } from "../api/requests";
+import { useFeedback } from "./FeedbackProvider";
 
 const filingTabs = [
   { key: "leave", label: "File Leave", icon: "🗓" },
@@ -8,6 +9,7 @@ const filingTabs = [
 ];
 
 export default function FilingCenterPanel({ onSubmitted = null, initialTab = "leave" }) {
+  const { confirm } = useFeedback();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [disputeType, setDisputeType] = useState("Time Correction");
   const [leaveType, setLeaveType] = useState("Sick Leave");
@@ -46,6 +48,13 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
   const handleSubmit = async () => {
     if (submitting) return;
     setMessage("");
+
+    const hasConfirmedSubmission = await confirm({
+      title: "Submit request?",
+      message: "Please confirm that you want to submit this request.",
+      confirmLabel: "Submit"
+    });
+    if (!hasConfirmedSubmission) return;
 
     try {
       setSubmitting(true);

@@ -800,11 +800,13 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(17, 24, 39, 0.45);
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(5px);
   display: grid;
   place-items: center;
   padding: 24px;
   z-index: 20;
+  animation: modalOverlayFade 0.18s ease-out;
 }
 
 @media (max-width: 900px) {
@@ -972,6 +974,7 @@ body {
   box-shadow: 0 28px 55px rgba(75, 34, 0, 0.18);
   display: grid;
   gap: 20px;
+  animation: confirmModalPop 0.2s ease-out;
 }
 
 .confirm-modal-title {
@@ -992,6 +995,23 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+@keyframes modalOverlayFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes confirmModalPop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .feedback-dialog-message {

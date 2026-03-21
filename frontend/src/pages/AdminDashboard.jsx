@@ -17,6 +17,7 @@ import { buildRequestHighlights, fetchAdminTeamRequests, fetchMyRequests, update
 import { logout } from "../utils/logout";
 import { parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
+import { useFeedback } from "../components/FeedbackProvider";
 
 const attendanceTagOptions = ["On Time", "Late", "Scheduled", "Off Scheduled"];
 
@@ -92,6 +93,7 @@ export default function AdminDashboard() {
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
+  const { confirm } = useFeedback();
   const { hasPermission } = usePermissions();
   const {
     canViewDashboard,
@@ -414,8 +416,23 @@ export default function AdminDashboard() {
     }
   };
 
+  const getAdminTeamRequestActionConfirmationMessage = (request, status) => {
+    const requestType = request?.request_type ?? "this request";
+    if (status === "Approved") return `Are you sure you want to accept ${requestType}?`;
+    if (status === "Denied") return `Are you sure you want to reject ${requestType}?`;
+    return `Are you sure you want to update ${requestType}?`;
+  };
+
   const handleAdminTeamRequestAction = async (request, status) => {
     if (!request?.id || !request?.request_source) return;
+
+    const hasConfirmedAction = await confirm({
+      title: status === "Approved" ? "Accept request?" : status === "Denied" ? "Reject request?" : "Confirm request action",
+      message: getAdminTeamRequestActionConfirmationMessage(request, status),
+      confirmLabel: status === "Approved" ? "Accept" : status === "Denied" ? "Reject" : "Confirm",
+      variant: status === "Denied" ? "danger" : "primary"
+    });
+    if (!hasConfirmedAction) return;
 
     setRequestActionLoadingId(request.id);
     setTeamRequestsError("");

@@ -17,6 +17,7 @@ import usePermissions from "../hooks/usePermissions";
 import { normalizeSchedule as normalizeAttendanceSchedule, parseDateValue, resolveAttendanceMainTag } from "../utils/attendanceTags";
 import { getFeatureAccess } from "../utils/featureAccess";
 import { logout } from "../utils/logout";
+import { useFeedback } from "../components/FeedbackProvider";
 
 const attendanceSortOptions = {
   newestAttendanceFirst: "newestAttendanceFirst",
@@ -176,6 +177,7 @@ export default function CoachDashboard() {
   });
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
+  const { confirm } = useFeedback();
   const { hasPermission } = usePermissions();
   const {
     canViewDashboard,
@@ -1513,8 +1515,24 @@ export default function CoachDashboard() {
       });
   }, [activeNav, canViewAttendance]);
 
+  const getTeamRequestActionConfirmationMessage = (request, status) => {
+    const requestType = request?.request_type ?? "this request";
+    if (status === "Endorsed") return `Are you sure you want to endorse ${requestType} to admin?`;
+    if (status === "Approved") return `Are you sure you want to accept ${requestType}?`;
+    if (status === "Denied") return `Are you sure you want to reject ${requestType}?`;
+    return `Are you sure you want to update ${requestType}?`;
+  };
+
   const handleTeamRequestAction = async (request, status) => {
     if (!request?.id || !request?.request_source) return;
+
+    const hasConfirmedAction = await confirm({
+      title: status === "Endorsed" ? "Endorse request to admin?" : status === "Approved" ? "Accept request?" : status === "Denied" ? "Reject request?" : "Confirm request action",
+      message: getTeamRequestActionConfirmationMessage(request, status),
+      confirmLabel: status === "Endorsed" ? "Endorse" : status === "Approved" ? "Accept" : status === "Denied" ? "Reject" : "Confirm",
+      variant: status === "Denied" ? "danger" : "primary"
+    });
+    if (!hasConfirmedAction) return;
 
     setRequestActionLoadingId(request.id);
     setTeamRequestsError("");
