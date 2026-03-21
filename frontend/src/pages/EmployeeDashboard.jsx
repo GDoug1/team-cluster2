@@ -44,6 +44,7 @@ export default function EmployeeDashboard() {
   const [data, setData] = useState([]);
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
+  const [filingCenterInitialTab, setFilingCenterInitialTab] = useState("leave");
   const isAttendanceView = attendanceNavItems.includes(activeNav);
   const sidebarNavItems = navItems.map(item => {
     if (item === "Attendance") {
@@ -516,7 +517,7 @@ export default function EmployeeDashboard() {
               {activeNav === "My Attendance" && (
                 <div className="employee-card">
                   <div className="employee-card-body employee-card-body-flush">
-                    <AttendanceModule />
+                    <AttendanceModule onDisputeClick={() => { setFilingCenterInitialTab("dispute"); setActiveNav("My Filing Center"); }} />
                   </div>
                 </div>
               )}
@@ -534,7 +535,7 @@ export default function EmployeeDashboard() {
               )}
 
               {activeNav === "My Filing Center" && (
-                <FilingCenterPanel onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
+                <FilingCenterPanel initialTab={filingCenterInitialTab} onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
               )}
 
               {activeNav === "Employees" && (

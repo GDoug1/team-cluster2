@@ -188,6 +188,7 @@ export default function CoachDashboard() {
   } = getFeatureAccess(hasPermission);
   const attendanceNavItems = ["My Attendance", "Team Cluster Attendance", "My Requests", "My Filing Center", "File Request"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
+  const [filingCenterInitialTab, setFilingCenterInitialTab] = useState("leave");
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
   const navItems = [
     ...(canViewDashboard ? [{ label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") }] : []),
@@ -1565,7 +1566,7 @@ export default function CoachDashboard() {
         ) : isAttendanceView && canViewAttendance ? (
           <section className="content">
             {isFilingCenterView ? (
-              <FilingCenterPanel onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
+              <FilingCenterPanel initialTab={filingCenterInitialTab} onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
             ) : (
               <div className="employee-card employee-attendance-history-card">
                 <div className="employee-card-header">
@@ -1676,7 +1677,7 @@ export default function CoachDashboard() {
                     <>
                       <div className="employee-card">
                         <div className="employee-card-body employee-card-body-flush">
-                          <AttendanceModule records={coachAttendanceHistory} />
+                          <AttendanceModule records={coachAttendanceHistory} onDisputeClick={() => { setFilingCenterInitialTab("dispute"); setActiveNav("My Filing Center"); }} />
                         </div>
                       </div>
                     </>

@@ -103,6 +103,7 @@ export default function AdminDashboard() {
   } = getFeatureAccess(hasPermission);
   const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "File Request"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
+  const [filingCenterInitialTab, setFilingCenterInitialTab] = useState("leave");
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
   const navItems = [
     ...(canViewDashboard ? [{ label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") }] : []),
@@ -856,7 +857,7 @@ const handleOpenRejectModal = cluster => {
             <div className="section-title">My Attendance</div>
             <div className="employee-card">
               <div className="employee-card-body employee-card-body-flush">
-                <AttendanceModule records={coachAttendance} />
+                <AttendanceModule records={coachAttendance} onDisputeClick={() => { setFilingCenterInitialTab("dispute"); setActiveNav("My Filing Center"); }} />
               </div>
             </div>
           </section>
@@ -882,7 +883,7 @@ const handleOpenRejectModal = cluster => {
           </section>
         ) : activeNav === "My Filing Center" && canViewAttendance ? (
           <section className="content">
-            <FilingCenterPanel onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
+            <FilingCenterPanel initialTab={filingCenterInitialTab} onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
           </section>
         ) : activeNav === "File Request" && canViewAttendance ? (
           <section className="content">

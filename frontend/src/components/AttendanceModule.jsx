@@ -35,6 +35,7 @@ export default function AttendanceModule({
   records = null,
   loading: loadingProp = false,
   error: errorProp = null,
+  onDisputeClick = null,
 }) {
   const historyState = useAttendanceHistory();
   const [searchQuery, setSearchQuery] = useState('');
@@ -120,8 +121,6 @@ export default function AttendanceModule({
                 <th>Date</th>
                 <th>Time In</th>
                 <th>Time Out</th>
-                <th>Break In</th>
-                <th>Break Out</th>
                 <th>Total Hours</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -130,20 +129,18 @@ export default function AttendanceModule({
             <tbody>
               {error ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '60px' }}>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '60px' }}>
                     <ListTodo size={48} color="#cbd5e1" style={{ marginBottom: '16px' }} />
                     <p style={{ color: '#475569', fontWeight: 'bold' }}>Server Connection Lost</p>
                   </td>
                 </tr>
               ) : filteredData.length === 0 ? (
-                <tr><td colSpan={8} className="am-empty">No records found.</td></tr>
+                <tr><td colSpan={6} className="am-empty">No records found.</td></tr>
               ) : filteredData.map((record, i) => (
                 <tr key={i}>
                   <td className="am-td-date">{record.date}</td>
                   <td className="am-td-time">{record.time_in}</td>
                   <td className="am-td-time">{record.time_out}</td>
-                  <td className="am-td-break">{record.break_in}</td>
-                  <td className="am-td-break">{record.break_out}</td>
                   <td className="am-td-total">{record.total_hours}h</td>
                   <td>
                     <div className="am-status-cell">
@@ -153,9 +150,12 @@ export default function AttendanceModule({
                   </td>
                   <td>
                     <div className="am-actions-hover">
-                      <button className="am-action-btn primary">Dispute</button>
-                      <div className="am-divider" />
-                      <button className="am-action-btn secondary">Details</button>
+                      <button
+                        className="am-action-btn primary"
+                        onClick={() => onDisputeClick?.(record)}
+                      >
+                        Dispute
+                      </button>
                     </div>
                   </td>
                 </tr>

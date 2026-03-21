@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { submitRequest } from "../api/requests";
 
 const filingTabs = [
@@ -7,8 +7,8 @@ const filingTabs = [
   { key: "dispute", label: "Attendance Dispute", icon: "!" }
 ];
 
-export default function FilingCenterPanel({ onSubmitted = null }) {
-  const [activeTab, setActiveTab] = useState("leave");
+export default function FilingCenterPanel({ onSubmitted = null, initialTab = "leave" }) {
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [disputeType, setDisputeType] = useState("Time Correction");
   const [leaveType, setLeaveType] = useState("Sick Leave");
   const [leaveStartDate, setLeaveStartDate] = useState("");
@@ -21,6 +21,11 @@ export default function FilingCenterPanel({ onSubmitted = null }) {
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const panelTitle = useMemo(() => {
     if (activeTab === "leave") return "New Leave Request";
