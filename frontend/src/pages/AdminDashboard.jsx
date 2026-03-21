@@ -60,7 +60,8 @@ const buildAllAttendanceHighlights = records => {
 };
 
 export default function AdminDashboard() {
-  const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const weekdayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+  const dayOptions = weekdayOptions;
   const workSetupOptions = ["Onsite", "Work From Home (WFH)"];
   const FIXED_SHIFT_START = { time: "9:00", period: "AM" };
   const FIXED_SHIFT_END = { time: "6:00", period: "PM" };
@@ -205,7 +206,7 @@ export default function AdminDashboard() {
   const normalizeScheduleForm = coachSchedule => {
     const nextForm = createDefaultScheduleForm();
     const assignedDays = Array.isArray(coachSchedule?.days)
-      ? coachSchedule.days.filter(day => dayOptions.includes(day))
+      ? coachSchedule.days.filter(day => weekdayOptions.includes(day))
       : [];
 
     if (assignedDays.length > 0) {
@@ -712,7 +713,7 @@ export default function AdminDashboard() {
     setScheduleModalMessage("");
 
     const normalizedSchedule = {
-      days: scheduleForm.days.filter(day => dayOptions.includes(day)),
+      days: scheduleForm.days.filter(day => weekdayOptions.includes(day)),
       daySchedules: Object.fromEntries(
         Object.entries(scheduleForm.daySchedules).map(([day, daySchedule]) => [
           day,
@@ -1017,7 +1018,7 @@ const handleOpenRejectModal = cluster => {
                       .map(cluster => (
                         <div key={`coach-schedule-${cluster.id}`} className="active-members-schedule-row" role="row">
                           <div className="active-members-owner" role="cell">{cluster.coach || "—"}</div>
-                          {dayOptions.map(day => {
+                          {weekdayOptions.map(day => {
                             const daySchedule = formatCoachDaySchedule(cluster.coach_schedule, day);
 
                             if (typeof daySchedule === "string") {
@@ -1100,11 +1101,11 @@ const handleOpenRejectModal = cluster => {
                 <div className="schedule-heading">
                   <div className="schedule-label">Schedule Details</div>
                   <p className="schedule-helper-text">
-                    Turn days on or off, then update the work shift and break windows.
+                    Fixed schedules for Admin and Super Admin can only be set from Monday to Friday.
                   </p>
                 </div>
                 <div className="schedule-day-grid">
-                  {dayOptions.map(day => {
+                  {weekdayOptions.map(day => {
                     const isWorkingDay = scheduleForm.days.includes(day);
                     const daySchedule = scheduleForm.daySchedules[day] ?? { ...defaultDaySchedule };
                     const endTimeOptions = getEndTimeOptions(

@@ -15,8 +15,12 @@ if ($cluster_id <= 0 || $employee_id <= 0 || !is_array($schedule)) {
     exit(json_encode(["error" => "Invalid schedule payload."]));
 }
 
-$validDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-$dayMap = [
+$sessionRole = strtolower(trim((string)($_SESSION['user']['role'] ?? '')));
+$isAdminFixedScheduleRole = in_array($sessionRole, ['admin', 'super admin'], true);
+
+$validDays = $isAdminFixedScheduleRole
+    ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+    : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     'Mon' => 'Monday',
     'Tue' => 'Tuesday',
     'Wed' => 'Wednesday',
