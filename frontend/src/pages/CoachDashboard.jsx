@@ -1620,6 +1620,8 @@ export default function CoachDashboard() {
                           { label: "Reject", status: "Denied", variant: "btn secondary", allowedStatuses: ["pending"], isVisible: item => item?.request_source === 'dispute' }
                         ]}
                         enableRequestFilters
+                        personField="employee_name"
+                        personLabel="Employee"
                       />
                     </>
                   ) : isTeamClusterAttendanceView ? (

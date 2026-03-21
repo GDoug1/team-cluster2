@@ -43,6 +43,28 @@ const formatDateTimeLabel = value => {
   });
 };
 
+const getPersonPrimaryValue = (item, field) => {
+  const value = String(item?.[field] ?? "").trim();
+  return value || "—";
+};
+
+const getPersonSecondaryValue = (item, field) => {
+  const candidates = [
+    item?.person_secondary_name,
+    item?.employee_username,
+    item?.username,
+    item?.user_name,
+    item?.email,
+  ];
+  const secondaryValue = candidates
+    .map(value => String(value ?? "").trim())
+    .find(Boolean);
+
+  if (!secondaryValue) return "";
+  const primaryValue = getPersonPrimaryValue(item, field);
+  return secondaryValue.toLowerCase() === primaryValue.toLowerCase() ? "" : secondaryValue;
+};
+
 const toDateInputValue = value => {
   if (!value) return null;
   const parsed = new Date(String(value).replace(" ", "T"));
@@ -99,7 +121,16 @@ export default function DataPanel({
         if (enableRequestFilters && requestTypeFilter !== "all" && normalizedRequestType !== requestTypeFilter.toLowerCase()) return false;
         if (enableRequestFilters && requestStatusFilter !== "all" && normalizedStatus !== requestStatusFilter.toLowerCase()) return false;
 
-        const haystack = [item.request_type, item.details, item.status, item.schedule_period]
+        const haystack = [
+          item.request_type,
+          item.details,
+          item.status,
+          item.schedule_period,
+          item.employee_name,
+          item.employee_username,
+          item.username,
+          item.user_name
+        ]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -121,6 +152,8 @@ export default function DataPanel({
         item.tag,
         item.attendance_note,
         item.note,
+        item.employee_username,
+        item.username,
         personField ? item[personField] : "",
       ]
         .filter(Boolean)
@@ -186,7 +219,12 @@ export default function DataPanel({
               <span role="cell">{item.attendance_tag ?? item.tag ?? "Pending"}</span>
               <span role="cell">{item.cluster_name ?? "—"}</span>
               <span role="cell">{item.attendance_note ?? item.note ?? "—"}</span>
-              {personField && <span role="cell">{item[personField] ?? "—"}</span>}
+              {personField && (
+                <span role="cell" className="team-attendance-employee-cell">
+                  <span>{getPersonPrimaryValue(item, personField)}</span>
+                  {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
+                </span>
+              )}
               {onEditRow && (
                 <span role="cell">
                   <button className="btn" type="button" onClick={() => onEditRow(item)}>Edit</button>
@@ -242,7 +280,7 @@ export default function DataPanel({
 
         <div className="employee-attendance-history-scroll">
           <div
-            className={`employee-attendance-history-header ${onRequestAction ? "employee-attendance-history-header-actions" : ""}`.trim()}
+            className={`employee-attendance-history-header ${personField ? "employee-attendance-history-header-person" : ""} ${onRequestAction ? "employee-attendance-history-header-actions" : ""}`.trim()}
             role="row"
           >
             <span role="columnheader">Date Filed</span>
@@ -250,13 +288,14 @@ export default function DataPanel({
             <span role="columnheader">Details</span>
             <span role="columnheader">Schedule / Period</span>
             <span role="columnheader">Status</span>
+            {personField && <span role="columnheader">{personLabel}</span>}
             {onRequestAction && <span role="columnheader">Actions</span>}
           </div>
 
           {filteredRecords.length > 0 ? filteredRecords.map(item => (
             <div
               key={item.id}
-              className={`employee-attendance-history-row ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
+              className={`employee-attendance-history-row ${personField ? "employee-attendance-history-row-person" : ""} ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
               role="row"
             >
             <span role="cell">{formatDateTimeLabel(item.date_filed)}</span>
@@ -275,6 +314,12 @@ export default function DataPanel({
             </span>
             <span role="cell">{item.schedule_period ?? "—"}</span>
             <span role="cell">{item.status ?? "Pending"}</span>
+            {personField && (
+              <span role="cell" className="team-attendance-employee-cell">
+                <span>{getPersonPrimaryValue(item, personField)}</span>
+                {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
+              </span>
+            )}
             {onRequestAction && (
               <span role="cell" className="employee-request-actions-cell">
                 <div className="employee-request-actions" role="group" aria-label={`Actions for request ${item.id}`}>
