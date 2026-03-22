@@ -8,6 +8,13 @@ const filingTabs = [
   { key: "dispute", label: "Attendance Dispute", icon: "!" }
 ];
 
+const getTodayDateInputValue = () => new Date().toISOString().slice(0, 10);
+const getTomorrowDateInputValue = () => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().slice(0, 10);
+};
+
 export default function FilingCenterPanel({ onSubmitted = null, initialTab = "leave" }) {
   const { confirm } = useFeedback();
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -30,6 +37,9 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
+
+  const todayDate = useMemo(() => getTodayDateInputValue(), []);
+  const tomorrowDate = useMemo(() => getTomorrowDateInputValue(), []);
 
   const panelTitle = useMemo(() => {
     if (activeTab === "leave") return "New Leave Request";
@@ -66,6 +76,12 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
         if (!leavePhoto) {
           throw { error: "Upload photo is required before submitting a leave request." };
         }
+        if (leaveStartDate < todayDate || leaveEndDate < todayDate) {
+          throw { error: "Leave dates cannot be earlier than today." };
+        }
+        if (leaveEndDate < leaveStartDate) {
+          throw { error: "Leave end date cannot be earlier than the start date." };
+        }
 
         const payload = new FormData();
         payload.append("type", "leave");
@@ -79,6 +95,10 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
 
         await submitRequest(payload);
       } else if (activeTab === "overtime") {
+        if (overtimeDate < tomorrowDate) {
+          throw { error: "Overtime requests must be filed for a future date." };
+        }
+
         await submitRequest({
           type: "overtime",
           otType,
@@ -88,6 +108,10 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
           reason
         });
       } else {
+        if (disputeDate < todayDate) {
+          throw { error: "Dispute dates cannot be earlier than today." };
+        }
+
         await submitRequest({
           type: "dispute",
           disputeDate,
@@ -148,11 +172,11 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
                 <div className="filing-grid-two">
                   <label className="filing-field">
                     <span>Start Date</span>
-                    <input type="date" value={leaveStartDate} onChange={event => setLeaveStartDate(event.target.value)} />
+                    <input type="date" min={todayDate} value={leaveStartDate} onChange={event => setLeaveStartDate(event.target.value)} />
                   </label>
                   <label className="filing-field">
                     <span>End Date</span>
-                    <input type="date" value={leaveEndDate} onChange={event => setLeaveEndDate(event.target.value)} />
+                    <input type="date" min={leaveStartDate || todayDate} value={leaveEndDate} onChange={event => setLeaveEndDate(event.target.value)} />
                   </label>
                 </div>
                 <div className="filing-grid-two">
@@ -190,7 +214,7 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
                 <div className="filing-grid-three">
                   <label className="filing-field">
                     <span>Date</span>
-                    <input type="date" value={overtimeDate} onChange={event => setOvertimeDate(event.target.value)} />
+                    <input type="date" min={tomorrowDate} value={overtimeDate} onChange={event => setOvertimeDate(event.target.value)} />
                   </label>
                   <label className="filing-field">
                     <span>Start Time</span>
@@ -208,7 +232,7 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
               <div className="filing-grid-two">
                 <label className="filing-field">
                   <span>Dispute Date</span>
-                  <input type="date" value={disputeDate} onChange={event => setDisputeDate(event.target.value)} />
+                  <input type="date" min={todayDate} value={disputeDate} onChange={event => setDisputeDate(event.target.value)} />
                 </label>
                 <label className="filing-field">
                   <span>Dispute Type</span>

@@ -31,6 +31,11 @@ function resolvePhotoColumn(mysqli $conn): ?string {
     return null;
 }
 
+function validateDateNotInPast(string $date, bool $allowToday = true): bool {
+    $today = date('Y-m-d');
+    return $allowToday ? $date >= $today : $date > $today;
+}
+
 function saveLeavePhoto(array $file): string {
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
         throw new RuntimeException('Unable to upload the leave photo.');
@@ -119,6 +124,18 @@ if ($type === 'leave') {
         exit;
     }
 
+    if (!validateDateNotInPast($startDate) || !validateDateNotInPast($endDate)) {
+        http_response_code(422);
+        echo json_encode(["error" => "Leave dates cannot be earlier than today."]);
+        exit;
+    }
+
+    if ($endDate < $startDate) {
+        http_response_code(422);
+        echo json_encode(["error" => "Leave end date cannot be earlier than the start date."]);
+        exit;
+    }
+
     $status = $initialStatus;
     $photoColumn = resolvePhotoColumn($conn);
     $photoPath = null;
@@ -157,6 +174,12 @@ if ($type === 'leave') {
         exit;
     }
 
+    if (!validateDateNotInPast($date, false)) {
+        http_response_code(422);
+        echo json_encode(["error" => "Overtime requests must be filed for a future date."]);
+        exit;
+    }
+
     $startDateTime = $date . ' ' . $startTime . ':00';
     $endDateTime = $date . ' ' . $endTime . ':00';
     $status = $initialStatus;
@@ -170,6 +193,12 @@ if ($type === 'leave') {
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $disputeDate)) {
         http_response_code(422);
         echo json_encode(["error" => "Valid dispute date is required."]);
+        exit;
+    }
+
+    if (!validateDateNotInPast($disputeDate)) {
+        http_response_code(422);
+        echo json_encode(["error" => "Dispute dates cannot be earlier than today."]);
         exit;
     }
 
