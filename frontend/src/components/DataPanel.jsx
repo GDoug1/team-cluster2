@@ -117,6 +117,7 @@ export default function DataPanel({
   requestActionLoadingId = "",
   requestActions = null,
   enableRequestFilters = false,
+  showRequestActionBy = false,
 }) {
   const config = panelConfig[type] ?? panelConfig.attendance;
   const resolvedRequestActions = Array.isArray(requestActions) && requestActions.length > 0
@@ -159,7 +160,9 @@ export default function DataPanel({
           item.employee_name,
           item.employee_username,
           item.username,
-          item.user_name
+          item.user_name,
+          item.request_action_by_name,
+          item.request_action_by_role
         ]
           .filter(Boolean)
           .join(" ")
@@ -325,6 +328,7 @@ export default function DataPanel({
             <span role="columnheader">Details</span>
             <span role="columnheader">Schedule / Period</span>
             <span role="columnheader">Status</span>
+            {showRequestActionBy && <span role="columnheader">Accepted / Rejected By</span>}
             {personField && <span role="columnheader">{personLabel}</span>}
             {onRequestAction && <span role="columnheader">Actions</span>}
           </div>
@@ -369,6 +373,12 @@ export default function DataPanel({
                     )}
                   </div>
                 </span>
+                {showRequestActionBy && (
+                  <span role="cell" className="team-attendance-employee-cell">
+                    <span>{getPersonPrimaryValue(item, 'request_action_by_name')}</span>
+                    {item?.request_action_by_role ? <small>{item.request_action_by_role}</small> : null}
+                  </span>
+                )}
                 {personField && (
                   <span role="cell" className="team-attendance-employee-cell">
                     <span>{getPersonPrimaryValue(item, personField)}</span>
