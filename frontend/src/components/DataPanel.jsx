@@ -320,7 +320,7 @@ export default function DataPanel({
 
         <div className="employee-attendance-history-scroll">
           <div
-            className={`employee-attendance-history-header ${personField ? "employee-attendance-history-header-person" : ""} ${onRequestAction ? "employee-attendance-history-header-actions" : ""}`.trim()}
+            className={`employee-attendance-history-header ${showRequestActionBy ? "employee-attendance-history-header-actor" : ""} ${personField ? "employee-attendance-history-header-person" : ""} ${onRequestAction ? "employee-attendance-history-header-actions" : ""}`.trim()}
             role="row"
           >
             <span role="columnheader">Date Filed</span>
@@ -339,7 +339,7 @@ export default function DataPanel({
             return (
               <div
                 key={item.id}
-                className={`employee-attendance-history-row ${personField ? "employee-attendance-history-row-person" : ""} ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
+                className={`employee-attendance-history-row ${showRequestActionBy ? "employee-attendance-history-row-actor" : ""} ${personField ? "employee-attendance-history-row-person" : ""} ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
                 role="row"
               >
                 <span role="cell">{formatDateTimeLabel(item.date_filed)}</span>

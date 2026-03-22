@@ -2328,6 +2328,12 @@ body {
   font-size: 13px;
 }
 
+.employee-attendance-history-header-actor,
+.employee-attendance-history-row-actor {
+  grid-template-columns: minmax(170px, 1.2fr) minmax(140px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(130px, 0.8fr) minmax(180px, 1fr);
+  min-width: 980px;
+}
+
 .employee-attendance-history-header-actions,
 .employee-attendance-history-row-actions {
   grid-template-columns: minmax(170px, 1.2fr) minmax(140px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(130px, 0.8fr) minmax(190px, 1fr);
@@ -2340,10 +2346,24 @@ body {
   min-width: 980px;
 }
 
+.employee-attendance-history-header-actor.employee-attendance-history-header-actions,
+.employee-attendance-history-row-actor.employee-attendance-history-row-actions,
 .employee-attendance-history-header-person.employee-attendance-history-header-actions,
 .employee-attendance-history-row-person.employee-attendance-history-row-actions {
   grid-template-columns: minmax(170px, 1.2fr) minmax(140px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(130px, 0.8fr) minmax(180px, 1fr) minmax(190px, 1fr);
   min-width: 1170px;
+}
+
+.employee-attendance-history-header-actor.employee-attendance-history-header-person,
+.employee-attendance-history-row-actor.employee-attendance-history-row-person {
+  grid-template-columns: minmax(170px, 1.2fr) minmax(140px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(130px, 0.8fr) minmax(180px, 1fr) minmax(180px, 1fr);
+  min-width: 1160px;
+}
+
+.employee-attendance-history-header-actor.employee-attendance-history-header-person.employee-attendance-history-header-actions,
+.employee-attendance-history-row-actor.employee-attendance-history-row-person.employee-attendance-history-row-actions {
+  grid-template-columns: minmax(170px, 1.2fr) minmax(140px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(130px, 0.8fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(190px, 1fr);
+  min-width: 1350px;
 }
 
 .employee-attendance-history-header {
