@@ -145,8 +145,19 @@ if (!$allowed || $allowed->num_rows === 0) {
     exit;
 }
 
-$updateStmt = $conn->prepare("UPDATE $table SET status = ? WHERE $idColumn = ?");
-$updateStmt->bind_param('si', $status, $requestId);
+$hasReviewedBy = false;
+$reviewedColumnsRes = $conn->query("SHOW COLUMNS FROM $table LIKE 'reviewed_by'");
+if ($reviewedColumnsRes && $reviewedColumnsRes->num_rows > 0) {
+    $hasReviewedBy = true;
+}
+
+if ($hasReviewedBy) {
+    $updateStmt = $conn->prepare("UPDATE $table SET status = ?, reviewed_by = ? WHERE $idColumn = ?");
+    $updateStmt->bind_param('sii', $status, $coachId, $requestId);
+} else {
+    $updateStmt = $conn->prepare("UPDATE $table SET status = ? WHERE $idColumn = ?");
+    $updateStmt->bind_param('si', $status, $requestId);
+}
 $updateStmt->execute();
 
 if ($conn->errno) {

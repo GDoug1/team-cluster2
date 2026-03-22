@@ -938,7 +938,7 @@ const handleOpenRejectModal = cluster => {
           <section className="content">
             <div className="section-title">My Requests</div>
             <AttendanceHistoryHighlights highlights={myRequestHighlights} />
-            <DataPanel type="requests" records={myRequests} enableRequestFilters />
+            <DataPanel type="requests" records={myRequests} enableRequestFilters showRequestActionBy />
           </section>
         ) : activeNav === "My Filing Center" && canViewAttendance ? (
           <section className="content">

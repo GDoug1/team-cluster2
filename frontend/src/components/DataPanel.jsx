@@ -52,6 +52,20 @@ const formatDateTimeLabel = value => {
   });
 };
 
+
+const formatRequestActionDate = value => {
+  if (!value) return "—";
+  const date = new Date(String(value).replace(" ", "T"));
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+};
+
 const formatAttendanceDate = value => {
   if (!value) return "—";
   const parsed = parseSqlDateTime(value) ?? new Date(String(value).replace(" ", "T"));
@@ -117,6 +131,7 @@ export default function DataPanel({
   requestActionLoadingId = "",
   requestActions = null,
   enableRequestFilters = false,
+  showRequestActionBy = false,
 }) {
   const config = panelConfig[type] ?? panelConfig.attendance;
   const resolvedRequestActions = Array.isArray(requestActions) && requestActions.length > 0
@@ -159,7 +174,10 @@ export default function DataPanel({
           item.employee_name,
           item.employee_username,
           item.username,
-          item.user_name
+          item.user_name,
+          item.request_action_by_name,
+          item.request_action_by_role,
+          item.request_action_at
         ]
           .filter(Boolean)
           .join(" ")
@@ -317,7 +335,7 @@ export default function DataPanel({
 
         <div className="employee-attendance-history-scroll">
           <div
-            className={`employee-attendance-history-header ${personField ? "employee-attendance-history-header-person" : ""} ${onRequestAction ? "employee-attendance-history-header-actions" : ""}`.trim()}
+            className={`employee-attendance-history-header ${showRequestActionBy ? "employee-attendance-history-header-actor" : ""} ${personField ? "employee-attendance-history-header-person" : ""} ${onRequestAction ? "employee-attendance-history-header-actions" : ""}`.trim()}
             role="row"
           >
             <span role="columnheader">Date Filed</span>
@@ -325,6 +343,8 @@ export default function DataPanel({
             <span role="columnheader">Details</span>
             <span role="columnheader">Schedule / Period</span>
             <span role="columnheader">Status</span>
+            {showRequestActionBy && <span role="columnheader">Accepted / Rejected By</span>}
+            {showRequestActionBy && <span role="columnheader">Accepted / Rejected Date</span>}
             {personField && <span role="columnheader">{personLabel}</span>}
             {onRequestAction && <span role="columnheader">Actions</span>}
           </div>
@@ -335,7 +355,7 @@ export default function DataPanel({
             return (
               <div
                 key={item.id}
-                className={`employee-attendance-history-row ${personField ? "employee-attendance-history-row-person" : ""} ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
+                className={`employee-attendance-history-row ${showRequestActionBy ? "employee-attendance-history-row-actor" : ""} ${personField ? "employee-attendance-history-row-person" : ""} ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
                 role="row"
               >
                 <span role="cell">{formatDateTimeLabel(item.date_filed)}</span>
@@ -369,6 +389,17 @@ export default function DataPanel({
                     )}
                   </div>
                 </span>
+                {showRequestActionBy && (
+                  <span role="cell" className="team-attendance-employee-cell">
+                    <span>{getPersonPrimaryValue(item, 'request_action_by_name')}</span>
+                    {item?.request_action_by_role ? <small>{item.request_action_by_role}</small> : null}
+                  </span>
+                )}
+                {showRequestActionBy && (
+                  <span role="cell">
+                    {formatRequestActionDate(item.request_action_at)}
+                  </span>
+                )}
                 {personField && (
                   <span role="cell" className="team-attendance-employee-cell">
                     <span>{getPersonPrimaryValue(item, personField)}</span>
