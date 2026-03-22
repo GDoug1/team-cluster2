@@ -2397,6 +2397,22 @@ body {
   flex: 0 1 auto;
 }
 
+.employee-request-status-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.employee-request-photo-btn {
+  white-space: nowrap;
+}
+
+.employee-request-photo-empty {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
 .request-details-overlay {
   z-index: 40;
 }
@@ -2450,6 +2466,39 @@ body {
   background: #f8fafc;
   color: #1f2937;
   line-height: 1.65;
+}
+
+.request-details-photo-section {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.request-details-photo-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.request-details-photo-link {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.request-details-photo-link:hover {
+  text-decoration: underline;
+}
+
+.request-details-photo-preview {
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 16px;
+  border: 1px solid #dbe4f0;
+  background: #f8fafc;
 }
 
 .request-details-modal-actions {
@@ -2685,6 +2734,12 @@ body {
 
 .filing-field-full {
   grid-column: 1 / -1;
+}
+
+.filing-field-help {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
 }
 
 .filing-warning {

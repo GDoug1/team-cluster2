@@ -16,6 +16,19 @@ function hasColumn(mysqli $conn, string $table, string $column): bool {
     return $result && $result->num_rows > 0;
 }
 
+
+function resolveLeavePhotoColumn(mysqli $conn): ?string {
+    foreach (['photo_path', 'photo_url', 'attachment_path', 'supporting_photo'] as $column) {
+        if (hasColumn($conn, 'leave_requests', $column)) {
+            return $column;
+        }
+    }
+
+    return null;
+}
+
+$leavePhotoColumn = resolveLeavePhotoColumn($conn);
+
 $sessionUserId = (int)($_SESSION['user']['id'] ?? 0);
 $employeeId = $sessionUserId;
 
@@ -38,6 +51,7 @@ if (hasTable($conn, 'leave_requests')) {
             created_at AS filed_at,
             leave_type AS request_type,
             reason AS details,
+            " . ($leavePhotoColumn !== null ? $leavePhotoColumn : "NULL") . " AS photo_path,
             CONCAT(COALESCE(start_date, ''), CASE WHEN end_date IS NOT NULL THEN CONCAT(' to ', end_date) ELSE '' END) AS schedule_period,
             status
          FROM leave_requests
@@ -53,6 +67,7 @@ if (hasTable($conn, 'leave_requests')) {
             'date_filed' => $row['filed_at'],
             'request_type' => $row['request_type'] ?: 'Leave',
             'details' => $row['details'] ?: '—',
+            'photo_path' => trim((string)($row['photo_path'] ?? '')),
             'schedule_period' => trim((string)$row['schedule_period']) ?: '—',
             'status' => $row['status'] ?: 'Pending'
         ];
@@ -81,6 +96,7 @@ if (hasTable($conn, 'overtime_requests')) {
             'date_filed' => $row['filed_at'],
             'request_type' => $row['request_type'] ?: 'Overtime',
             'details' => $row['details'] ?: '—',
+            'photo_path' => trim((string)($row['photo_path'] ?? '')),
             'schedule_period' => trim((string)$row['schedule_period']) ?: '—',
             'status' => $row['status'] ?: 'Pending'
         ];

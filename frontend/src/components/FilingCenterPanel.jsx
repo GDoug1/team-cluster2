@@ -21,6 +21,8 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
   const [overtimeEnd, setOvertimeEnd] = useState("");
   const [disputeDate, setDisputeDate] = useState("");
   const [reason, setReason] = useState("");
+  const [leavePhoto, setLeavePhoto] = useState(null);
+  const [leavePhotoInputKey, setLeavePhotoInputKey] = useState(0);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -43,6 +45,8 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
     setOvertimeStart("");
     setOvertimeEnd("");
     setDisputeDate("");
+    setLeavePhoto(null);
+    setLeavePhotoInputKey(prev => prev + 1);
   };
 
   const handleSubmit = async () => {
@@ -59,13 +63,17 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
     try {
       setSubmitting(true);
       if (activeTab === "leave") {
-        await submitRequest({
-          type: "leave",
-          leaveType,
-          startDate: leaveStartDate,
-          endDate: leaveEndDate,
-          reason
-        });
+        const payload = new FormData();
+        payload.append("type", "leave");
+        payload.append("leaveType", leaveType);
+        payload.append("startDate", leaveStartDate);
+        payload.append("endDate", leaveEndDate);
+        payload.append("reason", reason);
+        if (leavePhoto) {
+          payload.append("photo", leavePhoto);
+        }
+
+        await submitRequest(payload);
       } else if (activeTab === "overtime") {
         await submitRequest({
           type: "overtime",
@@ -141,6 +149,21 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
                   <label className="filing-field">
                     <span>End Date</span>
                     <input type="date" value={leaveEndDate} onChange={event => setLeaveEndDate(event.target.value)} />
+                  </label>
+                </div>
+                <div className="filing-grid-two">
+                  <label className="filing-field filing-field-full">
+                    <span>Upload Photo</span>
+                    <input
+                      key={leavePhotoInputKey}
+                      type="file"
+                      accept="image/*"
+                      onChange={event => setLeavePhoto(event.target.files?.[0] ?? null)}
+                    />
+                    <small className="filing-field-help">
+                      Upload a supporting photo for leave filings only.
+                      {leavePhoto ? ` Selected: ${leavePhoto.name}` : ""}
+                    </small>
                   </label>
                 </div>
               </>
