@@ -5,9 +5,11 @@ export async function fetchMyRequests() {
 }
 
 export async function submitRequest(payload) {
+  const isFormData = payload instanceof FormData;
+
   return apiFetch("api/shared/create_request.php", {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: isFormData ? payload : JSON.stringify(payload)
   });
 }
 

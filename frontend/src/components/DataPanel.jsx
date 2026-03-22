@@ -12,6 +12,14 @@ const truncateRequestDetails = (value, maxLength = 72) => {
   return `${details.slice(0, maxLength).trimEnd()}…`;
 };
 
+const resolveRequestPhotoUrl = value => {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  if (/^https?:\/\//i.test(text)) return text;
+  const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost/team-cluster2/backend").replace(/\/$/, "");
+  return `${baseUrl}/${text.replace(/^\/+/, "")}`;
+};
+
 const panelConfig = {
   attendance: {
     title: "My Attendance Logs",
@@ -321,67 +329,86 @@ export default function DataPanel({
             {onRequestAction && <span role="columnheader">Actions</span>}
           </div>
 
-          {filteredRecords.length > 0 ? filteredRecords.map(item => (
-            <div
-              key={item.id}
-              className={`employee-attendance-history-row ${personField ? "employee-attendance-history-row-person" : ""} ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
-              role="row"
-            >
-            <span role="cell">{formatDateTimeLabel(item.date_filed)}</span>
-            <span role="cell">{item.request_type ?? "—"}</span>
-            <span role="cell">
-              <div className="employee-request-details-cell">
-                <span className="employee-request-details-text" title={normalizeRequestDetails(item.details)}>{truncateRequestDetails(item.details)}</span>
-                <button
-                  className="btn secondary"
-                  type="button"
-                  onClick={() => setSelectedRequest(item)}
-                >
-                  View
-                </button>
-              </div>
-            </span>
-            <span role="cell">{item.schedule_period ?? "—"}</span>
-            <span role="cell">{item.status ?? "Pending"}</span>
-            {personField && (
-              <span role="cell" className="team-attendance-employee-cell">
-                <span>{getPersonPrimaryValue(item, personField)}</span>
-                {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
-              </span>
-            )}
-            {onRequestAction && (
-              <span role="cell" className="employee-request-actions-cell">
-                <div className="employee-request-actions" role="group" aria-label={`Actions for request ${item.id}`}>
-                  {resolvedRequestActions.map(action => {
-                    const currentStatus = String(item.status ?? "").toLowerCase();
-                    const allowedStatuses = Array.isArray(action.allowedStatuses)
-                      ? action.allowedStatuses.map(value => String(value).toLowerCase())
-                      : ["pending"];
-                    const canReview = item.can_review !== false;
-                    const isVisible = typeof action.isVisible === "function" ? action.isVisible(item) : true;
-                    const isEnabled = isVisible && canReview && allowedStatuses.some(status => currentStatus.includes(status));
+          {filteredRecords.length > 0 ? filteredRecords.map(item => {
+            const photoUrl = resolveRequestPhotoUrl(item.photo_url ?? item.photo_path);
 
-                    if (!isVisible) {
-                      return null;
-                    }
-
-                    return (
+            return (
+              <div
+                key={item.id}
+                className={`employee-attendance-history-row ${personField ? "employee-attendance-history-row-person" : ""} ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
+                role="row"
+              >
+                <span role="cell">{formatDateTimeLabel(item.date_filed)}</span>
+                <span role="cell">{item.request_type ?? "—"}</span>
+                <span role="cell">
+                  <div className="employee-request-details-cell">
+                    <span className="employee-request-details-text" title={normalizeRequestDetails(item.details)}>{truncateRequestDetails(item.details)}</span>
+                    <button
+                      className="btn secondary"
+                      type="button"
+                      onClick={() => setSelectedRequest(item)}
+                    >
+                      View
+                    </button>
+                  </div>
+                </span>
+                <span role="cell">{item.schedule_period ?? "—"}</span>
+                <span role="cell">
+                  <div className="employee-request-status-cell">
+                    <span>{item.status ?? "Pending"}</span>
+                    {photoUrl ? (
                       <button
-                        key={`${item.id}-${action.status}`}
-                        className={action.variant ?? "btn"}
+                        className="btn secondary employee-request-photo-btn"
                         type="button"
-                        disabled={requestActionLoadingId === item.id || !isEnabled}
-                        onClick={() => onRequestAction(item, action.status)}
+                        onClick={() => setSelectedRequest(item)}
                       >
-                        {requestActionLoadingId === item.id ? "Saving..." : action.label}
+                        View Photo
                       </button>
-                    );
-                  })}
-                </div>
-              </span>
-            )}
-            </div>
-          )) : (
+                    ) : (
+                      <span className="employee-request-photo-empty">No photo</span>
+                    )}
+                  </div>
+                </span>
+                {personField && (
+                  <span role="cell" className="team-attendance-employee-cell">
+                    <span>{getPersonPrimaryValue(item, personField)}</span>
+                    {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
+                  </span>
+                )}
+                {onRequestAction && (
+                  <span role="cell" className="employee-request-actions-cell">
+                    <div className="employee-request-actions" role="group" aria-label={`Actions for request ${item.id}`}>
+                      {resolvedRequestActions.map(action => {
+                        const currentStatus = String(item.status ?? "").toLowerCase();
+                        const allowedStatuses = Array.isArray(action.allowedStatuses)
+                          ? action.allowedStatuses.map(value => String(value).toLowerCase())
+                          : ["pending"];
+                        const canReview = item.can_review !== false;
+                        const isVisible = typeof action.isVisible === "function" ? action.isVisible(item) : true;
+                        const isEnabled = isVisible && canReview && allowedStatuses.some(status => currentStatus.includes(status));
+
+                        if (!isVisible) {
+                          return null;
+                        }
+
+                        return (
+                          <button
+                            key={`${item.id}-${action.status}`}
+                            className={action.variant ?? "btn"}
+                            type="button"
+                            disabled={requestActionLoadingId === item.id || !isEnabled}
+                            onClick={() => onRequestAction(item, action.status)}
+                          >
+                            {requestActionLoadingId === item.id ? "Saving..." : action.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </span>
+                )}
+              </div>
+            );
+          }) : (
             <div className="empty-state">No requests found.</div>
           )}
         </div>
@@ -408,6 +435,24 @@ export default function DataPanel({
                 <div className="request-details-content">
                   {normalizeRequestDetails(selectedRequest.details)}
                 </div>
+                {resolveRequestPhotoUrl(selectedRequest.photo_url ?? selectedRequest.photo_path) ? (
+                  <div className="request-details-photo-section">
+                    <div className="request-details-photo-label">Supporting Photo</div>
+                    <a
+                      className="request-details-photo-link"
+                      href={resolveRequestPhotoUrl(selectedRequest.photo_url ?? selectedRequest.photo_path)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open photo in new tab
+                    </a>
+                    <img
+                      className="request-details-photo-preview"
+                      src={resolveRequestPhotoUrl(selectedRequest.photo_url ?? selectedRequest.photo_path)}
+                      alt={`${selectedRequest.request_type ?? "Request"} supporting upload`}
+                    />
+                  </div>
+                ) : null}
               </div>
               <div className="modal-actions request-details-modal-actions">
                 <button className="btn" type="button" onClick={() => setSelectedRequest(null)}>Close</button>

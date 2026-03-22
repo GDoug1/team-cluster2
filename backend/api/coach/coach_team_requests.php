@@ -73,6 +73,18 @@ function getClusterMemberEmployeeReference(mysqli $conn): ?string {
     return $row['REFERENCED_TABLE_NAME'] ?? null;
 }
 
+
+function resolveLeavePhotoSelect(mysqli $conn): string {
+    $columns = getColumns($conn, 'leave_requests');
+    foreach (['photo_path', 'photo_url', 'attachment_path', 'supporting_photo'] as $column) {
+        if (in_array($column, $columns, true)) {
+            return "req.$column AS photo_path";
+        }
+    }
+
+    return "NULL AS photo_path";
+}
+
 $coachId = (int)($_SESSION['user']['id'] ?? 0);
 $clusterColumns = getColumns($conn, 'clusters');
 $userColumns = hasTable($conn, 'users') ? getColumns($conn, 'users') : [];
@@ -112,14 +124,17 @@ if ($usersIdColumn !== null && $userDisplayColumn !== null) {
     }
 }
 
+$leavePhotoSelect = resolveLeavePhotoSelect($conn);
+
 $items = [];
 
-$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType, string $extraJoinSql = '', string $extraWhereSql = '') use ($conn, $coachId, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, $employeeSecondaryExpr, &$items) {
+$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType, string $extraJoinSql = '', string $extraWhereSql = '') use ($conn, $coachId, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, $employeeSecondaryExpr, $leavePhotoSelect, &$items) {
     $sql = "SELECT DISTINCT
                 req.$idColumn AS source_id,
                 req.created_at AS filed_at,
                 req.$typeColumn AS request_type,
                 req.$detailsColumn AS details,
+                $leavePhotoSelect,
                 $scheduleExpr AS schedule_period,
                 req.status,
                 $requestEmployeeExpr AS employee_id,
@@ -152,6 +167,7 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
             'date_filed' => $row['filed_at'],
             'request_type' => $row['request_type'] ?: $defaultType,
             'details' => $row['details'] ?: '—',
+            'photo_path' => trim((string)($row['photo_path'] ?? '')),
             'schedule_period' => trim((string)$row['schedule_period']) ?: '—',
             'status' => $row['status'] ?: 'Pending',
             'employee_id' => (int)$row['employee_id'],

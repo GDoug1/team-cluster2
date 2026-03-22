@@ -10,11 +10,16 @@ function buildEndpointUrl(endpoint, method) {
 
 export async function apiFetch(endpoint, options = {}) {
   const method = (options.method ?? "GET").toUpperCase();
+  const isFormData = options.body instanceof FormData;
+  const headers = isFormData
+    ? { ...(options.headers ?? {}) }
+    : { "Content-Type": "application/json", ...(options.headers ?? {}) };
+
   const res = await fetch(buildEndpointUrl(endpoint, method), {
     credentials: "include",
     cache: "no-store",
-    headers: { "Content-Type": "application/json" },
-    ...options
+    ...options,
+    headers
   });
 
   const data = await res.json();

@@ -207,6 +207,7 @@ CREATE TABLE `leave_requests` (
   `start_date` date DEFAULT NULL,
   `end_date` date DEFAULT NULL,
   `reason` text DEFAULT NULL,
+  `photo_path` varchar(255) DEFAULT NULL,
   `status` varchar(50) DEFAULT NULL,
   `reviewed_by` int(11) DEFAULT NULL,
   `approved_by` int(11) DEFAULT NULL,
