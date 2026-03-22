@@ -123,14 +123,18 @@ if ($type === 'leave') {
     $photoColumn = resolvePhotoColumn($conn);
     $photoPath = null;
 
-    if (isset($_FILES['photo']) && (int)($_FILES['photo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-        try {
-            $photoPath = saveLeavePhoto($_FILES['photo']);
-        } catch (RuntimeException $exception) {
-            http_response_code(422);
-            echo json_encode(["error" => $exception->getMessage()]);
-            exit;
-        }
+    if (!isset($_FILES['photo']) || (int)($_FILES['photo']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+        http_response_code(422);
+        echo json_encode(["error" => "Leave photo is required."]);
+        exit;
+    }
+
+    try {
+        $photoPath = saveLeavePhoto($_FILES['photo']);
+    } catch (RuntimeException $exception) {
+        http_response_code(422);
+        echo json_encode(["error" => $exception->getMessage()]);
+        exit;
     }
 
     if ($photoColumn !== null) {

@@ -63,6 +63,10 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
     try {
       setSubmitting(true);
       if (activeTab === "leave") {
+        if (!leavePhoto) {
+          throw { error: "Upload photo is required before submitting a leave request." };
+        }
+
         const payload = new FormData();
         payload.append("type", "leave");
         payload.append("leaveType", leaveType);
@@ -158,10 +162,11 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
                       key={leavePhotoInputKey}
                       type="file"
                       accept="image/*"
+                      required
                       onChange={event => setLeavePhoto(event.target.files?.[0] ?? null)}
                     />
                     <small className="filing-field-help">
-                      Upload a supporting photo for leave filings only.
+                      Upload a supporting photo before you can submit a leave request.
                       {leavePhoto ? ` Selected: ${leavePhoto.name}` : ""}
                     </small>
                   </label>

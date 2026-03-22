@@ -89,7 +89,7 @@ if ($status === 'Approved' && $source !== 'dispute') {
     $status = 'Endorsed';
 }
 
-$allowedStatuses = $source === 'dispute' ? ['Approved', 'Denied'] : ['Endorsed'];
+$allowedStatuses = $source === 'dispute' ? ['Approved', 'Denied'] : ['Endorsed', 'Denied'];
 
 if (!in_array($source, ['leave', 'overtime', 'dispute'], true) || $requestId <= 0 || !in_array($status, $allowedStatuses, true)) {
     http_response_code(422);
