@@ -129,6 +129,70 @@ export default function AdminDashboard() {
   const [isSavingEditAttendance, setIsSavingEditAttendance] = useState(false);
   const [attendanceLog, setAttendanceLog] = useState({ timeInAt: null, timeOutAt: null, tag: null });
   const [isSavingAttendance, setIsSavingAttendance] = useState(false);
+
+  const adminStats = useMemo(() => {
+    const totals = (Array.isArray(coachAttendance) ? coachAttendance : []).reduce((acc, row) => {
+      const timeIn = parseAttendanceDate(row?.time_in_at);
+      const timeOut = parseAttendanceDate(row?.time_out_at);
+      const status = String(row?.attendance_tag ?? row?.tag ?? "").toLowerCase();
+
+      if (timeIn && timeOut && timeOut >= timeIn) {
+        acc.totalHours += (timeOut.getTime() - timeIn.getTime()) / (1000 * 60 * 60);
+      }
+
+      if (timeIn) {
+        acc.daysPresent.add(timeIn.toISOString().slice(0, 10));
+      }
+
+      if (status.includes("late")) acc.totalLate += 1;
+      return acc;
+    }, {
+      totalHours: 0,
+      daysPresent: new Set(),
+      totalLate: 0
+    });
+
+    return {
+      totalHours: totals.totalHours.toFixed(2),
+      presentCount: totals.daysPresent.size,
+      lateCount: totals.totalLate
+    };
+  }, [coachAttendance]);
+
+  const persistAttendance = async (nextAttendance) => {
+    setIsSavingAttendance(true);
+    try {
+      const savedAttendance = await saveAdminDashboardAttendance({ nextAttendance });
+      setAttendanceLog(savedAttendance);
+    } catch (error) {
+      console.error("Failed to persist admin attendance:", error);
+    } finally {
+      setIsSavingAttendance(false);
+    }
+  };
+
+  const handleAdminTimeIn = async () => {
+    if (attendanceLog.timeInAt && !attendanceLog.timeOutAt) return;
+    const now = new Date();
+    const scheduledStartMinutes = toMinutes(FIXED_SHIFT_START.time, FIXED_SHIFT_START.period);
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const lateThreshold = (scheduledStartMinutes ?? 540) + 15;
+    const tag = nowMinutes <= lateThreshold ? "On Time" : "Late";
+
+    await persistAttendance({
+      timeInAt: now,
+      timeOutAt: null,
+      tag
+    });
+  };
+
+  const handleAdminTimeOut = async () => {
+    if (!attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
+    await persistAttendance({
+      ...attendanceLog,
+      timeOutAt: new Date()
+    });
+  };
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
   const { confirm } = useFeedback();
@@ -491,27 +555,29 @@ export default function AdminDashboard() {
 
 
   useEffect(() => {
-    if (!canViewAttendance || activeNav !== "Dashboard") return;
+    if (!canViewAttendance) return;
 
     const today = new Date().toISOString().slice(0, 10);
     apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${today}`)
       .then(data => {
         const currentAttendance = Array.isArray(data) ? data[0] ?? null : null;
-        setAttendanceLog({
-          timeInAt: parseSqlDateTime(currentAttendance?.time_in_at ?? null),
-          timeOutAt: parseSqlDateTime(currentAttendance?.time_out_at ?? null),
-          tag: currentAttendance?.attendance_tag ?? null
-        });
+        if (currentAttendance) {
+          setAttendanceLog({
+            timeInAt: parseSqlDateTime(currentAttendance.time_in_at),
+            timeOutAt: parseSqlDateTime(currentAttendance.time_out_at),
+            tag: currentAttendance.attendance_tag ?? null
+          });
+        }
       })
       .catch(() => setAttendanceLog({ timeInAt: null, timeOutAt: null, tag: null }));
-  }, [activeNav, canViewAttendance]);
+  }, [canViewAttendance]);
 
   useEffect(() => {
-    if (activeNav !== "Attendance") return;
+    if (activeNav !== "Attendance" || !canViewAttendance) return;
     apiFetch("api/admin/admin_my_attendance_history.php")
       .then(data => setCoachAttendance(Array.isArray(data) ? data : []))
       .catch(() => setCoachAttendance([]));
-  }, [activeNav]);
+  }, [activeNav, canViewAttendance]);
 
   useEffect(() => {
     if (activeNav !== "All Attendance") return;
@@ -827,9 +893,10 @@ const handleOpenRejectModal = cluster => {
                 canClickTimeIn: !isSavingAttendance && !(attendanceLog.timeInAt && !attendanceLog.timeOutAt),
                 canClickTimeOut: !isSavingAttendance && Boolean(attendanceLog.timeInAt && !attendanceLog.timeOutAt),
                 hasCompletedShift: isSameCalendarDay(attendanceLog.timeOutAt, new Date()) && !(attendanceLog.timeInAt && !attendanceLog.timeOutAt),
-                onTimeIn: handleTimeIn,
-                onTimeOut: handleTimeOut
+                onTimeIn: handleAdminTimeIn,
+                onTimeOut: handleAdminTimeOut
               }}
+              dashboardStats={adminStats}
               schedule={adminMainDashboardSchedule}
               dashboardMeta={{
                 attendanceTag: resolveAttendanceMainTag({

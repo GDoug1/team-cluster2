@@ -105,3 +105,20 @@ export const saveDashboardAttendance = async ({ clusterId, nextAttendance }) => 
     tag: response?.attendance?.tag ?? null,
   };
 };
+
+export const saveAdminDashboardAttendance = async ({ nextAttendance }) => {
+  const response = await apiFetch("api/admin/save_attendance.php", {
+    method: "POST",
+    body: JSON.stringify({
+      ...nextAttendance,
+      timeInAt: nextAttendance.timeInAt ? toLocalSqlDateTime(nextAttendance.timeInAt) : null,
+      timeOutAt: nextAttendance.timeOutAt ? toLocalSqlDateTime(nextAttendance.timeOutAt) : null,
+    })
+  });
+
+  return {
+    timeInAt: parseSqlDateTime(response?.attendance?.timeInAt ?? null),
+    timeOutAt: parseSqlDateTime(response?.attendance?.timeOutAt ?? null),
+    tag: response?.attendance?.tag ?? null,
+  };
+};
