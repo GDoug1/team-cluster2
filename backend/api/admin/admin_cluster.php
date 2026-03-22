@@ -42,11 +42,13 @@ $res = $conn->query(
             c.rejection_reason,
             COALESCE($userDisplayExpr, 'Unknown') AS coach,
             MAX(e.employee_id) AS coach_employee_id,
-            COUNT(cm.employee_id) AS members
+            COUNT(cm.employee_id) AS members,
+            GROUP_CONCAT(CONCAT(me.first_name, ' ', me.last_name) SEPARATOR ', ') AS member_list
      FROM clusters c
      LEFT JOIN users u ON c.$ownerColumn = u.$userIdColumn
      LEFT JOIN employees e ON e.user_id = u.$userIdColumn
      LEFT JOIN cluster_members cm ON c.$clusterIdColumn = cm.cluster_id
+     LEFT JOIN employees me ON cm.employee_id = me.employee_id
      GROUP BY c.$clusterIdColumn, c.name, c.description, c.created_at, c.status, c.rejection_reason, coach
      ORDER BY c.created_at DESC"
 );

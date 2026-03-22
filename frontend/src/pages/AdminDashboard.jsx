@@ -1052,7 +1052,9 @@ const handleOpenRejectModal = cluster => {
                     <div key={cluster.id} className="table-row">
                       <div className="table-cell">{cluster.coach}</div>
                       <div className="table-cell">{cluster.name}</div>
-                      <div className="table-cell">{cluster.members ?? 0}</div>
+                      <div className="table-cell" title={cluster.member_list || "No members"}>
+                        <span className="member-count-pill">{cluster.members ?? 0} members</span>
+                      </div>
                       <div className="table-cell">
                         <span className={`badge ${cluster.status}`}>{cluster.status}</span>
                       </div>
