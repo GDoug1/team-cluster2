@@ -248,8 +248,17 @@ function SummaryCard({ timeInStart, totalHours, hasScheduleToday = true, dashboa
   );
 }
 
+function isOpenFileRequest(request) {
+  const normalizedStatus = String(request?.status ?? "").trim().toLowerCase();
+  if (!normalizedStatus) return true;
+
+  return normalizedStatus.includes("pending") || normalizedStatus.includes("endorsed");
+}
+
 function FileRequestCard({ requests = [], onViewRequest = null }) {
-  const visibleRequests = Array.isArray(requests) ? requests.slice(0, 3) : [];
+  const visibleRequests = Array.isArray(requests)
+    ? requests.filter(isOpenFileRequest).slice(0, 3)
+    : [];
 
   return (
     <div className="card member-card">
