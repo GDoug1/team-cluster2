@@ -926,7 +926,7 @@ const handleOpenRejectModal = cluster => {
                   type="attendance"
                   records={allAttendance}
                   personField="employee_name"
-                  personLabel="Employee / Coach"
+                  personLabel="Name"
                   onEditRow={canEditAttendance ? openAttendanceEdit : undefined}
                   externalDateFilter={attendanceDate}
                   onExternalDateFilterChange={setAttendanceDate}
@@ -961,7 +961,7 @@ const handleOpenRejectModal = cluster => {
               ]}
               enableRequestFilters
               personField="employee_name"
-              personLabel="Employee / Coach"
+              personLabel="Name"
             />
           </section>
         ) : activeNav === "Employees" && canAccessEmployeesTab ? (

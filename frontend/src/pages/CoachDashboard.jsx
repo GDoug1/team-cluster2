@@ -1621,7 +1621,7 @@ export default function CoachDashboard() {
                         ]}
                         enableRequestFilters
                         personField="employee_name"
-                        personLabel="Employee"
+                        personLabel="Name"
                       />
                     </>
                   ) : isTeamClusterAttendanceView ? (

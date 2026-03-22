@@ -112,25 +112,51 @@ if ($requestEmployeeReference === 'users' && $canJoinEmployees) {
 $employeeNameExpr = "CONCAT('Employee #', $requestEmployeeExpr)";
 $employeeSecondaryExpr = "''";
 $userJoinSql = '';
-if ($usersIdColumn !== null && $userDisplayColumn !== null) {
+$employeeDetailsJoinSql = '';
+
+$employeeNameColumns = array_values(array_filter([
+    in_array('first_name', $employeeColumns, true) ? 'requester_employee.first_name' : null,
+    in_array('last_name', $employeeColumns, true) ? 'requester_employee.last_name' : null,
+]));
+
+if (in_array('employee_id', $employeeColumns, true)) {
+    if ($requestEmployeeReference === 'users' && in_array('user_id', $employeeColumns, true)) {
+        $employeeDetailsJoinSql = ' LEFT JOIN employees requester_employee ON requester_employee.user_id = req.employee_id';
+    } else {
+        $employeeDetailsJoinSql = " LEFT JOIN employees requester_employee ON requester_employee.employee_id = $requestEmployeeExpr";
+    }
+}
+
+$employeeFullNameExpr = count($employeeNameColumns) > 0
+    ? "NULLIF(TRIM(CONCAT_WS(' ', " . implode(', ', $employeeNameColumns) . ")), '')"
+    : "''";
+
+if ($usersIdColumn !== null) {
     if ($requestEmployeeReference === 'users') {
         $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = req.employee_id";
-        $employeeNameExpr = "COALESCE(NULLIF(requester.$userDisplayColumn, ''), CONCAT('Employee #', $requestEmployeeExpr))";
-        if ($userSecondaryColumn !== null) {
-            $employeeSecondaryExpr = "COALESCE(NULLIF(requester.$userSecondaryColumn, ''), '')";
-        }
     } else {
         $userJoinSql = " LEFT JOIN users requester ON requester.$usersIdColumn = $requestEmployeeExpr";
-        $employeeNameExpr = "COALESCE(NULLIF(requester.$userDisplayColumn, ''), CONCAT('Employee #', $requestEmployeeExpr))";
-        if ($userSecondaryColumn !== null) {
-            $employeeSecondaryExpr = "COALESCE(NULLIF(requester.$userSecondaryColumn, ''), '')";
-        }
     }
+
+    $userDisplayExpr = $userDisplayColumn !== null
+        ? "NULLIF(requester.$userDisplayColumn, '')"
+        : "''";
+    $userFallbackExpr = in_array('email', $userColumns, true)
+        ? "NULLIF(requester.email, '')"
+        : "''";
+
+    $employeeNameExpr = "COALESCE($employeeFullNameExpr, $userDisplayExpr, $userFallbackExpr, CONCAT('Employee #', $requestEmployeeExpr))";
+
+    if ($userSecondaryColumn !== null) {
+        $employeeSecondaryExpr = "COALESCE(NULLIF(requester.$userSecondaryColumn, ''), '')";
+    }
+} else {
+    $employeeNameExpr = "COALESCE($employeeFullNameExpr, CONCAT('Employee #', $requestEmployeeExpr))";
 }
 
 $items = [];
 
-$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType, string $extraJoinSql = '', string $extraWhereSql = '') use ($conn, $coachId, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $userJoinSql, $employeeNameExpr, $employeeSecondaryExpr, &$items) {
+$loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType, string $extraJoinSql = '', string $extraWhereSql = '') use ($conn, $coachId, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $employeeDetailsJoinSql, $userJoinSql, $employeeNameExpr, $employeeSecondaryExpr, &$items) {
     $photoSelect = resolvePhotoSelect($conn, $table);
 
     $sql = "SELECT DISTINCT
@@ -146,6 +172,7 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
                 $employeeSecondaryExpr AS employee_username
             FROM $table req
             $employeeJoinSql
+            $employeeDetailsJoinSql
             INNER JOIN cluster_members cm ON cm.employee_id = $requestEmployeeExpr
             INNER JOIN clusters c ON c.$clusterIdColumn = cm.cluster_id
             $userJoinSql
