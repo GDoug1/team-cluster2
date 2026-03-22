@@ -236,6 +236,8 @@
 .announcement-list {
   padding-right: 12px;
   margin-bottom: 0;
+  max-height: 138px;
+  overflow-y: auto;
 }
 
 .announcement-item {
@@ -248,6 +250,20 @@
   background: rgba(219, 219, 219, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.45);
   margin-bottom: 6px;
+}
+
+.announcement-item-stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.announcement-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
 }
 
 .announcement-tag {
@@ -281,6 +297,59 @@
 .announcement-meta {
   font-size: 10px;
   color: #4f4f4f;
+}
+
+.announcement-content,
+.announcement-empty-state {
+  font-size: 11px;
+  color: #2f2f2f;
+}
+
+.announcement-content {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.announcement-modal {
+  width: min(92vw, 520px);
+}
+
+.announcement-form {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.announcement-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #223054;
+}
+
+.announcement-form-field input,
+.announcement-form-field textarea {
+  width: 100%;
+  border: 1px solid #ccd4e4;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+  color: #1b1f2a;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.announcement-form-field textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.announcement-form-error {
+  margin: 0;
+  font-size: 13px;
+  color: #c0392b;
 }
 
 .mini-actions {

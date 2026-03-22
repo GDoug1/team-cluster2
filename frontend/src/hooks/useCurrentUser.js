@@ -1,53 +1,42 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { apiFetch } from "../api/api";
 
-const STORAGE_KEY = "teamClusterUser";
-
-const readStoredUser = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (error) {
-    console.warn("Unable to read stored user", error);
-    return null;
-  }
-};
-
 export default function useCurrentUser() {
-  const [user, setUser] = useState(() => readStoredUser());
-  const [loading, setLoading] = useState(!user);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const location = useLocation();
 
   useEffect(() => {
     let isActive = true;
 
     const fetchUser = async () => {
+      if (isActive) {
+        setLoading(true);
+      }
+
       try {
-        const response = await apiFetch("auth/me.php");
-        if (!isActive) return;
-        setUser(response);
-        localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({ fullname: response.fullname, role: response.role })
-        );
+        const data = await apiFetch("auth/me.php");
+        if (isActive) {
+          setUser(data);
+        }
       } catch {
-        if (!isActive) return;
-        setUser(null);
+        if (isActive) {
+          setUser(null);
+        }
       } finally {
-        if (isActive) setLoading(false);
+        if (isActive) {
+          setLoading(false);
+        }
       }
     };
 
-    if (!user) {
-      fetchUser();
-    } else {
-      setLoading(false);
-    }
+    fetchUser();
 
     return () => {
       isActive = false;
     };
-  }, [user]);
+  }, [location.pathname]);
 
   return { user, loading };
 }

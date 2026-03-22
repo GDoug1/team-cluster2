@@ -1,12 +1,51 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
+import { useFeedback } from "./FeedbackProvider";
+
+const RESTRICTED_PERMISSIONS_BY_ROLE = {
+  employee: new Set([
+    "Access Control Panel",
+    "Add Employee",
+    "Edit Employee",
+    "Delete Employee",
+    "Set Attendance",
+    "Edit Attendance",
+    "View Employee List"
+  ]),
+  "team coach": new Set([
+    "Access Control Panel",
+    "Add Employee",
+    "Edit Employee",
+    "Delete Employee"
+  ]),
+  coach: new Set([
+    "Access Control Panel",
+    "Add Employee",
+    "Edit Employee",
+    "Delete Employee"
+  ])
+};
+
+function getEditablePermissionOptions(roleName, permissionOptions) {
+  const normalizedRole = String(roleName ?? "").trim().toLowerCase();
+  const restrictedPermissions = RESTRICTED_PERMISSIONS_BY_ROLE[normalizedRole];
+  if (!restrictedPermissions) {
+    return permissionOptions;
+  }
+
+  return permissionOptions.filter(permission => !restrictedPermissions.has(permission.name));
+}
 
 function PermissionEditorModal({ title, selectedPermissionIds, permissionOptions, onClose, onSave, isSaving = false, errorMessage = "" }) {
   const [draftPermissionIds, setDraftPermissionIds] = useState(selectedPermissionIds);
+  const selectedPermissionKey = useMemo(
+    () => [...selectedPermissionIds].sort((a, b) => a - b).join(","),
+    [selectedPermissionIds]
+  );
 
   useEffect(() => {
     setDraftPermissionIds(selectedPermissionIds);
-  }, [selectedPermissionIds]);
+  }, [selectedPermissionKey]);
 
   const togglePermission = permissionId => {
     setDraftPermissionIds(current => {
@@ -45,7 +84,52 @@ function PermissionEditorModal({ title, selectedPermissionIds, permissionOptions
   );
 }
 
+function LogDetailsModal({ log, onClose }) {
+  if (!log) return null;
+
+  useEffect(() => {
+    const handleKeyDown = event => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Log details" onClick={onClose}>
+      <div className="modal-card log-details-modal" onClick={event => event.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <h3 className="permission-modal-title">Log Details</h3>
+            <p className="modal-subtitle">{log.action || "No action provided"}</p>
+          </div>
+          <button className="btn secondary" type="button" onClick={onClose}>Close</button>
+        </div>
+
+        <div className="log-details-grid">
+          <div className="log-detail-card">
+            <span className="log-detail-label">User</span>
+            <span className="log-detail-value">{log.user || "-"}</span>
+          </div>
+          <div className="log-detail-card">
+            <span className="log-detail-label">Date</span>
+            <span className="log-detail-value">{log.created_at || "-"}</span>
+          </div>
+          <div className="log-detail-card log-detail-card-full">
+            <span className="log-detail-label">Description</span>
+            <p className="log-detail-description">{log.target || "-"}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ControlPanelSection() {
+  const { confirm, showToast } = useFeedback();
   const [activeTab, setActiveTab] = useState("role");
   const [searchTerm, setSearchTerm] = useState("");
   const [permissionOptions, setPermissionOptions] = useState([]);
@@ -65,6 +149,7 @@ export default function ControlPanelSection() {
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [logsError, setLogsError] = useState("");
+  const [selectedLog, setSelectedLog] = useState(null);
 
   const showRolePermissions = activeTab === "role";
   const showIndividualAccess = activeTab === "individual";
@@ -198,10 +283,36 @@ export default function ControlPanelSection() {
 
   const editingRole = rolePermissions.find(item => item.id === editingRoleId);
   const editingUser = userPermissions.find(item => item.id === editingUserId);
+  const editingRolePermissionIds = useMemo(
+    () => (editingRole?.permissionIds ?? []),
+    [editingRole]
+  );
+  const editingRolePermissionOptions = useMemo(
+    () => getEditablePermissionOptions(editingRole?.role, permissionOptions),
+    [editingRole, permissionOptions]
+  );
+  const editingUserPermissionIds = useMemo(() => {
+    if (!editingUser) return [];
+
+    return editingUser.permissions
+      .map(name => permissionOptions.find(option => option.name === name)?.id)
+      .filter(Boolean);
+  }, [editingUser, permissionOptions]);
+  const editingUserPermissionOptions = useMemo(
+    () => getEditablePermissionOptions(editingUser?.role, permissionOptions),
+    [editingUser, permissionOptions]
+  );
 
   const handleSaveRolePermissions = async permissionIds => {
     const role = rolePermissions.find(item => item.id === editingRoleId);
     if (!role) return;
+
+    const shouldSave = await confirm({
+      title: "Save role permissions?",
+      message: `Update permissions for the ${role.role} role?`,
+      confirmLabel: "Save"
+    });
+    if (!shouldSave) return;
 
     try {
       const response = await apiFetch("api/admin/control_panel/permissions.php", {
@@ -218,14 +329,32 @@ export default function ControlPanelSection() {
         permissionIds: Array.isArray(item.permissionIds) ? item.permissionIds : [],
         permissions: Array.isArray(item.permissions) ? item.permissions : []
       })));
-    } finally {
+      window.dispatchEvent(new Event("permissions-updated"));
       setEditingRoleId("");
+      showToast({
+        title: "Permissions updated",
+        message: `${role.role} role permissions were saved successfully.`,
+        type: "success"
+      });
+    } catch (error) {
+      showToast({
+        title: "Save failed",
+        message: error?.error ?? error?.message ?? "Unable to save role permissions.",
+        type: "error"
+      });
     }
   };
 
   const handleSaveUserPermissions = async permissionIds => {
     const user = userPermissions.find(item => item.id === editingUserId);
     if (!user) return;
+
+    const shouldSave = await confirm({
+      title: "Save user permissions?",
+      message: `Update permissions for ${user.name}?`,
+      confirmLabel: "Save"
+    });
+    if (!shouldSave) return;
 
     setSavingUserPermissions(true);
     setUserSaveError("");
@@ -245,16 +374,34 @@ export default function ControlPanelSection() {
         email: item.email,
         permissions: Array.isArray(item.permissions) ? item.permissions : []
       })));
+      window.dispatchEvent(new Event("permissions-updated"));
       setEditingUserId("");
+      showToast({
+        title: "Permissions updated",
+        message: `${user.name}'s permissions were saved successfully.`,
+        type: "success"
+      });
     } catch (error) {
-      setUserSaveError(error?.error ?? "Unable to save user permissions.");
+      const message = error?.error ?? "Unable to save user permissions.";
+      setUserSaveError(message);
+      showToast({
+        title: "Save failed",
+        message,
+        type: "error"
+      });
     } finally {
       setSavingUserPermissions(false);
     }
   };
 
   const handleArchiveAction = async (employeeId, endpointName, confirmMessage) => {
-    if (!window.confirm(confirmMessage)) return;
+    const shouldProceed = await confirm({
+      title: endpointName === "restore_user" ? "Restore archived user?" : "Delete archived user?",
+      message: confirmMessage,
+      confirmLabel: endpointName === "restore_user" ? "Restore" : "Delete",
+      variant: endpointName === "restore_user" ? "primary" : "danger"
+    });
+    if (!shouldProceed) return;
 
     setArchiveActionEmployeeId(employeeId);
     setArchivedUsersError("");
@@ -267,8 +414,21 @@ export default function ControlPanelSection() {
 
       setArchivedUsers(current => current.filter(item => item.id !== employeeId));
       await fetchLogs();
+      showToast({
+        title: endpointName === "restore_user" ? "User restored" : "User deleted",
+        message: endpointName === "restore_user"
+          ? "The archived user was restored successfully."
+          : "The archived user was deleted permanently.",
+        type: "success"
+      });
     } catch (error) {
-      setArchivedUsersError(error?.error ?? error?.message ?? "Unable to update archived user.");
+      const message = error?.error ?? error?.message ?? "Unable to update archived user.";
+      setArchivedUsersError(message);
+      showToast({
+        title: "Action failed",
+        message,
+        type: "error"
+      });
     } finally {
       setArchiveActionEmployeeId(null);
     }
@@ -298,7 +458,7 @@ export default function ControlPanelSection() {
           : showUserArchives
             ? "Search archived user, email, or position..."
             : showLogs
-              ? "Search logs by user, action, or target..."
+              ? "Search logs by user, action, or details..."
               : "Search user, role, or permission..."}
       />
 
@@ -324,8 +484,8 @@ export default function ControlPanelSection() {
           </div>
           {filteredUsers.map(userItem => (
             <div key={userItem.id} className="control-panel-table-row" role="row">
-              <span role="cell">{userItem.id}</span><span role="cell">{userItem.name}</span><span role="cell">{userItem.role}</span><span role="cell">{userItem.permissions.length}</span>
-              <span role="cell"><button className="btn permission-edit-btn" type="button" onClick={() => { setUserSaveError(""); setEditingUserId(userItem.id); }}>Edit Permission</button></span>
+              <span role="cell" data-label="ID">{userItem.id}</span><span role="cell" data-label="User">{userItem.name}</span><span role="cell" data-label="Role">{userItem.role}</span><span role="cell" data-label="Permissions">{userItem.permissions.length}</span>
+              <span role="cell" data-label="Action"><button className="btn permission-edit-btn" type="button" onClick={() => { setUserSaveError(""); setEditingUserId(userItem.id); }}>Edit Permission</button></span>
             </div>
           ))}
         </div>
@@ -333,13 +493,21 @@ export default function ControlPanelSection() {
         <>
           {logsError ? <p className="team-empty-note">{logsError}</p> : null}
           {loadingLogs ? <p className="team-empty-note">Loading logs...</p> : filteredLogs.length === 0 ? <p className="team-empty-note">No logs found.</p> : (
-            <div className="control-panel-table-wrap" role="table" aria-label="Control panel logs table">
+            <div className="control-panel-table-wrap control-panel-logs-table" role="table" aria-label="Control panel logs table">
               <div className="control-panel-table-header" role="row">
-                <span role="columnheader">ID</span><span role="columnheader">User</span><span role="columnheader">Action</span><span role="columnheader">Target</span><span role="columnheader">Date</span>
+                <span role="columnheader">ID</span><span role="columnheader">User</span><span role="columnheader">Action</span><span role="columnheader">View</span><span role="columnheader">Date</span>
               </div>
               {filteredLogs.map(logItem => (
                 <div key={logItem.id} className="control-panel-table-row" role="row">
-                  <span role="cell">{logItem.id}</span><span role="cell">{logItem.user}</span><span role="cell">{logItem.action || "—"}</span><span role="cell">{logItem.target || "—"}</span><span role="cell">{logItem.created_at || "—"}</span>
+                  <span role="cell" data-label="ID">{logItem.id}</span>
+                  <span role="cell" data-label="User">{logItem.user}</span>
+                  <span role="cell" data-label="Action">{logItem.action || "-"}</span>
+                  <span role="cell" data-label="View">
+                    <button className="btn secondary log-view-btn" type="button" onClick={() => setSelectedLog(logItem)}>
+                      View
+                    </button>
+                  </span>
+                  <span role="cell" data-label="Date">{logItem.created_at || "-"}</span>
                 </div>
               ))}
             </div>
@@ -355,10 +523,10 @@ export default function ControlPanelSection() {
               </div>
               {filteredArchivedUsers.map(userItem => (
                 <div key={userItem.id} className="control-panel-table-row" role="row">
-                  <span role="cell">{userItem.id}</span>
-                  <span role="cell">{userItem.fullname || userItem.email || `Employee #${userItem.id}`}</span>
-                  <span role="cell">{userItem.position || "—"}</span>
-                  <span role="cell" className="user-archive-actions">
+                  <span role="cell" data-label="ID">{userItem.id}</span>
+                  <span role="cell" data-label="User">{userItem.fullname || userItem.email || `Employee #${userItem.id}`}</span>
+                  <span role="cell" data-label="Position">{userItem.position || "—"}</span>
+                  <span role="cell" data-label="Action" className="user-archive-actions">
                     <button className="btn secondary" type="button" onClick={() => handleArchiveAction(userItem.id, "restore_user", "Restore this archived user?")} disabled={archiveActionEmployeeId === userItem.id}>
                       {archiveActionEmployeeId === userItem.id ? "Updating..." : "Restore"}
                     </button>
@@ -376,8 +544,8 @@ export default function ControlPanelSection() {
       {editingRole ? (
         <PermissionEditorModal
           title={`${editingRole.role} Role`}
-          selectedPermissionIds={editingRole.permissionIds}
-          permissionOptions={permissionOptions}
+          selectedPermissionIds={editingRolePermissionIds}
+          permissionOptions={editingRolePermissionOptions}
           onClose={() => setEditingRoleId("")}
           onSave={handleSaveRolePermissions}
         />
@@ -386,13 +554,17 @@ export default function ControlPanelSection() {
       {editingUser ? (
         <PermissionEditorModal
           title={`${editingUser.name} (${editingUser.role})`}
-          selectedPermissionIds={editingUser.permissions.map(name => permissionOptions.find(option => option.name === name)?.id).filter(Boolean)}
-          permissionOptions={permissionOptions}
+          selectedPermissionIds={editingUserPermissionIds}
+          permissionOptions={editingUserPermissionOptions}
           onClose={() => setEditingUserId("")}
           onSave={handleSaveUserPermissions}
           isSaving={savingUserPermissions}
           errorMessage={userSaveError}
         />
+      ) : null}
+
+      {selectedLog ? (
+        <LogDetailsModal log={selectedLog} onClose={() => setSelectedLog(null)} />
       ) : null}
     </section>
   );

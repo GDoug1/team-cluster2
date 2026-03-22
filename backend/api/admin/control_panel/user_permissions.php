@@ -1,8 +1,172 @@
 <?php
 include __DIR__ . "/../../../config/database.php";
 include __DIR__ . "/../../../config/auth.php";
+include __DIR__ . "/../../utils/logger.php";
 
 requireRoleOrPermission(["super admin", "admin"], $conn, "Access Control Panel");
+
+function getUserPermissionsIndexes(mysqli $conn): array {
+    $indexes = [];
+    $result = $conn->query("SHOW INDEX FROM user_permissions");
+    if (!$result) {
+        return $indexes;
+    }
+
+    while ($row = $result->fetch_assoc()) {
+        $keyName = (string)($row['Key_name'] ?? '');
+        $columnName = (string)($row['Column_name'] ?? '');
+        $seqInIndex = (int)($row['Seq_in_index'] ?? 0);
+        $nonUnique = (int)($row['Non_unique'] ?? 1) === 1;
+        if ($keyName === '' || $columnName === '' || $seqInIndex <= 0) {
+            continue;
+        }
+
+        if (!isset($indexes[$keyName])) {
+            $indexes[$keyName] = [
+                'columns' => [],
+                'non_unique' => $nonUnique
+            ];
+        }
+
+        $indexes[$keyName]['columns'][$seqInIndex] = $columnName;
+    }
+
+    foreach ($indexes as &$index) {
+        ksort($index['columns']);
+        $index['columns'] = array_values($index['columns']);
+    }
+    unset($index);
+
+    return $indexes;
+}
+
+function hasIndex(array $indexes, array $columns, bool $isUnique): bool {
+    foreach ($indexes as $index) {
+        $indexColumns = $index['columns'] ?? [];
+        $indexIsUnique = !($index['non_unique'] ?? true);
+        if ($indexColumns === $columns && $indexIsUnique === $isUnique) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function userPermissionsIdIsAutoIncrement(mysqli $conn): bool {
+    $sql = "SELECT EXTRA
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'user_permissions'
+              AND COLUMN_NAME = 'Id'
+            LIMIT 1";
+    $result = $conn->query($sql);
+    if (!$result) {
+        return false;
+    }
+
+    $row = $result->fetch_assoc();
+    $extra = strtolower(trim((string)($row['EXTRA'] ?? '')));
+    return $extra === 'auto_increment';
+}
+
+function ensureUserPermissionsSchema(mysqli $conn): void {
+    $indexes = getUserPermissionsIndexes($conn);
+    $hasLegacyUserIndex = isset($indexes['user_id']) && ($indexes['user_id']['columns'] ?? []) === ['user_id'];
+    $hasLegacyPermissionIndex = isset($indexes['permission_id']) && ($indexes['permission_id']['columns'] ?? []) === ['permission_id'];
+    $hasComposite = hasIndex($indexes, ['user_id', 'permission_id'], true);
+    $hasPermissionLookupIndex = hasIndex($indexes, ['permission_id'], false);
+    $hasAutoIncrementId = userPermissionsIdIsAutoIncrement($conn);
+
+    if (!$hasLegacyUserIndex && !$hasLegacyPermissionIndex && $hasComposite && $hasPermissionLookupIndex && $hasAutoIncrementId) {
+        return;
+    }
+
+    if (!$hasComposite) {
+        if (!$conn->query("ALTER TABLE user_permissions ADD UNIQUE KEY uniq_user_permission (user_id, permission_id)")) {
+            throw new Exception('Failed to create user_permissions composite unique index');
+        }
+    }
+
+    if (!$hasPermissionLookupIndex) {
+        if (!$conn->query("ALTER TABLE user_permissions ADD KEY idx_user_permissions_permission_id (permission_id)")) {
+            throw new Exception('Failed to create user_permissions.permission_id lookup index');
+        }
+    }
+
+    if ($hasLegacyUserIndex) {
+        if (!$conn->query("ALTER TABLE user_permissions DROP INDEX user_id")) {
+            throw new Exception('Failed to drop invalid user_permissions.user_id index');
+        }
+    }
+
+    if ($hasLegacyPermissionIndex) {
+        if (!$conn->query("ALTER TABLE user_permissions DROP INDEX permission_id")) {
+            throw new Exception('Failed to drop invalid user_permissions.permission_id index');
+        }
+    }
+
+    if (!$hasAutoIncrementId) {
+        if (!$conn->query("ALTER TABLE user_permissions MODIFY `Id` int(11) NOT NULL AUTO_INCREMENT")) {
+            throw new Exception('Failed to enable AUTO_INCREMENT for user_permissions.Id');
+        }
+    }
+}
+
+try {
+    ensureUserPermissionsSchema($conn);
+} catch (Throwable $error) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => $error->getMessage()
+    ]);
+    exit;
+}
+
+function normalizeRoleName(string $roleName): string {
+    return strtolower(trim($roleName));
+}
+
+function getRestrictedPermissionNamesForRole(string $roleName): array {
+    $normalizedRole = normalizeRoleName($roleName);
+
+    if ($normalizedRole === 'employee') {
+        return [
+            'Access Control Panel',
+            'Add Employee',
+            'Edit Employee',
+            'Delete Employee',
+            'Set Attendance',
+            'Edit Attendance',
+            'View Employee List'
+        ];
+    }
+
+    if ($normalizedRole === 'team coach' || $normalizedRole === 'coach') {
+        return [
+            'Access Control Panel',
+            'Add Employee',
+            'Edit Employee',
+            'Delete Employee'
+        ];
+    }
+
+    return [];
+}
+
+function getPermissionIdNameMap(mysqli $conn): array {
+    $result = $conn->query("SELECT permission_id, permission_name FROM permissions");
+    if (!$result) {
+        return [];
+    }
+
+    $permissionMap = [];
+    while ($row = $result->fetch_assoc()) {
+        $permissionMap[(int)$row['permission_id']] = (string)$row['permission_name'];
+    }
+
+    return $permissionMap;
+}
 
 function getAllPermissions(mysqli $conn): array {
     $result = $conn->query("SELECT permission_id, permission_name FROM permissions ORDER BY permission_id ASC");
@@ -100,7 +264,9 @@ function getUserPermissions(mysqli $conn): array {
     $userMap = [];
     while ($row = $usersResult->fetch_assoc()) {
         $userId = (int)($row['user_id'] ?? 0);
-        if ($userId <= 0) continue;
+        if ($userId <= 0) {
+            continue;
+        }
 
         $userMap[$userId] = [
             'userId' => $userId,
@@ -129,7 +295,9 @@ function getUserPermissions(mysqli $conn): array {
         while ($row = $rolePermissionsResult->fetch_assoc()) {
             $userId = (int)($row['user_id'] ?? 0);
             $permissionName = trim((string)($row['permission_name'] ?? ''));
-            if ($userId <= 0 || $permissionName === '') continue;
+            if ($userId <= 0 || $permissionName === '') {
+                continue;
+            }
 
             if (!isset($effectivePermissionMap[$userId])) {
                 $effectivePermissionMap[$userId] = [];
@@ -152,7 +320,9 @@ function getUserPermissions(mysqli $conn): array {
             $userId = (int)($row['user_id'] ?? 0);
             $permissionName = trim((string)($row['permission_name'] ?? ''));
             $isAllowed = (int)($row['is_allowed'] ?? 0) === 1;
-            if ($userId <= 0 || $permissionName === '') continue;
+            if ($userId <= 0 || $permissionName === '') {
+                continue;
+            }
 
             if (!isset($effectivePermissionMap[$userId])) {
                 $effectivePermissionMap[$userId] = [];
@@ -191,7 +361,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-
 function getUserRoleId(mysqli $conn, int $userId): int {
     $stmt = $conn->prepare("SELECT role_id FROM users WHERE user_id = ? LIMIT 1");
     if (!$stmt) {
@@ -210,6 +379,28 @@ function getUserRoleId(mysqli $conn, int $userId): int {
 
     $row = $result->fetch_assoc();
     return (int)($row['role_id'] ?? 0);
+}
+
+function getUserRoleName(mysqli $conn, int $userId): string {
+    $stmt = $conn->prepare(
+        "SELECT COALESCE(r.role_name, '') AS role_name
+         FROM users u
+         LEFT JOIN roles r ON r.role_id = u.role_id
+         WHERE u.user_id = ?
+         LIMIT 1"
+    );
+    if (!$stmt) {
+        return '';
+    }
+
+    $stmt->bind_param("i", $userId);
+    if (!$stmt->execute()) {
+        return '';
+    }
+
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+    return (string)($row['role_name'] ?? '');
 }
 
 function getRolePermissionIdMap(mysqli $conn, int $roleId): array {
@@ -268,6 +459,20 @@ if ($roleId <= 0) {
     exit;
 }
 
+$targetUserRoleName = getUserRoleName($conn, $userId);
+$restrictedPermissionNames = getRestrictedPermissionNamesForRole($targetUserRoleName);
+if (count($restrictedPermissionNames) > 0) {
+    $permissionIdNameMap = getPermissionIdNameMap($conn);
+    $restrictedMap = array_fill_keys($restrictedPermissionNames, true);
+
+    foreach (array_keys($requestedPermissionMap) as $permissionId) {
+        $permissionName = $permissionIdNameMap[$permissionId] ?? '';
+        if (isset($restrictedMap[$permissionName])) {
+            unset($requestedPermissionMap[$permissionId]);
+        }
+    }
+}
+
 $rolePermissionMap = getRolePermissionIdMap($conn, $roleId);
 
 $conn->begin_transaction();
@@ -309,6 +514,11 @@ try {
     }
 
     $conn->commit();
+    logCurrentUserAction(
+        $conn,
+        'user_permissions_update',
+        buildAuditTarget('user', $userId, 'permissions=' . implode(',', array_keys($requestedPermissionMap)))
+    );
 
     echo json_encode([
         'success' => true,

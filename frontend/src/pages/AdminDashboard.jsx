@@ -1,17 +1,63 @@
 import "../styles/DashboardLayout.css";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
 import DashboardSidebar from "../components/DashboardSidebar";
 import MainDashboard from "./MainDashboard";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
 import usePermissions from "../hooks/usePermissions";
+import { getFeatureAccess } from "../utils/featureAccess";
 import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
 import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
 import ControlPanelSection from "../components/ControlPanelSection";
 import EmployeesSection from "../components/EmployeesSection";
+import AttendanceModule from "../components/AttendanceModule";
 import { buildRequestHighlights, fetchAdminTeamRequests, fetchMyRequests, updateAdminTeamRequestStatus } from "../api/requests";
+import { logout } from "../utils/logout";
+import { parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
+import { resolveAttendanceMainTag } from "../utils/attendanceTags";
+import { useFeedback } from "../components/FeedbackProvider";
+
+const attendanceTagOptions = ["On Time", "Late", "Scheduled", "Off Scheduled"];
+
+const parseAttendanceDate = value => {
+  if (!value) return null;
+  const parsed = new Date(String(value).replace(" ", "T"));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const buildAllAttendanceHighlights = records => {
+  const totals = (Array.isArray(records) ? records : []).reduce((acc, row) => {
+    const timeIn = parseAttendanceDate(row?.time_in_at);
+    const timeOut = parseAttendanceDate(row?.time_out_at);
+    const status = String(row?.attendance_tag ?? row?.tag ?? "").toLowerCase();
+
+    if (timeIn && timeOut && timeOut >= timeIn) {
+      acc.totalHours += (timeOut.getTime() - timeIn.getTime()) / (1000 * 60 * 60);
+    }
+
+    if (timeIn) {
+      acc.daysPresent.add(`${row?.user_id ?? row?.employee_id ?? "unknown"}-${timeIn.toISOString().slice(0, 10)}`);
+    }
+
+    if (status.includes("late")) acc.totalLate += 1;
+    if (status.includes("overtime") || status.includes("over time")) acc.overtime += 1;
+    return acc;
+  }, {
+    totalHours: 0,
+    daysPresent: new Set(),
+    totalLate: 0,
+    overtime: 0
+  });
+
+  return [
+    { key: "totalHours", label: "Total Hours", icon: "◷", accentClass: "is-slate", value: totals.totalHours.toFixed(2), subValue: "Calculated from logs" },
+    { key: "daysPresent", label: "Days Present", icon: "◉", accentClass: "is-green", value: totals.daysPresent.size, subValue: "Logged attendance days" },
+    { key: "totalLate", label: "Total Late", icon: "!", accentClass: "is-amber", value: totals.totalLate, subValue: "Requires attention" },
+    { key: "overtime", label: "Overtime", icon: "↗", accentClass: "is-blue", value: totals.overtime.toFixed(2), subValue: "Tagged overtime logs" },
+  ];
+};
 
 export default function AdminDashboard() {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -50,6 +96,16 @@ export default function AdminDashboard() {
     return `${hour}:${minute.toString().padStart(2, "0")}`;
   });
   const MAX_SHIFT_MINUTES = 9 * 60;
+  const createDefaultScheduleForm = () => ({
+    days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+    daySchedules: {
+      Mon: { ...defaultDaySchedule },
+      Tue: { ...defaultDaySchedule },
+      Wed: { ...defaultDaySchedule },
+      Thu: { ...defaultDaySchedule },
+      Fri: { ...defaultDaySchedule }
+    }
+  });
   const [clusters, setClusters] = useState([]);
   const [rejectingCluster, setRejectingCluster] = useState(null);
   const [activeNav, setActiveNav] = useState("Dashboard");
@@ -65,35 +121,34 @@ export default function AdminDashboard() {
   const [requestActionLoadingId, setRequestActionLoadingId] = useState("");
   const [scheduleModalMessage, setScheduleModalMessage] = useState("");
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState({
-    days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
-    daySchedules: {
-      Mon: { ...defaultDaySchedule },
-      Tue: { ...defaultDaySchedule },
-      Wed: { ...defaultDaySchedule },
-      Thu: { ...defaultDaySchedule },
-      Fri: { ...defaultDaySchedule }
-    }
-  });
+  const [scheduleForm, setScheduleForm] = useState(() => createDefaultScheduleForm());
   const [attendanceDate, setAttendanceDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [editingCoachAttendance, setEditingCoachAttendance] = useState(null);
   const [editForm, setEditForm] = useState({ timeInAt: "", timeOutAt: "", tag: "", note: "" });
+  const [editAttendanceMessage, setEditAttendanceMessage] = useState("");
+  const [isSavingEditAttendance, setIsSavingEditAttendance] = useState(false);
+  const [attendanceLog, setAttendanceLog] = useState({ timeInAt: null, timeOutAt: null, tag: null });
+  const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
+  const { confirm } = useFeedback();
   const { hasPermission } = usePermissions();
-  const canAccessControlPanel = hasPermission("Access Control Panel");
-  const canViewEmployeeList = hasPermission("View Employee List");
-  const canAddEmployee = hasPermission("Add Employee");
-  const canEditEmployee = hasPermission("Edit Employee");
-  const canDeleteEmployee = hasPermission("Delete Employee");
-  const canAccessEmployeesTab = canViewEmployeeList || canAddEmployee || canEditEmployee || canDeleteEmployee;
-  const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "Team Request"];
+  const {
+    canViewDashboard,
+    canViewTeam,
+    canViewAttendance,
+    canEditAttendance,
+    canAccessControlPanel,
+    canAccessEmployeesTab
+  } = getFeatureAccess(hasPermission);
+  const attendanceNavItems = ["My Attendance", "All Attendance", "My Requests", "My Filing Center", "File Request"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
+  const [filingCenterInitialTab, setFilingCenterInitialTab] = useState("leave");
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
   const navItems = [
-    { label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") },
-    { label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") },
-    {
+    ...(canViewDashboard ? [{ label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") }] : []),
+    ...(canViewTeam ? [{ label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") }] : []),
+    ...(canViewAttendance ? [{
       label: "Attendance",
       active: isAttendanceView,
       expanded: attendanceExpanded,
@@ -103,27 +158,82 @@ export default function AdminDashboard() {
         active: (label === "My Attendance" && activeNav === "Attendance") || activeNav === label,
         onClick: () => setActiveNav(label === "My Attendance" ? "Attendance" : label)
       }))
-    },
-    { label: "Team Coach Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") },
+    }] : []),
+    ...(canViewTeam ? [{ label: "Team Coach Schedule", active: activeNav === "Schedule", onClick: () => setActiveNav("Schedule") }] : []),
     ...(canAccessEmployeesTab ? [{ label: "Employees", active: activeNav === "Employees", onClick: () => setActiveNav("Employees") }] : []),
     ...(canAccessControlPanel ? [{ label: "Control Panel", active: activeNav === "Control Panel", onClick: () => setActiveNav("Control Panel") }] : [])
   ];
 
   useEffect(() => {
-    if (!canAccessControlPanel && activeNav === "Control Panel") {
-      setActiveNav("Dashboard");
-    }
-  }, [activeNav, canAccessControlPanel]);
+    const canAccessActiveNav = (
+      (activeNav === "Dashboard" && canViewDashboard)
+      || ((activeNav === "Team" || activeNav === "Schedule") && canViewTeam)
+      || ((activeNav === "Attendance" || attendanceNavItems.includes(activeNav)) && canViewAttendance)
+      || (activeNav === "Employees" && canAccessEmployeesTab)
+      || (activeNav === "Control Panel" && canAccessControlPanel)
+    );
 
-  useEffect(() => {
-    if (!canAccessEmployeesTab && activeNav === "Employees") {
-      setActiveNav("Dashboard");
+    if (canAccessActiveNav) {
+      return;
     }
-  }, [activeNav, canAccessEmployeesTab]);
+
+    if (canViewDashboard) {
+      setActiveNav("Dashboard");
+      return;
+    }
+
+    if (canViewTeam) {
+      setActiveNav("Team");
+      return;
+    }
+
+    if (canViewAttendance) {
+      setActiveNav("Attendance");
+      return;
+    }
+
+    if (canAccessEmployeesTab) {
+      setActiveNav("Employees");
+      return;
+    }
+
+    if (canAccessControlPanel) {
+      setActiveNav("Control Panel");
+    }
+  }, [activeNav, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
+
+  const normalizeScheduleForm = coachSchedule => {
+    const nextForm = createDefaultScheduleForm();
+    const assignedDays = Array.isArray(coachSchedule?.days)
+      ? coachSchedule.days.filter(day => dayOptions.includes(day))
+      : [];
+
+    if (assignedDays.length > 0) {
+      nextForm.days = assignedDays;
+    }
+
+    assignedDays.forEach(day => {
+      nextForm.daySchedules[day] = {
+        ...defaultDaySchedule,
+        ...(coachSchedule?.daySchedules?.[day] ?? {})
+      };
+    });
+
+    return nextForm;
+  };
 
   const formatTimeRange = daySchedule => {
     if (!daySchedule || typeof daySchedule !== "object") return "—";
-    return FIXED_SHIFT_LABEL;
+
+    const {
+      startTime,
+      startPeriod,
+      endTime,
+      endPeriod
+    } = daySchedule;
+
+    if (!startTime || !startPeriod || !endTime || !endPeriod) return "Schedule set";
+    return `${startTime} ${startPeriod} - ${endTime} ${endPeriod}`;
   };
 
 
@@ -238,19 +348,29 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
+    if (!canViewTeam) {
+      setClusters([]);
+      return undefined;
+    }
+
     fetchClusters();
     const interval = setInterval(fetchClusters, 5000);
     return () => clearInterval(interval);
-  }, [fetchClusters]);
+  }, [canViewTeam, fetchClusters]);
 
   useEffect(() => {
+    if (!canViewAttendance) {
+      setMyRequests([]);
+      return;
+    }
+
     fetchMyRequests().then(response => {
       setMyRequests(Array.isArray(response) ? response : []);
     }).catch(() => setMyRequests([]));
-  }, []);
+  }, [canViewAttendance]);
 
   useEffect(() => {
-    if (activeNav !== "Team Request") return;
+    if (!canViewAttendance || !["Dashboard", "File Request"].includes(activeNav)) return;
 
     fetchAdminTeamRequests()
       .then(response => {
@@ -259,12 +379,98 @@ export default function AdminDashboard() {
       })
       .catch(() => {
         setTeamRequests([]);
-        setTeamRequestsError("Unable to load endorsed team requests.");
+        setTeamRequestsError("Unable to load endorsed file requests.");
       });
-  }, [activeNav]);
+  }, [activeNav, canViewAttendance]);
+
+  const isSameCalendarDay = (firstDate, secondDate) => {
+    if (!(firstDate instanceof Date) || Number.isNaN(firstDate.getTime())) return false;
+    if (!(secondDate instanceof Date) || Number.isNaN(secondDate.getTime())) return false;
+
+    return (
+      firstDate.getFullYear() === secondDate.getFullYear()
+      && firstDate.getMonth() === secondDate.getMonth()
+      && firstDate.getDate() === secondDate.getDate()
+    );
+  };
+
+  const persistAttendance = async nextAttendance => {
+    setIsSavingAttendance(true);
+
+    try {
+      const response = await apiFetch("api/admin/save_attendance.php", {
+        method: "POST",
+        body: JSON.stringify({
+          ...nextAttendance,
+          timeInAt: nextAttendance.timeInAt ? toLocalSqlDateTime(nextAttendance.timeInAt) : null,
+          timeOutAt: nextAttendance.timeOutAt ? toLocalSqlDateTime(nextAttendance.timeOutAt) : null,
+        })
+      });
+
+      const savedAttendance = {
+        timeInAt: parseSqlDateTime(response?.attendance?.timeInAt ?? null),
+        timeOutAt: parseSqlDateTime(response?.attendance?.timeOutAt ?? null),
+        tag: response?.attendance?.tag ?? null,
+      };
+
+      setAttendanceLog(savedAttendance);
+      return savedAttendance;
+    } finally {
+      setIsSavingAttendance(false);
+    }
+  };
+
+  const handleTimeIn = async () => {
+    if (isSavingAttendance || (attendanceLog.timeInAt && !attendanceLog.timeOutAt)) return;
+
+    const now = new Date();
+    const scheduledStartMinutes = 9 * 60;
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const tag = nowMinutes <= scheduledStartMinutes + 15 ? "On Time" : "Late";
+
+    await persistAttendance({
+      timeInAt: now,
+      timeOutAt: null,
+      tag
+    });
+
+    if (activeNav === "Attendance") {
+      const refreshed = await apiFetch("api/admin/admin_my_attendance_history.php");
+      setCoachAttendance(Array.isArray(refreshed) ? refreshed : []);
+    }
+  };
+
+  const handleTimeOut = async () => {
+    if (isSavingAttendance || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
+
+    await persistAttendance({
+      ...attendanceLog,
+      timeOutAt: new Date()
+    });
+
+    if (activeNav === "Attendance") {
+      const refreshed = await apiFetch("api/admin/admin_my_attendance_history.php");
+      setCoachAttendance(Array.isArray(refreshed) ? refreshed : []);
+    }
+  };
+
+  const getAdminTeamRequestActionConfirmationMessage = (request, status) => {
+    const requestType = request?.request_type ?? "this request";
+    if (status === "Approved") return `Are you sure you want to accept ${requestType}?`;
+    if (status === "Denied") return `Are you sure you want to reject ${requestType}?`;
+    return `Are you sure you want to update ${requestType}?`;
+  };
 
   const handleAdminTeamRequestAction = async (request, status) => {
     if (!request?.id || !request?.request_source) return;
+
+    const hasConfirmedAction = await confirm({
+      title: status === "Approved" ? "Accept request?" : status === "Denied" ? "Reject request?" : "Confirm request action",
+      message: getAdminTeamRequestActionConfirmationMessage(request, status),
+      confirmLabel: status === "Approved" ? "Accept" : status === "Denied" ? "Reject" : "Confirm",
+      variant: status === "Denied" ? "danger" : "primary"
+    });
+    if (!hasConfirmedAction) return;
 
     setRequestActionLoadingId(request.id);
     setTeamRequestsError("");
@@ -277,7 +483,7 @@ export default function AdminDashboard() {
 
       setTeamRequests(prev => prev.map(item => (item.id === request.id ? { ...item, status } : item)));
     } catch (error) {
-      setTeamRequestsError(error?.error ?? "Unable to finalize team request status.");
+      setTeamRequestsError(error?.error ?? "Unable to finalize file request status.");
     } finally {
       setRequestActionLoadingId("");
     }
@@ -285,18 +491,34 @@ export default function AdminDashboard() {
 
 
   useEffect(() => {
+    if (!canViewAttendance || activeNav !== "Dashboard") return;
+
+    const today = new Date().toISOString().slice(0, 10);
+    apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${today}`)
+      .then(data => {
+        const currentAttendance = Array.isArray(data) ? data[0] ?? null : null;
+        setAttendanceLog({
+          timeInAt: parseSqlDateTime(currentAttendance?.time_in_at ?? null),
+          timeOutAt: parseSqlDateTime(currentAttendance?.time_out_at ?? null),
+          tag: currentAttendance?.attendance_tag ?? null
+        });
+      })
+      .catch(() => setAttendanceLog({ timeInAt: null, timeOutAt: null, tag: null }));
+  }, [activeNav, canViewAttendance]);
+
+  useEffect(() => {
     if (activeNav !== "Attendance") return;
-    apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${attendanceDate}`)
+    apiFetch("api/admin/admin_my_attendance_history.php")
       .then(data => setCoachAttendance(Array.isArray(data) ? data : []))
       .catch(() => setCoachAttendance([]));
-  }, [activeNav, attendanceDate]);
+  }, [activeNav]);
 
   useEffect(() => {
     if (activeNav !== "All Attendance") return;
-    apiFetch(`api/admin/admin_all_attendance.php?attendance_date=${attendanceDate}`)
+    apiFetch("api/admin/admin_all_attendance_history.php")
       .then(data => setAllAttendance(Array.isArray(data) ? data : []))
       .catch(() => setAllAttendance([]));
-  }, [activeNav, attendanceDate]);
+  }, [activeNav]);
 
   const toDateTimeLocalValue = value => {
     if (!value) return "";
@@ -318,33 +540,60 @@ export default function AdminDashboard() {
       tag: row.attendance_tag ?? "",
       note: row.attendance_note ?? ""
     });
+    setEditAttendanceMessage("");
+  };
+
+  const handleCloseAttendanceEdit = () => {
+    setEditingCoachAttendance(null);
+    setEditAttendanceMessage("");
   };
 
   const saveCoachAttendanceEdit = async () => {
-    if (!editingCoachAttendance?.attendance_id) return;
-    await apiFetch("api/admin/admin_update_coach_attendance.php", {
-      method: "POST",
-      body: JSON.stringify({
-        attendance_id: editingCoachAttendance.attendance_id,
-        timeInAt: editForm.timeInAt ? `${editForm.timeInAt.replace("T", " ")}:00` : null,
-        timeOutAt: editForm.timeOutAt ? `${editForm.timeOutAt.replace("T", " ")}:00` : null,
-        tag: editForm.tag,
-        note: editForm.note
-      })
-    });
-    setEditingCoachAttendance(null);
-    const refreshed = await apiFetch(`api/admin/admin_my_attendance.php?attendance_date=${attendanceDate}`);
-    setCoachAttendance(Array.isArray(refreshed) ? refreshed : []);
-  };
+    if (!editingCoachAttendance?.attendance_id || isSavingEditAttendance) return;
 
-  const handleLogout = async () => {
+    setIsSavingEditAttendance(true);
+    setEditAttendanceMessage("");
+
     try {
-      await apiFetch("auth/logout.php", { method: "POST" });
+      const updatedAttendance = await apiFetch("api/admin/admin_update_coach_attendance.php", {
+        method: "POST",
+        body: JSON.stringify({
+          attendance_id: editingCoachAttendance.attendance_id,
+          employee_id: editingCoachAttendance.user_id ?? null,
+          timeInAt: editForm.timeInAt ? `${editForm.timeInAt.replace("T", " ")}:00` : null,
+          timeOutAt: editForm.timeOutAt ? `${editForm.timeOutAt.replace("T", " ")}:00` : null,
+          tag: editForm.tag.trim() || null,
+          note: editForm.note
+        })
+      });
+
+      const refreshed = await apiFetch("api/admin/admin_all_attendance_history.php");
+      const normalizedAttendance = Array.isArray(refreshed) ? refreshed : [];
+      setAllAttendance(normalizedAttendance);
+
+      const refreshedRow = normalizedAttendance.find(row => Number(row.attendance_id) === Number(editingCoachAttendance.attendance_id));
+      if (refreshedRow) {
+        setEditingCoachAttendance(refreshedRow);
+        setEditForm({
+          timeInAt: toDateTimeLocalValue(refreshedRow.time_in_at),
+          timeOutAt: toDateTimeLocalValue(refreshedRow.time_out_at),
+          tag: refreshedRow.attendance_tag ?? "",
+          note: refreshedRow.attendance_note ?? ""
+        });
+      } else if (updatedAttendance?.attendance) {
+        setEditForm({
+          timeInAt: toDateTimeLocalValue(updatedAttendance.attendance.time_in_at),
+          timeOutAt: toDateTimeLocalValue(updatedAttendance.attendance.time_out_at),
+          tag: updatedAttendance.attendance.attendance_tag ?? updatedAttendance.attendance.tag ?? "",
+          note: updatedAttendance.attendance.attendance_note ?? updatedAttendance.attendance.note ?? ""
+        });
+      }
+
+      setEditAttendanceMessage("Attendance updated successfully.");
     } catch (error) {
-      console.error("Logout failed", error);
+      setEditAttendanceMessage(error?.error ?? "Unable to update attendance record.");
     } finally {
-      localStorage.removeItem("teamClusterUser");
-      window.location.href = "/login";
+      setIsSavingEditAttendance(false);
     }
   };
 
@@ -364,11 +613,29 @@ export default function AdminDashboard() {
     setScheduleForm(current => {
       const currentDay = current.daySchedules[day] ?? { ...defaultDaySchedule };
       const nextDay = { ...currentDay };
-      if (["startTime", "endTime", "breakStart", "breakEnd"].includes(field)) {
-        return current;
-      }
+      const [time, period] = String(value).split("|");
 
-      nextDay[field] = value;
+      if (["endTime", "breakStart", "breakEnd"].includes(field)) {
+        if (field === "endTime") {
+          nextDay.endTime = time ?? currentDay.endTime;
+          nextDay.endPeriod = period ?? currentDay.endPeriod;
+        }
+
+        if (field === "breakStart") {
+          nextDay.breakStartTime = time ?? currentDay.breakStartTime;
+          nextDay.breakStartPeriod = period ?? currentDay.breakStartPeriod;
+        }
+
+        if (field === "breakEnd") {
+          nextDay.breakEndTime = time ?? currentDay.breakEndTime;
+          nextDay.breakEndPeriod = period ?? currentDay.breakEndPeriod;
+        }
+      } else if (field === "startTime") {
+        nextDay.startTime = time ?? currentDay.startTime;
+        nextDay.startPeriod = period ?? currentDay.startPeriod;
+      } else {
+        nextDay[field] = value;
+      }
 
       const endTimeOptions = getEndTimeOptions(nextDay.startTime, nextDay.startPeriod);
       const hasSelectedEndTime = endTimeOptions.some(
@@ -422,11 +689,13 @@ export default function AdminDashboard() {
 
   const handleOpenScheduleModal = cluster => {
     setManagingScheduleCluster(cluster);
+    setScheduleForm(normalizeScheduleForm(cluster?.coach_schedule));
     setScheduleModalMessage("");
   };
 
   const handleCloseScheduleModal = () => {
     setManagingScheduleCluster(null);
+    setScheduleForm(createDefaultScheduleForm());
     setScheduleModalMessage("");
   };
 
@@ -443,21 +712,17 @@ export default function AdminDashboard() {
     setScheduleModalMessage("");
 
     const normalizedSchedule = {
-      ...scheduleForm,
+      days: scheduleForm.days.filter(day => dayOptions.includes(day)),
       daySchedules: Object.fromEntries(
         Object.entries(scheduleForm.daySchedules).map(([day, daySchedule]) => [
           day,
           {
+            ...defaultDaySchedule,
             ...daySchedule,
-            shiftType: "Morning Shift",
-            startTime: FIXED_SHIFT_START.time,
-            startPeriod: FIXED_SHIFT_START.period,
-            endTime: FIXED_SHIFT_END.time,
-            endPeriod: FIXED_SHIFT_END.period,
-            breakStartTime: FIXED_BREAK_START.time,
-            breakStartPeriod: FIXED_BREAK_START.period,
-            breakEndTime: FIXED_BREAK_END.time,
-            breakEndPeriod: FIXED_BREAK_END.period
+            shiftType: getAutomaticShiftType(
+              daySchedule?.startTime ?? defaultDaySchedule.startTime,
+              daySchedule?.startPeriod ?? defaultDaySchedule.startPeriod
+            )
           }
         ])
       )
@@ -530,6 +795,7 @@ const handleOpenRejectModal = cluster => {
 
   const myRequestHighlights = buildRequestHighlights(myRequests);
   const teamRequestHighlights = buildRequestHighlights(teamRequests);
+  const allAttendanceHighlights = useMemo(() => buildAllAttendanceHighlights(allAttendance), [allAttendance]);
 
   const formatDate = dateString => {
     if (!dateString) return "—";
@@ -545,28 +811,43 @@ const handleOpenRejectModal = cluster => {
         roleLabel="Admin"
         userName={user?.fullname}
         navItems={navItems}
-        onLogout={handleLogout}
+        onLogout={logout}
       />
 
       <main className="main">
-        {activeNav === "Dashboard" ? (
+        {activeNav === "Dashboard" && canViewDashboard ? (
           <section className="content">
             <MainDashboard
               showMemberStatusCard
+              fileRequests={teamRequests}
+              onViewFileRequests={() => setActiveNav("File Request")}
+              attendanceControls={{
+                timeInAt: attendanceLog.timeInAt,
+                timeOutAt: attendanceLog.timeOutAt,
+                canClickTimeIn: !isSavingAttendance && !(attendanceLog.timeInAt && !attendanceLog.timeOutAt),
+                canClickTimeOut: !isSavingAttendance && Boolean(attendanceLog.timeInAt && !attendanceLog.timeOutAt),
+                hasCompletedShift: isSameCalendarDay(attendanceLog.timeOutAt, new Date()) && !(attendanceLog.timeInAt && !attendanceLog.timeOutAt),
+                onTimeIn: handleTimeIn,
+                onTimeOut: handleTimeOut
+              }}
               schedule={adminMainDashboardSchedule}
               dashboardMeta={{
+                attendanceTag: resolveAttendanceMainTag({
+                  attendanceTag: attendanceLog.tag,
+                  schedule: adminMainDashboardSchedule,
+                  timeInAt: attendanceLog.timeInAt,
+                  fallbackTag: attendanceLog.timeInAt ? "Present" : "Scheduled"
+                }),
                 scheduleTag: "Fixed schedule",
-                breakTime: FIXED_BREAK_LABEL
+                breakTag: "Break inactive",
+                breakTime: FIXED_BREAK_LABEL,
+                availabilityLabel: attendanceLog.timeInAt && !attendanceLog.timeOutAt ? "Available" : "Not available"
               }}
             />
           </section>
-        ) : activeNav === "Team" ? (
+        ) : activeNav === "Team" && canViewTeam ? (
           <>
             <header className="topbar">
-              <div>
-                <h2>TEAM</h2>
-                <div className="section-title">Admin Dashboard</div>
-              </div>
               <span className="datetime">{dateTimeLabel}</span>
             </header>
 
@@ -623,45 +904,50 @@ const handleOpenRejectModal = cluster => {
               )}
           </section>
           </>
-        ) : activeNav === "Attendance" ? (
+        ) : activeNav === "Attendance" && canViewAttendance ? (
           <section className="content">
             <div className="section-title">My Attendance</div>
-            <AttendanceHistoryHighlights />
-            <DataPanel
-              type="attendance"
-              records={coachAttendance}
-              externalDateFilter={attendanceDate}
-              onExternalDateFilterChange={setAttendanceDate}
-            />
+            <div className="employee-card">
+              <div className="employee-card-body employee-card-body-flush">
+                <AttendanceModule records={coachAttendance} onDisputeClick={() => { setFilingCenterInitialTab("dispute"); setActiveNav("My Filing Center"); }} />
+              </div>
+            </div>
           </section>
-          ) : activeNav === "All Attendance" ? (
+          ) : activeNav === "All Attendance" && canViewAttendance ? (
           <section className="content">
-            <div className="section-title">All Attendance</div>
-            <AttendanceHistoryHighlights />
-            <DataPanel
-              type="attendance"
-              records={allAttendance}
-              personField="employee_name"
-              personLabel="Employee"
-              onEditRow={openAttendanceEdit}
-              externalDateFilter={attendanceDate}
-              onExternalDateFilterChange={setAttendanceDate}
-            />
+            <div className="employee-card employee-attendance-history-card">
+              <div className="employee-card-header">
+                <div className="employee-card-title">All Attendance</div>
+                <p className="employee-card-subtitle">Review all attendance logs across employees and coaches with the same polished summary view used in My Attendance.</p>
+              </div>
+              <div className="employee-card-body">
+                <AttendanceHistoryHighlights highlights={allAttendanceHighlights} />
+                <DataPanel
+                  type="attendance"
+                  records={allAttendance}
+                  personField="employee_name"
+                  personLabel="Name"
+                  onEditRow={canEditAttendance ? openAttendanceEdit : undefined}
+                  externalDateFilter={attendanceDate}
+                  onExternalDateFilterChange={setAttendanceDate}
+                />
+              </div>
+            </div>
           </section>
-        ) : activeNav === "My Requests" ? (
+        ) : activeNav === "My Requests" && canViewAttendance ? (
           <section className="content">
             <div className="section-title">My Requests</div>
             <AttendanceHistoryHighlights highlights={myRequestHighlights} />
-            <DataPanel type="requests" records={myRequests} />
+            <DataPanel type="requests" records={myRequests} enableRequestFilters showRequestActionBy />
           </section>
-        ) : activeNav === "My Filing Center" ? (
+        ) : activeNav === "My Filing Center" && canViewAttendance ? (
           <section className="content">
-            <FilingCenterPanel onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
+            <FilingCenterPanel initialTab={filingCenterInitialTab} onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
           </section>
-        ) : activeNav === "Team Request" ? (
+        ) : activeNav === "File Request" && canViewAttendance ? (
           <section className="content">
-            <div className="section-title">Team Requests</div>
-            <p className="table-subtitle">Endorsed team requests waiting for final admin approval or rejection.</p>
+            <div className="section-title">File Requests</div>
+            <p className="table-subtitle">Endorsed file requests waiting for final admin approval or rejection.</p>
             <AttendanceHistoryHighlights highlights={teamRequestHighlights} />
             {teamRequestsError && <div className="error">{teamRequestsError}</div>}
             <DataPanel
@@ -673,11 +959,14 @@ const handleOpenRejectModal = cluster => {
                 { label: "Accept", status: "Approved", variant: "btn", allowedStatuses: ["endorsed"] },
                 { label: "Reject", status: "Denied", variant: "btn secondary", allowedStatuses: ["endorsed"] }
               ]}
+              enableRequestFilters
+              personField="employee_name"
+              personLabel="Name"
             />
           </section>
-        ) : activeNav === "Employees" ? (
+        ) : activeNav === "Employees" && canAccessEmployeesTab ? (
           <EmployeesSection />
-        ) : activeNav === "Schedule" ? (
+        ) : activeNav === "Schedule" && canViewTeam ? (
           <section className="content">
             <div className="section-title">Team Coach Schedule</div>
             {clusters.length === 0 ? (
@@ -764,20 +1053,31 @@ const handleOpenRejectModal = cluster => {
       </main>
 
       {editingCoachAttendance && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-card reject-modal-card">
-            <div className="modal-header">
+        <div className="modal-overlay" role="presentation" onClick={handleCloseAttendanceEdit}>
+          <section className="modal-card attendance-edit-modal" role="dialog" aria-modal="true" onClick={event => event.stopPropagation()}>
+            <header className="modal-header">
               <div className="modal-title">Edit Coach Attendance</div>
-              <button className="btn link modal-close-btn" type="button" onClick={() => setEditingCoachAttendance(null)}>Close</button>
-            </div>
+              <button className="btn secondary" type="button" onClick={handleCloseAttendanceEdit}>Close</button>
+            </header>
             <div className="modal-body">
-              <label className="form-field">Time In<input type="datetime-local" value={editForm.timeInAt} onChange={event => setEditForm(curr => ({ ...curr, timeInAt: event.target.value }))} /></label>
-              <label className="form-field">Time Out<input type="datetime-local" value={editForm.timeOutAt} onChange={event => setEditForm(curr => ({ ...curr, timeOutAt: event.target.value }))} /></label>
-              <label className="form-field">Tag<input type="text" value={editForm.tag} onChange={event => setEditForm(curr => ({ ...curr, tag: event.target.value }))} /></label>
-              <label className="form-field">Note<input type="text" value={editForm.note} onChange={event => setEditForm(curr => ({ ...curr, note: event.target.value }))} /></label>
-              <div className="form-actions"><button className="btn" type="button" onClick={saveCoachAttendanceEdit}>Save</button></div>
+              <div className="attendance-history-range-filter" role="group" aria-label="Edit coach attendance values">
+                <label className="attendance-history-filter" htmlFor="admin-attendance-time-in"><span>Time In</span><input id="admin-attendance-time-in" type="datetime-local" value={editForm.timeInAt} onChange={event => setEditForm(curr => ({ ...curr, timeInAt: event.target.value }))} /></label>
+                <label className="attendance-history-filter" htmlFor="admin-attendance-time-out"><span>Time Out</span><input id="admin-attendance-time-out" type="datetime-local" value={editForm.timeOutAt} onChange={event => setEditForm(curr => ({ ...curr, timeOutAt: event.target.value }))} /></label>
+                <label className="attendance-history-filter" htmlFor="admin-attendance-tag">
+                  <span>Tag</span>
+                  <select id="admin-attendance-tag" value={editForm.tag} onChange={event => setEditForm(curr => ({ ...curr, tag: event.target.value }))}>
+                    <option value="">Select tag</option>
+                    {attendanceTagOptions.map(tag => <option key={tag} value={tag}>{tag}</option>)}
+                  </select>
+                </label>
+                <label className="attendance-history-filter" htmlFor="admin-attendance-note"><span>Note</span><input id="admin-attendance-note" type="text" value={editForm.note} onChange={event => setEditForm(curr => ({ ...curr, note: event.target.value }))} /></label>
+              </div>
+              <div className="attendance-edit-actions">
+                <button className="btn primary" type="button" disabled={isSavingEditAttendance} onClick={saveCoachAttendanceEdit}>{isSavingEditAttendance ? "Saving..." : "Save Attendance"}</button>
+                {editAttendanceMessage && <span className="attendance-detail-value">{editAttendanceMessage}</span>}
+              </div>
             </div>
-          </div>
+          </section>
         </div>
       )}
 
@@ -807,16 +1107,46 @@ const handleOpenRejectModal = cluster => {
                   {dayOptions.map(day => {
                     const isWorkingDay = scheduleForm.days.includes(day);
                     const daySchedule = scheduleForm.daySchedules[day] ?? { ...defaultDaySchedule };
-                    const shiftHours = getMinutesBetween(daySchedule.startTime, daySchedule.startPeriod, daySchedule.endTime, daySchedule.endPeriod);
-                    const shiftHoursLabel = `${Math.floor(shiftHours / 60)}h ${shiftHours % 60}m`;
-                    const breakMinutes = getMinutesBetween(daySchedule.breakStartTime, daySchedule.breakStartPeriod, daySchedule.breakEndTime, daySchedule.breakEndPeriod);
-                    const breakLabel = `${Math.floor(breakMinutes / 60)}h ${breakMinutes % 60}m`;
+                    const endTimeOptions = getEndTimeOptions(
+                      daySchedule.startTime,
+                      daySchedule.startPeriod
+                    );
+                    const shiftRangeOptions = getTimeOptionsWithinRange(
+                      daySchedule.startTime,
+                      daySchedule.startPeriod,
+                      daySchedule.endTime,
+                      daySchedule.endPeriod
+                    );
+                    const breakEndOptions = getTimeOptionsWithinRange(
+                      daySchedule.breakStartTime,
+                      daySchedule.breakStartPeriod,
+                      daySchedule.endTime,
+                      daySchedule.endPeriod
+                    );
+                    const shiftMinutes = getMinutesBetween(
+                      daySchedule.startTime,
+                      daySchedule.startPeriod,
+                      daySchedule.endTime,
+                      daySchedule.endPeriod
+                    );
+                    const breakMinutes = getMinutesBetween(
+                      daySchedule.breakStartTime,
+                      daySchedule.breakStartPeriod,
+                      daySchedule.breakEndTime,
+                      daySchedule.breakEndPeriod
+                    );
+                    const shiftHoursLabel = `${Math.floor(shiftMinutes / 60)} hrs`;
+                    const breakLabel = `${breakMinutes} mins`;
 
                     return (
                       <div key={day} className="schedule-day-row">
                         <div className="schedule-day-header">
                           <label className="schedule-day-toggle">
-                            <input type="checkbox" checked={isWorkingDay} onChange={() => handleToggleScheduleDay(day)} />
+                            <input
+                              type="checkbox"
+                              checked={isWorkingDay}
+                              onChange={() => handleToggleScheduleDay(day)}
+                            />
                             <span>{day}</span>
                           </label>
                           <span className={`schedule-day-status ${isWorkingDay ? "is-working" : "is-off"}`}>
@@ -829,11 +1159,41 @@ const handleOpenRejectModal = cluster => {
                               <div className="schedule-panel-title">Main Shift</div>
                               <div className="schedule-time-row schedule-field">
                                 <div className="schedule-time-label">Start Time</div>
-                                <input type="text" value={`${daySchedule.startTime} ${daySchedule.startPeriod}`} readOnly />
+                                <div className="schedule-start-time">
+                                  <select
+                                    value={daySchedule.startTime}
+                                    onChange={event => handleChangeDayTime(day, "startTime", event.target.value)}
+                                  >
+                                    {timeOptions.map(time => (
+                                      <option key={`${day}-start-${time}`} value={time}>
+                                        {time}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <select
+                                    value={daySchedule.startPeriod}
+                                    onChange={event => handleChangeDayTime(day, "startPeriod", event.target.value)}
+                                  >
+                                    <option value="AM">AM</option>
+                                    <option value="PM">PM</option>
+                                  </select>
+                                </div>
                               </div>
                               <div className="schedule-time-row schedule-field">
                                 <div className="schedule-time-label">End Time</div>
-                                <input type="text" value={`${daySchedule.endTime} ${daySchedule.endPeriod}`} readOnly />
+                                <select
+                                  value={`${daySchedule.endTime}|${daySchedule.endPeriod}`}
+                                  onChange={event => handleChangeDayTime(day, "endTime", event.target.value)}
+                                >
+                                  {endTimeOptions.map(option => (
+                                    <option
+                                      key={`${day}-end-${option.time}-${option.period}`}
+                                      value={`${option.time}|${option.period}`}
+                                    >
+                                      {option.time} {option.period}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
                               <div className="schedule-panel-total">Total: {shiftHoursLabel}</div>
                             </div>
@@ -845,8 +1205,15 @@ const handleOpenRejectModal = cluster => {
                               </div>
                               <div className="schedule-time-row schedule-field">
                                 <div className="schedule-time-label">Work Setup</div>
-                                <select value={daySchedule.workSetup} onChange={event => handleChangeDayTime(day, "workSetup", event.target.value)}>
-                                  {workSetupOptions.map(option => (<option key={`${day}-work-setup-${option}`} value={option}>{option}</option>))}
+                                <select
+                                  value={daySchedule.workSetup}
+                                  onChange={event => handleChangeDayTime(day, "workSetup", event.target.value)}
+                                >
+                                  {workSetupOptions.map(option => (
+                                    <option key={`${day}-work-setup-${option}`} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
                                 </select>
                               </div>
                             </div>
@@ -854,20 +1221,43 @@ const handleOpenRejectModal = cluster => {
                               <div className="schedule-panel-title">Scheduled Breaks</div>
                               <div className="schedule-time-row schedule-field">
                                 <div className="schedule-time-label">Break Start</div>
-                                <input type="text" value={`${daySchedule.breakStartTime} ${daySchedule.breakStartPeriod}`} readOnly />
+                                <select
+                                  className="schedule-break-select"
+                                  value={`${daySchedule.breakStartTime}|${daySchedule.breakStartPeriod}`}
+                                  onChange={event => handleChangeDayTime(day, "breakStart", event.target.value)}
+                                >
+                                  {shiftRangeOptions.map(option => (
+                                    <option
+                                      key={`${day}-break-start-${option.time}-${option.period}`}
+                                      value={`${option.time}|${option.period}`}
+                                    >
+                                      {option.time} {option.period}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
                               <div className="schedule-time-row schedule-field">
                                 <div className="schedule-time-label">Break End</div>
-                                <input type="text" value={`${daySchedule.breakEndTime} ${daySchedule.breakEndPeriod}`} readOnly />
+                                <select
+                                  className="schedule-break-select"
+                                  value={`${daySchedule.breakEndTime}|${daySchedule.breakEndPeriod}`}
+                                  onChange={event => handleChangeDayTime(day, "breakEnd", event.target.value)}
+                                >
+                                  {breakEndOptions.map(option => (
+                                    <option
+                                      key={`${day}-break-end-${option.time}-${option.period}`}
+                                      value={`${option.time}|${option.period}`}
+                                    >
+                                      {option.time} {option.period}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
                               <div className="schedule-panel-total">Total Break: {breakLabel}</div>
-                              <div className="modal-text">{formatBreakTimeRange(daySchedule.breakStartTime, daySchedule.breakStartPeriod, daySchedule.breakEndTime, daySchedule.breakEndPeriod)}</div>
                             </div>
                           </div>
                         ) : (
-                          <div className="schedule-not-working">
-                            Day is marked as off. Enable it to edit shift and break settings.
-                          </div>
+                          <div className="schedule-not-working">Not working</div>
                         )}
                       </div>
                     );
@@ -893,7 +1283,7 @@ const handleOpenRejectModal = cluster => {
           <div className="modal-card reject-modal-card">
             <div className="modal-header">
               <div>
-                <div id="reject-modal-title" className="modal-title reject-modal-title">Reject Team Request</div>
+                <div id="reject-modal-title" className="modal-title reject-modal-title">Reject File Request</div>
                 <div className="modal-subtitle">{rejectingCluster.name}</div>
               </div>
               <button className="btn link modal-close-btn" type="button" onClick={handleCloseRejectModal}>

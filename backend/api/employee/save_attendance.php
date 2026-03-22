@@ -1,11 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
-if (!in_array($_SESSION["user"]["role"] ?? "", ["employee", "coach"], true)) {
-    http_response_code(403);
-    echo json_encode(["error" => "Forbidden"]);
-    exit;
-}
+requireRoleOrPermission(["employee"], $conn, "Set Attendance");
 
 function getColumns(mysqli $conn, string $table): array {
     $columns = [];
@@ -82,6 +78,79 @@ function mapTagToAttendanceStatus(?string $tag): string {
     if ($normalizedTag === 'late') return 'Late';
     if ($normalizedTag === 'on time') return 'Present';
     return 'Present';
+}
+
+function employeeHasScheduleForDate(mysqli $conn, int $clusterId, int $employeeId, string $attendanceDate): bool {
+    $scheduleColumns = getColumns($conn, 'schedules');
+    if (count($scheduleColumns) === 0) {
+        return false;
+    }
+
+    $dayShort = date('D', strtotime($attendanceDate));
+    $dayMap = [
+        'Mon' => 'Monday',
+        'Tue' => 'Tuesday',
+        'Wed' => 'Wednesday',
+        'Thu' => 'Thursday',
+        'Fri' => 'Friday',
+        'Sat' => 'Saturday',
+        'Sun' => 'Sunday',
+    ];
+    $fullDay = $dayMap[$dayShort] ?? null;
+    if ($fullDay === null) {
+        return false;
+    }
+
+    if (in_array('day_of_week', $scheduleColumns, true)) {
+        $stmt = $conn->prepare(
+            "SELECT 1
+             FROM schedules
+             WHERE cluster_id = ?
+               AND employee_id = ?
+               AND day_of_week = ?
+             LIMIT 1"
+        );
+        if ($stmt) {
+            $stmt->bind_param('iis', $clusterId, $employeeId, $fullDay);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($result && $result->num_rows > 0) {
+                return true;
+            }
+        }
+    }
+
+    if (in_array('schedule', $scheduleColumns, true)) {
+        $scheduleOrderColumn = in_array('id', $scheduleColumns, true)
+            ? 'id'
+            : (in_array('schedule_id', $scheduleColumns, true) ? 'schedule_id' : null);
+
+        $sql = "SELECT schedule
+                FROM schedules
+                WHERE cluster_id = ?
+                  AND employee_id = ?";
+        if ($scheduleOrderColumn !== null) {
+            $sql .= " ORDER BY $scheduleOrderColumn DESC";
+        }
+        $sql .= " LIMIT 1";
+
+        $stmt = $conn->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param('ii', $clusterId, $employeeId);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($result && $result->num_rows > 0) {
+                $rawSchedule = $result->fetch_assoc()['schedule'] ?? null;
+                $decodedSchedule = is_string($rawSchedule) ? json_decode($rawSchedule, true) : null;
+                $days = is_array($decodedSchedule['days'] ?? null) ? $decodedSchedule['days'] : [];
+                if (in_array($dayShort, $days, true)) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
 }
 
 $data = json_decode(file_get_contents("php://input"), true);
@@ -169,6 +238,13 @@ $hasTimeLogTag = in_array('tag', $timeLogColumns, true);
 
 $timeInSql = $timeInAt ? date("Y-m-d H:i:s", strtotime($timeInAt)) : null;
 $timeOutSql = $timeOutAt ? date("Y-m-d H:i:s", strtotime($timeOutAt)) : null;
+$attendanceDate = $timeInSql ? date('Y-m-d', strtotime($timeInSql)) : date('Y-m-d');
+
+if (!employeeHasScheduleForDate($conn, $cluster_id, $employee_id, $attendanceDate)) {
+    http_response_code(403);
+    echo json_encode(["error" => "No schedule found for this day."]);
+    exit;
+}
 
 $timeInValue = $timeInSql ? "'" . $conn->real_escape_string($timeInSql) . "'" : "NULL";
 $timeOutValue = $timeOutSql ? "'" . $conn->real_escape_string($timeOutSql) . "'" : "NULL";
@@ -228,7 +304,6 @@ if ($hasLegacyAttendance) {
         );
     }
 } elseif ($hasNewAttendance) {
-    $attendanceDate = $timeInSql ? date('Y-m-d', strtotime($timeInSql)) : date('Y-m-d');
     $attendanceDateEscaped = "'" . $conn->real_escape_string($attendanceDate) . "'";
     $attendanceStatus = mapTagToAttendanceStatus($tag);
     $attendanceStatusEscaped = "'" . $conn->real_escape_string($attendanceStatus) . "'";

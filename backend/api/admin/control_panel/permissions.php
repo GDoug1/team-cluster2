@@ -1,8 +1,54 @@
 <?php
 include __DIR__ . "/../../../config/database.php";
 include __DIR__ . "/../../../config/auth.php";
+include __DIR__ . "/../../utils/logger.php";
 
 requireRoleOrPermission(["super admin", "admin"], $conn, "Access Control Panel");
+
+function normalizeRoleName(string $roleName): string {
+    return strtolower(trim($roleName));
+}
+
+function getRestrictedPermissionNamesForRole(string $roleName): array {
+    $normalizedRole = normalizeRoleName($roleName);
+
+    if ($normalizedRole === 'employee') {
+        return [
+            'Access Control Panel',
+            'Add Employee',
+            'Edit Employee',
+            'Delete Employee',
+            'Set Attendance',
+            'Edit Attendance',
+            'View Employee List'
+        ];
+    }
+
+    if ($normalizedRole === 'team coach' || $normalizedRole === 'coach') {
+        return [
+            'Access Control Panel',
+            'Add Employee',
+            'Edit Employee',
+            'Delete Employee'
+        ];
+    }
+
+    return [];
+}
+
+function getPermissionIdNameMap(mysqli $conn): array {
+    $result = $conn->query("SELECT permission_id, permission_name FROM permissions");
+    if (!$result) {
+        return [];
+    }
+
+    $permissionMap = [];
+    while ($row = $result->fetch_assoc()) {
+        $permissionMap[(int)$row['permission_id']] = (string)$row['permission_name'];
+    }
+
+    return $permissionMap;
+}
 
 function getAllPermissions(mysqli $conn): array {
     $result = $conn->query("SELECT permission_id, permission_name FROM permissions ORDER BY permission_id ASC");
@@ -100,7 +146,9 @@ function getUserPermissions(mysqli $conn): array {
     $userMap = [];
     while ($row = $usersResult->fetch_assoc()) {
         $userId = (int)($row['user_id'] ?? 0);
-        if ($userId <= 0) continue;
+        if ($userId <= 0) {
+            continue;
+        }
 
         $userMap[$userId] = [
             'userId' => $userId,
@@ -129,7 +177,9 @@ function getUserPermissions(mysqli $conn): array {
         while ($row = $rolePermissionsResult->fetch_assoc()) {
             $userId = (int)($row['user_id'] ?? 0);
             $permissionName = trim((string)($row['permission_name'] ?? ''));
-            if ($userId <= 0 || $permissionName === '') continue;
+            if ($userId <= 0 || $permissionName === '') {
+                continue;
+            }
 
             if (!isset($effectivePermissionMap[$userId])) {
                 $effectivePermissionMap[$userId] = [];
@@ -152,7 +202,9 @@ function getUserPermissions(mysqli $conn): array {
             $userId = (int)($row['user_id'] ?? 0);
             $permissionName = trim((string)($row['permission_name'] ?? ''));
             $isAllowed = (int)($row['is_allowed'] ?? 0) === 1;
-            if ($userId <= 0 || $permissionName === '') continue;
+            if ($userId <= 0 || $permissionName === '') {
+                continue;
+            }
 
             if (!isset($effectivePermissionMap[$userId])) {
                 $effectivePermissionMap[$userId] = [];
@@ -173,6 +225,38 @@ function getUserPermissions(mysqli $conn): array {
     }
 
     return array_values($userMap);
+}
+
+function getRoleNameById(mysqli $conn, int $roleId): string {
+    $stmt = $conn->prepare("SELECT role_name FROM roles WHERE role_id = ? LIMIT 1");
+    if (!$stmt) {
+        return '';
+    }
+
+    $stmt->bind_param("i", $roleId);
+    if (!$stmt->execute()) {
+        return '';
+    }
+
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+    return (string)($row['role_name'] ?? '');
+}
+
+function sanitizePermissionIdsForRole(mysqli $conn, int $roleId, array $permissionIds): array {
+    $roleName = getRoleNameById($conn, $roleId);
+    $restrictedPermissionNames = getRestrictedPermissionNamesForRole($roleName);
+    if (count($restrictedPermissionNames) === 0) {
+        return $permissionIds;
+    }
+
+    $permissionIdNameMap = getPermissionIdNameMap($conn);
+    $restrictedMap = array_fill_keys($restrictedPermissionNames, true);
+
+    return array_values(array_filter(
+        $permissionIds,
+        static fn($permissionId) => !isset($restrictedMap[$permissionIdNameMap[(int)$permissionId] ?? ''])
+    ));
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -208,21 +292,19 @@ foreach ($permissionIds as $permissionId) {
         $cleanPermissionIds[$value] = true;
     }
 }
-$cleanPermissionIds = array_keys($cleanPermissionIds);
+$cleanPermissionIds = sanitizePermissionIdsForRole($conn, $roleId, array_keys($cleanPermissionIds));
 
 $conn->begin_transaction();
 
 try {
-    if ($roleId > 0) {
-        $deleteStmt = $conn->prepare("DELETE FROM role_permissions WHERE role_id = ?");
-        if (!$deleteStmt) {
-            throw new Exception('Failed to prepare delete statement');
-        }
+    $deleteStmt = $conn->prepare("DELETE FROM role_permissions WHERE role_id = ?");
+    if (!$deleteStmt) {
+        throw new Exception('Failed to prepare delete statement');
+    }
 
-        $deleteStmt->bind_param("i", $roleId);
-        if (!$deleteStmt->execute()) {
-            throw new Exception('Failed to clear role permissions');
-        }
+    $deleteStmt->bind_param("i", $roleId);
+    if (!$deleteStmt->execute()) {
+        throw new Exception('Failed to clear role permissions');
     }
 
     if (count($cleanPermissionIds) > 0) {
@@ -240,6 +322,11 @@ try {
     }
 
     $conn->commit();
+    logCurrentUserAction(
+        $conn,
+        'role_permissions_update',
+        buildAuditTarget('role', $roleId, 'permissions=' . implode(',', $cleanPermissionIds))
+    );
 
     echo json_encode([
         'success' => true,

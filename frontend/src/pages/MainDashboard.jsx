@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createAnnouncement, fetchAnnouncements } from "../api/announcement";
 import "../styles/MainDashboard.css";
 
 function DashboardHeader({ headerTime, headerDate }) {
@@ -13,7 +14,7 @@ function TimeCard({
   counterDisplay,
   hasActiveTimeIn,
   onToggleTimeIn,
-  canToggleTimeIn,
+  isButtonDisabled = false,
   hasScheduleToday = true,
   hasCompletedShift = false,
 }) {
@@ -31,7 +32,7 @@ function TimeCard({
             type="button"
             className="time-in-btn"
             onClick={onToggleTimeIn}
-            disabled={!canToggleTimeIn}
+            disabled={isButtonDisabled}
           >
             {hasActiveTimeIn ? "Time Out" : "Time In"}
           </button>
@@ -41,14 +42,55 @@ function TimeCard({
   );
 }
 
-function AnnouncementCard({ canEdit = true }) {
+function AnnouncementCard({
+  canEdit = true,
+  announcements = [],
+  isLoading = false,
+  errorMessage = "",
+  onCreateAnnouncement = null
+}) {
   return (
     <div className="card announcement-card">
       <div className="card-top">
         <span>Announcement</span>
-        {canEdit ? <button type="button" className="pill-btn">+ Announcement</button> : null}
+        {canEdit ? (
+          <button
+            type="button"
+            className="pill-btn"
+            onClick={onCreateAnnouncement}
+          >
+            + Announcement
+          </button>
+        ) : null}
       </div>
-      <ul className="list-items announcement-list" aria-label="No announcements yet" />
+      <ul
+        className="list-items announcement-list"
+        aria-label={announcements.length > 0 ? "Announcements" : "No announcements yet"}
+      >
+        {isLoading ? (
+          <li className="announcement-empty-state">Loading announcements...</li>
+        ) : errorMessage ? (
+          <li className="announcement-empty-state">{errorMessage}</li>
+        ) : announcements.length > 0 ? (
+          announcements.map(announcement => (
+            <li
+              key={announcement.announcement_id}
+              className="announcement-item announcement-item-stacked"
+            >
+              <div className="announcement-title-row">
+                <div className="announcement-title">{announcement.title}</div>
+                <div className="announcement-meta">{announcement.date_posted}</div>
+              </div>
+              <div className="announcement-content">{announcement.content}</div>
+              <div className="announcement-meta">
+                Posted by {announcement.posted_by_name || "Unknown"}
+              </div>
+            </li>
+          ))
+        ) : (
+          <li className="announcement-empty-state">No announcements yet.</li>
+        )}
+      </ul>
       <div className="mini-actions">{canEdit ? "✎\u00A0\u00A0" : null}◷</div>
     </div>
   );
@@ -110,13 +152,29 @@ function ShiftCard({ schedule = null, dashboardMeta = null }) {
   );
 }
 
-function CalendarCard({ calendarData }) {
+function CalendarCard({ calendarData, onPrevMonth, onNextMonth }) {
   return (
     <div className="card calendar-card">
       <div className="card-top">
+        <button 
+          type="button"
+          className="calendar-nav-btn" 
+          onClick={onPrevMonth}
+          title="Previous month"
+        >
+          ◀
+        </button>
         <span>Calendar</span>
-        <span className="calendar-month">{calendarData.monthLabel}</span>
+        <button 
+          type="button"
+          className="calendar-nav-btn" 
+          onClick={onNextMonth}
+          title="Next month"
+        >
+          ▶
+        </button>
       </div>
+      <div className="calendar-month-label">{calendarData.monthLabel}</div>
       <div className="calendar-grid weekdays">
         {calendarData.weekDays.map(weekday => (
           <div key={weekday} className="calendar-cell header">{weekday}</div>
@@ -190,16 +248,47 @@ function SummaryCard({ timeInStart, totalHours, hasScheduleToday = true, dashboa
   );
 }
 
-function MemberStatusCard() {
+function isOpenFileRequest(request) {
+  const normalizedStatus = String(request?.status ?? "").trim().toLowerCase();
+  if (!normalizedStatus) return true;
+
+  return normalizedStatus.includes("pending") || normalizedStatus.includes("endorsed");
+}
+
+function FileRequestCard({ requests = [], onViewRequest = null }) {
+  const visibleRequests = Array.isArray(requests)
+    ? requests.filter(isOpenFileRequest).slice(0, 3)
+    : [];
+
   return (
     <div className="card member-card">
-      <div className="member-title">Member Status</div>
-      <div className="request-list" aria-label="No member status updates yet">
-        <div className="request-row">
-          <span>Kim Santos</span>
-          <span className="requesting">Requesting OT</span>
-          <button type="button" className="view-btn">View</button>
-        </div>
+      <div className="member-title">File Request</div>
+      <div
+        className="request-list"
+        aria-label={visibleRequests.length > 0 ? "Employee file requests" : "No file requests yet"}
+      >
+        {visibleRequests.length > 0 ? visibleRequests.map(request => (
+          <div key={request.id} className="request-row">
+            <span>{request.employee_name ?? "Employee"}</span>
+            <span className="requesting">{request.request_type ?? "Request"}</span>
+            <button type="button" className="view-btn" onClick={() => onViewRequest?.(request)}>
+              View
+            </button>
+          </div>
+        )) : (
+          <div className="empty-state">No file requests yet.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DateTimeSection({ now }) {
+  return (
+    <div className="time-datetime-section">
+      <div className="time-datetime-display">
+        {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" })}{" "}
+        {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
       </div>
     </div>
   );
@@ -211,14 +300,53 @@ export default function MainDashboard({
   schedule = null,
   canEditCards = true,
   dashboardMeta = null,
+  fileRequests = [],
+  onViewFileRequests = null,
 }) {
   const [timeInStart, setTimeInStart] = useState(null);
   const [now, setNow] = useState(new Date());
   const [isTimeOutConfirmOpen, setIsTimeOutConfirmOpen] = useState(false);
+  const [displayDate, setDisplayDate] = useState(new Date());
+  const [announcements, setAnnouncements] = useState([]);
+  const [isLoadingAnnouncements, setIsLoadingAnnouncements] = useState(true);
+  const [announcementError, setAnnouncementError] = useState("");
+  const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementContent, setAnnouncementContent] = useState("");
+  const [isSavingAnnouncement, setIsSavingAnnouncement] = useState(false);
+  const [announcementFormError, setAnnouncementFormError] = useState("");
+
+  const loadAnnouncements = async () => {
+    setIsLoadingAnnouncements(true);
+    setAnnouncementError("");
+
+    try {
+      const response = await fetchAnnouncements();
+      setAnnouncements(Array.isArray(response?.announcements) ? response.announcements : []);
+    } catch (error) {
+      setAnnouncements([]);
+      setAnnouncementError(error?.error || "Unable to load announcements.");
+    } finally {
+      setIsLoadingAnnouncements(false);
+    }
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadAnnouncements().catch(() => {
+      if (isMounted) {
+        setAnnouncementError("Unable to load announcements.");
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const activeTimeIn = attendanceControls?.timeInAt ?? timeInStart;
@@ -226,9 +354,9 @@ export default function MainDashboard({
   const hasCompletedShift = Boolean(attendanceControls?.hasCompletedShift);
   const hasActiveTimeIn = Boolean(activeTimeIn && !activeTimeOut);
   const hasScheduleToday = Boolean(getTodayShiftSchedule(schedule));
-  const canToggleTimeIn = attendanceControls
-    ? Boolean(attendanceControls.canClickTimeIn || attendanceControls.canClickTimeOut) && hasScheduleToday
-    : hasScheduleToday;
+  const canClickTimeIn = attendanceControls?.canClickTimeIn ?? (hasScheduleToday && !hasActiveTimeIn && !hasCompletedShift);
+  const canClickTimeOut = attendanceControls?.canClickTimeOut ?? (hasActiveTimeIn && !hasCompletedShift);
+  const canToggleTimeIn = hasActiveTimeIn ? canClickTimeOut : canClickTimeIn;
 
   const counterDisplay = useMemo(() => {
     if (!activeTimeIn) return "00:00:00";
@@ -242,8 +370,8 @@ export default function MainDashboard({
 
   const calendarData = useMemo(() => {
     const currentDate = new Date();
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
+    const year = displayDate.getFullYear();
+    const month = displayDate.getMonth();
     const firstDayOfMonth = new Date(year, month, 1);
     const lastDayOfMonth = new Date(year, month + 1, 0);
     const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -262,11 +390,11 @@ export default function MainDashboard({
     }
 
     return {
-      monthLabel: currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      monthLabel: displayDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
       weekDays,
       cells,
     };
-  }, []);
+  }, [displayDate]);
 
 
   const totalHours = useMemo(() => {
@@ -291,14 +419,25 @@ export default function MainDashboard({
   };
 
   const onToggleTimeIn = () => {
+    if (hasCompletedShift) {
+      return;
+    }
+
     if (attendanceControls) {
-      if (attendanceControls.canClickTimeOut) {
+      if (hasActiveTimeIn) {
         setIsTimeOutConfirmOpen(true);
         return;
       }
-      if (attendanceControls.canClickTimeIn) {
-        attendanceControls.onTimeIn();
+
+      if (!hasScheduleToday) {
+        return;
       }
+
+      attendanceControls.onTimeIn();
+      return;
+    }
+
+    if (!hasScheduleToday) {
       return;
     }
 
@@ -310,25 +449,84 @@ export default function MainDashboard({
     setTimeInStart(new Date());
   };
 
+  const handlePrevMonth = () => {
+    setDisplayDate(prevDate => new Date(prevDate.getFullYear(), prevDate.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setDisplayDate(prevDate => new Date(prevDate.getFullYear(), prevDate.getMonth() + 1, 1));
+  };
+
+  const handleOpenAnnouncementModal = () => {
+    setAnnouncementFormError("");
+    setIsAnnouncementModalOpen(true);
+  };
+
+  const handleCloseAnnouncementModal = () => {
+    setIsAnnouncementModalOpen(false);
+    setAnnouncementTitle("");
+    setAnnouncementContent("");
+    setAnnouncementFormError("");
+  };
+
+  const handleCreateAnnouncement = async event => {
+    event.preventDefault();
+
+    const trimmedTitle = announcementTitle.trim();
+    const trimmedContent = announcementContent.trim();
+
+    if (!trimmedTitle || !trimmedContent) {
+      setAnnouncementFormError("Title and content are required.");
+      return;
+    }
+
+    setIsSavingAnnouncement(true);
+    setAnnouncementFormError("");
+
+    try {
+      await createAnnouncement({
+        title: trimmedTitle,
+        content: trimmedContent
+      });
+      await loadAnnouncements();
+      handleCloseAnnouncementModal();
+    } catch (error) {
+      setAnnouncementFormError(error?.error || "Unable to create announcement.");
+    } finally {
+      setIsSavingAnnouncement(false);
+    }
+  };
+
   return (
     <>
       <DashboardHeader
-        headerTime={now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-        headerDate={now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+        headerTime=""
+        headerDate=""
       />
 
       <div className={`dashboard-grid ${showMemberStatusCard ? "has-member-status" : "no-member-status"}`}>
+        <DateTimeSection now={now} />
         <TimeCard
           counterDisplay={counterDisplay}
           hasActiveTimeIn={hasActiveTimeIn}
           onToggleTimeIn={onToggleTimeIn}
-          canToggleTimeIn={canToggleTimeIn}
+          isButtonDisabled={!canToggleTimeIn}
           hasScheduleToday={hasScheduleToday}
           hasCompletedShift={hasCompletedShift}
         />
-        <AnnouncementCard canEdit={canEditCards} />
+        <AnnouncementCard
+          canEdit={canEditCards}
+          announcements={announcements}
+          isLoading={isLoadingAnnouncements}
+          errorMessage={announcementError}
+          onCreateAnnouncement={handleOpenAnnouncementModal}
+        />
         <ShiftCard schedule={schedule} dashboardMeta={dashboardMeta} />
-        <CalendarCard calendarData={calendarData} />
+        <CalendarCard 
+          calendarData={calendarData} 
+          onPrevMonth={handlePrevMonth}
+          onNextMonth={handleNextMonth}
+        />
         <HolidayCard canEdit={canEditCards} />
         <SummaryCard
           timeInStart={activeTimeIn}
@@ -336,7 +534,7 @@ export default function MainDashboard({
           hasScheduleToday={hasScheduleToday}
           dashboardMeta={dashboardMeta}
         />
-        {showMemberStatusCard ? <MemberStatusCard /> : null}
+        {showMemberStatusCard ? <FileRequestCard requests={fileRequests} onViewRequest={onViewFileRequests} /> : null}
       </div>
 
       {isTimeOutConfirmOpen ? (
@@ -357,6 +555,56 @@ export default function MainDashboard({
                 Confirm Time Out
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isAnnouncementModalOpen ? (
+        <div className="time-out-modal-backdrop" role="presentation">
+          <div
+            className="time-out-modal announcement-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="announcement-modal-title"
+          >
+            <h3 id="announcement-modal-title">Create Announcement</h3>
+            <form onSubmit={handleCreateAnnouncement} className="announcement-form">
+              <label className="announcement-form-field">
+                <span>Title</span>
+                <input
+                  type="text"
+                  value={announcementTitle}
+                  onChange={event => setAnnouncementTitle(event.target.value)}
+                  maxLength={100}
+                  disabled={isSavingAnnouncement}
+                />
+              </label>
+              <label className="announcement-form-field">
+                <span>Content</span>
+                <textarea
+                  value={announcementContent}
+                  onChange={event => setAnnouncementContent(event.target.value)}
+                  rows={5}
+                  disabled={isSavingAnnouncement}
+                />
+              </label>
+              {announcementFormError ? (
+                <p className="announcement-form-error">{announcementFormError}</p>
+              ) : null}
+              <div className="time-out-modal-actions">
+                <button
+                  type="button"
+                  className="time-out-cancel-btn"
+                  onClick={handleCloseAnnouncementModal}
+                  disabled={isSavingAnnouncement}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="time-out-confirm-btn" disabled={isSavingAnnouncement}>
+                  {isSavingAnnouncement ? "Saving..." : "Post Announcement"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       ) : null}

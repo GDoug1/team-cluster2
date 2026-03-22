@@ -1,7 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
-requireRole(["admin", "super admin"]);
+requirePermission($conn, "View Team");
 
 header("Content-Type: application/json");
 
@@ -61,11 +61,17 @@ $out = [];
 function sqlTimeToUi(?string $value): array {
     if (!$value) return ['9:00', 'AM'];
 
-    $parts = explode(':', $value);
-    if (count($parts) < 2) return ['9:00', 'AM'];
+    $date = date_create($value);
+    if (!$date) {
+        $parts = explode(':', $value);
+        if (count($parts) < 2) return ['9:00', 'AM'];
+        $hour24 = (int)$parts[0];
+        $minute = (int)$parts[1];
+    } else {
+        $hour24 = (int)$date->format('G');
+        $minute = (int)$date->format('i');
+    }
 
-    $hour24 = (int)$parts[0];
-    $minute = (int)$parts[1];
     $period = $hour24 >= 12 ? 'PM' : 'AM';
     $hour12 = $hour24 % 12;
     if ($hour12 === 0) $hour12 = 12;
@@ -84,12 +90,26 @@ function loadCoachSchedule(mysqli $conn, int $clusterId, int $coachUserId): ?arr
 
     if ($coachEmployeeId <= 0) return null;
 
-    $scheduleStmt = $conn->prepare(
-        "SELECT day_of_week, shift_type, start_time, end_time, work_setup, breaksched_start, breaksched_end
+    $scheduleColumns = [];
+    $scheduleColumnResult = $conn->query("SHOW COLUMNS FROM schedules");
+    if ($scheduleColumnResult) {
+        while ($columnRow = $scheduleColumnResult->fetch_assoc()) {
+            $scheduleColumns[] = $columnRow['Field'];
+        }
+    }
+
+    $scheduleOrderColumn = in_array('schedule_id', $scheduleColumns, true)
+        ? 'schedule_id'
+        : (in_array('id', $scheduleColumns, true) ? 'id' : null);
+
+    $scheduleSql = "SELECT day_of_week, shift_type, start_time, end_time, work_setup, breaksched_start, breaksched_end
          FROM schedules
-         WHERE cluster_id = ? AND employee_id = ?
-         ORDER BY schedule_id ASC"
-    );
+         WHERE cluster_id = ? AND employee_id = ?";
+    if ($scheduleOrderColumn) {
+        $scheduleSql .= " ORDER BY $scheduleOrderColumn ASC";
+    }
+
+    $scheduleStmt = $conn->prepare($scheduleSql);
     if (!$scheduleStmt) return null;
     $scheduleStmt->bind_param("ii", $clusterId, $coachEmployeeId);
     $scheduleStmt->execute();

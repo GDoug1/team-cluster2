@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 requireRole("coach");
 
 header("Content-Type: application/json");
@@ -60,5 +61,11 @@ if ($stmt->affected_rows === 0) {
     http_response_code(404);
     exit(json_encode(["error" => "Rejected cluster not found."]));
 }
+
+logCurrentUserAction(
+    $conn,
+    'cluster_resubmit',
+    buildAuditTarget('cluster', $cluster_id, $name)
+);
 
 echo json_encode(["success" => true]);

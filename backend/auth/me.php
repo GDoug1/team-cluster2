@@ -1,13 +1,14 @@
 <?php
 include "../config/auth.php";
 
-$user = $_SESSION['user'] ?? null;
-
-if (!$user) {
+// ✅ Only trust session user
+if (!isset($_SESSION['user']) || !is_array($_SESSION['user'])) {
     http_response_code(401);
-    echo json_encode(["error" => "Unauthorized"]);
+    echo json_encode(null);
     exit;
 }
+
+$user = $_SESSION['user'];
 
 echo json_encode([
     "id" => $user["id"],

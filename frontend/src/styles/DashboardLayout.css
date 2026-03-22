@@ -1,7 +1,9 @@
 .dashboard {
   display: flex;
   min-height: 100vh;
-   background: transparent;
+  height: 100vh;
+  overflow: hidden;
+  background: transparent;
 }
 
 .main {
@@ -10,6 +12,10 @@
   display: flex;
   flex-direction: column;
   padding: 24px 32px;
+  min-height: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .topbar {
@@ -17,6 +23,8 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .topbar h2 {
@@ -28,6 +36,7 @@
 .topbar .datetime {
   font-size: 12px;
   color: #6b7280;
+  overflow-wrap: anywhere;
 }
 
 .toolbar {
@@ -47,6 +56,9 @@
 @media (max-width: 900px) {
   .dashboard {
     flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
   }
 
   .sidebar {
@@ -64,10 +76,82 @@
 
   .main {
     padding: 16px;
+    height: auto;
+    overflow: visible;
+  }
+
+  .topbar {
+    align-items: flex-start;
+  }
+
+  .topbar .datetime {
+    width: 100%;
   }
 
   .card {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+.coach-schedule-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.coach-schedule-note {
+  margin: 0;
+  color: #5b6475;
+}
+
+.coach-schedule-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  color: #1f2937;
+}
+
+.coach-schedule-grid {
+  display: grid;
+  gap: 0;
+  border: 1px solid #d7deea;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.coach-schedule-grid-header,
+.coach-schedule-grid-row {
+  display: grid;
+  grid-template-columns: 90px minmax(140px, 1.2fr) minmax(160px, 1.3fr) minmax(120px, 1fr) minmax(120px, 1fr) 110px;
+}
+
+.coach-schedule-grid-header {
+  background: #e9edf5;
+  font-weight: 700;
+}
+
+.coach-schedule-grid-header span,
+.coach-schedule-grid-row span {
+  padding: 14px 16px;
+  border-bottom: 1px solid #d7deea;
+}
+
+.coach-schedule-grid-row:last-child span {
+  border-bottom: none;
+}
+
+.coach-schedule-grid-row {
+  background: #fff;
+}
+
+@media (max-width: 900px) {
+  .coach-schedule-grid {
+    overflow-x: auto;
+  }
+
+  .coach-schedule-grid-header,
+  .coach-schedule-grid-row {
+    min-width: 760px;
   }
 }

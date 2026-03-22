@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { submitRequest } from "../api/requests";
+import { useFeedback } from "./FeedbackProvider";
 
 const filingTabs = [
   { key: "leave", label: "File Leave", icon: "🗓" },
@@ -7,8 +8,16 @@ const filingTabs = [
   { key: "dispute", label: "Attendance Dispute", icon: "!" }
 ];
 
-export default function FilingCenterPanel({ onSubmitted = null }) {
-  const [activeTab, setActiveTab] = useState("leave");
+const getTodayDateInputValue = () => new Date().toISOString().slice(0, 10);
+const getTomorrowDateInputValue = () => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().slice(0, 10);
+};
+
+export default function FilingCenterPanel({ onSubmitted = null, initialTab = "leave" }) {
+  const { confirm } = useFeedback();
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [disputeType, setDisputeType] = useState("Time Correction");
   const [leaveType, setLeaveType] = useState("Sick Leave");
   const [leaveStartDate, setLeaveStartDate] = useState("");
@@ -19,8 +28,18 @@ export default function FilingCenterPanel({ onSubmitted = null }) {
   const [overtimeEnd, setOvertimeEnd] = useState("");
   const [disputeDate, setDisputeDate] = useState("");
   const [reason, setReason] = useState("");
+  const [leavePhoto, setLeavePhoto] = useState(null);
+  const [leavePhotoInputKey, setLeavePhotoInputKey] = useState(0);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
+  const todayDate = useMemo(() => getTodayDateInputValue(), []);
+  const tomorrowDate = useMemo(() => getTomorrowDateInputValue(), []);
 
   const panelTitle = useMemo(() => {
     if (activeTab === "leave") return "New Leave Request";
@@ -36,23 +55,50 @@ export default function FilingCenterPanel({ onSubmitted = null }) {
     setOvertimeStart("");
     setOvertimeEnd("");
     setDisputeDate("");
+    setLeavePhoto(null);
+    setLeavePhotoInputKey(prev => prev + 1);
   };
 
   const handleSubmit = async () => {
     if (submitting) return;
     setMessage("");
 
+    const hasConfirmedSubmission = await confirm({
+      title: "Submit request?",
+      message: "Please confirm that you want to submit this request.",
+      confirmLabel: "Submit"
+    });
+    if (!hasConfirmedSubmission) return;
+
     try {
       setSubmitting(true);
       if (activeTab === "leave") {
-        await submitRequest({
-          type: "leave",
-          leaveType,
-          startDate: leaveStartDate,
-          endDate: leaveEndDate,
-          reason
-        });
+        if (!leavePhoto) {
+          throw { error: "Upload photo is required before submitting a leave request." };
+        }
+        if (leaveStartDate < todayDate || leaveEndDate < todayDate) {
+          throw { error: "Leave dates cannot be earlier than today." };
+        }
+        if (leaveEndDate < leaveStartDate) {
+          throw { error: "Leave end date cannot be earlier than the start date." };
+        }
+
+        const payload = new FormData();
+        payload.append("type", "leave");
+        payload.append("leaveType", leaveType);
+        payload.append("startDate", leaveStartDate);
+        payload.append("endDate", leaveEndDate);
+        payload.append("reason", reason);
+        if (leavePhoto) {
+          payload.append("photo", leavePhoto);
+        }
+
+        await submitRequest(payload);
       } else if (activeTab === "overtime") {
+        if (overtimeDate < tomorrowDate) {
+          throw { error: "Overtime requests must be filed for a future date." };
+        }
+
         await submitRequest({
           type: "overtime",
           otType,
@@ -62,6 +108,10 @@ export default function FilingCenterPanel({ onSubmitted = null }) {
           reason
         });
       } else {
+        if (disputeDate < todayDate) {
+          throw { error: "Dispute dates cannot be earlier than today." };
+        }
+
         await submitRequest({
           type: "dispute",
           disputeDate,
@@ -122,11 +172,27 @@ export default function FilingCenterPanel({ onSubmitted = null }) {
                 <div className="filing-grid-two">
                   <label className="filing-field">
                     <span>Start Date</span>
-                    <input type="date" value={leaveStartDate} onChange={event => setLeaveStartDate(event.target.value)} />
+                    <input type="date" min={todayDate} value={leaveStartDate} onChange={event => setLeaveStartDate(event.target.value)} />
                   </label>
                   <label className="filing-field">
                     <span>End Date</span>
-                    <input type="date" value={leaveEndDate} onChange={event => setLeaveEndDate(event.target.value)} />
+                    <input type="date" min={leaveStartDate || todayDate} value={leaveEndDate} onChange={event => setLeaveEndDate(event.target.value)} />
+                  </label>
+                </div>
+                <div className="filing-grid-two">
+                  <label className="filing-field filing-field-full">
+                    <span>Upload Photo</span>
+                    <input
+                      key={leavePhotoInputKey}
+                      type="file"
+                      accept="image/*"
+                      required
+                      onChange={event => setLeavePhoto(event.target.files?.[0] ?? null)}
+                    />
+                    <small className="filing-field-help">
+                      Upload a supporting photo before you can submit a leave request.
+                      {leavePhoto ? ` Selected: ${leavePhoto.name}` : ""}
+                    </small>
                   </label>
                 </div>
               </>
@@ -148,7 +214,7 @@ export default function FilingCenterPanel({ onSubmitted = null }) {
                 <div className="filing-grid-three">
                   <label className="filing-field">
                     <span>Date</span>
-                    <input type="date" value={overtimeDate} onChange={event => setOvertimeDate(event.target.value)} />
+                    <input type="date" min={tomorrowDate} value={overtimeDate} onChange={event => setOvertimeDate(event.target.value)} />
                   </label>
                   <label className="filing-field">
                     <span>Start Time</span>
@@ -166,7 +232,7 @@ export default function FilingCenterPanel({ onSubmitted = null }) {
               <div className="filing-grid-two">
                 <label className="filing-field">
                   <span>Dispute Date</span>
-                  <input type="date" value={disputeDate} onChange={event => setDisputeDate(event.target.value)} />
+                  <input type="date" min={todayDate} value={disputeDate} onChange={event => setDisputeDate(event.target.value)} />
                 </label>
                 <label className="filing-field">
                   <span>Dispute Type</span>

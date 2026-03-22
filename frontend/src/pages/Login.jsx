@@ -1,13 +1,19 @@
 import "../styles/AuthPages.css";
+import "../styles/login.css";
 import { useState } from "react";
 import { apiFetch } from "../api/api";
 import AuthLayout from "../components/AuthLayout";
+import { useNavigate } from "react-router-dom";
+
+import bg from "../assets/login_bg.svg";
+import logo from "../assets/ireply.png";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -21,22 +27,28 @@ export default function Login() {
       });
 
       const normalizedRole = String(data.role || "").toLowerCase();
+
       if (data.fullname) {
-        localStorage.setItem("teamClusterUser", JSON.stringify({
-          fullname: data.fullname,
-          role: data.role
-        }));
+        localStorage.setItem(
+          "teamClusterUser",
+          JSON.stringify({
+            fullname: data.fullname,
+            role: data.role
+          })
+        );
       }
-      const redirectPath = data.redirect
-        || (normalizedRole.includes("super admin")
+
+      const redirectPath =
+        data.redirect ||
+        (normalizedRole.includes("super admin")
           ? "/super-admin"
           : normalizedRole.includes("admin")
-            ? "/admin"
-            : normalizedRole.includes("coach")
-              ? "/coach"
-              : "/employee");
+          ? "/admin"
+          : normalizedRole.includes("coach")
+          ? "/coach"
+          : "/employee");
 
-      window.location.href = redirectPath;
+      navigate(redirectPath);
     } catch (err) {
       setError(err.error || "Login failed");
     } finally {
@@ -45,51 +57,51 @@ export default function Login() {
   }
 
   return (
-    <AuthLayout
-      showPanel={false}
-      title="Welcome back"
-      description="Access your dashboard and keep your team aligned in real time."
-      highlights={[]}
-    >
-      <form className="auth-card" onSubmit={handleSubmit}>
-        <div>
-          <h2 className="auth-heading">Sign in</h2>
-          <p className="auth-subtitle">Use your registered email and password.</p>
-        </div>
+    <AuthLayout showPanel={false}  className="auth-login"  title="" description="" highlights={[]}>
+        <div
+          className="login-page-container"
+          style={{ backgroundImage: `url(${bg})` }}
+        >
+        <form className="login-page-card" onSubmit={handleSubmit}>
+          
+          <div className="login-page-logo">
+            <img src={logo} alt="Logo" />
+          </div>
 
-        {error && <p className="auth-error">{error}</p>}
+          {error && <p className="login-page-error">{error}</p>}
 
-        <label className="auth-field">
-          Email address
-          <input
-            className="auth-input"
-            type="email"
-            placeholder="you@company.com"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-          />
-        </label>
+          <div className="login-page-group">
+            <label>Email</label>
+            <input
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
 
-        <label className="auth-field">
-          Password
-          <input
-            className="auth-input"
-            type="password"
-            placeholder="Enter your password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-          />
-        </label>
-        <button type="submit" className="btn primary auth-submit" disabled={isSubmitting}>
-          {isSubmitting ? "Signing in..." : "Login"}
-        </button>
+          <div className="login-page-group">
+            <label>Password</label>
+            <input
+              type="password"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
 
-        <p className="auth-footer">
-          No account? <a href="/register">Register</a>
-        </p>
-      </form>
+          <button
+            type="submit"
+            className="login-page-btn"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Logging in..." : "LOG IN"}
+          </button>
+
+        </form>
+      </div>
     </AuthLayout>
   );
 }

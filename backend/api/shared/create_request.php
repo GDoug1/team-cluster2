@@ -1,7 +1,8 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
-requireRole(["admin", "coach", "employee"]);
+include __DIR__ . "/../utils/logger.php";
+requirePermission($conn, "View Attendance");
 
 function hasColumn(mysqli $conn, string $table, string $column): bool {
     $safeTable = $conn->real_escape_string($table);
@@ -10,8 +11,70 @@ function hasColumn(mysqli $conn, string $table, string $column): bool {
     return $result && $result->num_rows > 0;
 }
 
-$body = json_decode(file_get_contents("php://input"), true);
-if (!is_array($body)) {
+function getRequestBody(): array {
+    $contentType = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
+    if (str_contains($contentType, 'multipart/form-data')) {
+        return $_POST;
+    }
+
+    $body = json_decode(file_get_contents("php://input"), true);
+    return is_array($body) ? $body : [];
+}
+
+function resolvePhotoColumn(mysqli $conn): ?string {
+    foreach (['photo_path', 'photo_url', 'attachment_path', 'supporting_photo'] as $column) {
+        if (hasColumn($conn, 'leave_requests', $column)) {
+            return $column;
+        }
+    }
+
+    return null;
+}
+
+function validateDateNotInPast(string $date, bool $allowToday = true): bool {
+    $today = date('Y-m-d');
+    return $allowToday ? $date >= $today : $date > $today;
+}
+
+function saveLeavePhoto(array $file): string {
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('Unable to upload the leave photo.');
+    }
+
+    $tmpName = (string)($file['tmp_name'] ?? '');
+    $mimeType = mime_content_type($tmpName) ?: '';
+    $allowedExtensions = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+        'image/gif' => 'gif'
+    ];
+
+    if (!isset($allowedExtensions[$mimeType])) {
+        throw new RuntimeException('Leave photo must be a JPG, PNG, WEBP, or GIF image.');
+    }
+
+    if (((int)($file['size'] ?? 0)) > 5 * 1024 * 1024) {
+        throw new RuntimeException('Leave photo must be 5MB or smaller.');
+    }
+
+    $relativeDirectory = 'uploads/leave-photos';
+    $absoluteDirectory = realpath(__DIR__ . '/../../') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'leave-photos';
+    if (!is_dir($absoluteDirectory) && !mkdir($absoluteDirectory, 0775, true) && !is_dir($absoluteDirectory)) {
+        throw new RuntimeException('Unable to prepare the leave photo upload directory.');
+    }
+
+    $fileName = sprintf('leave_%s_%s.%s', date('YmdHis'), bin2hex(random_bytes(8)), $allowedExtensions[$mimeType]);
+    $absolutePath = $absoluteDirectory . DIRECTORY_SEPARATOR . $fileName;
+    if (!move_uploaded_file($tmpName, $absolutePath)) {
+        throw new RuntimeException('Unable to store the leave photo.');
+    }
+
+    return $relativeDirectory . '/' . $fileName;
+}
+
+$body = getRequestBody();
+if ($body === []) {
     http_response_code(400);
     echo json_encode(["error" => "Invalid request payload."]);
     exit;
@@ -27,7 +90,7 @@ if ($type === '' || $reason === '') {
 
 $sessionUserId = (int)($_SESSION['user']['id'] ?? 0);
 $currentUserRole = strtolower((string)($_SESSION['user']['role'] ?? ''));
-$initialStatus = in_array($currentUserRole, ['coach', 'admin'], true) ? 'Endorsed' : 'Pending';
+$initialStatus = in_array($currentUserRole, ['coach', 'admin', 'super admin'], true) ? 'Endorsed' : 'Pending';
 $employeeId = $sessionUserId;
 if (hasColumn($conn, 'employees', 'user_id') && hasColumn($conn, 'employees', 'employee_id')) {
     $stmt = $conn->prepare("SELECT employee_id FROM employees WHERE user_id = ? LIMIT 1");
@@ -61,9 +124,43 @@ if ($type === 'leave') {
         exit;
     }
 
+    if (!validateDateNotInPast($startDate) || !validateDateNotInPast($endDate)) {
+        http_response_code(422);
+        echo json_encode(["error" => "Leave dates cannot be earlier than today."]);
+        exit;
+    }
+
+    if ($endDate < $startDate) {
+        http_response_code(422);
+        echo json_encode(["error" => "Leave end date cannot be earlier than the start date."]);
+        exit;
+    }
+
     $status = $initialStatus;
-    $stmt = $conn->prepare("INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, reason, status, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-    $stmt->bind_param('isssss', $employeeId, $leaveType, $startDate, $endDate, $reason, $status);
+    $photoColumn = resolvePhotoColumn($conn);
+    $photoPath = null;
+
+    if (!isset($_FILES['photo']) || (int)($_FILES['photo']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+        http_response_code(422);
+        echo json_encode(["error" => "Leave photo is required."]);
+        exit;
+    }
+
+    try {
+        $photoPath = saveLeavePhoto($_FILES['photo']);
+    } catch (RuntimeException $exception) {
+        http_response_code(422);
+        echo json_encode(["error" => $exception->getMessage()]);
+        exit;
+    }
+
+    if ($photoColumn !== null) {
+        $stmt = $conn->prepare("INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, reason, {$photoColumn}, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->bind_param('issssss', $employeeId, $leaveType, $startDate, $endDate, $reason, $photoPath, $status);
+    } else {
+        $stmt = $conn->prepare("INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, reason, status, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->bind_param('isssss', $employeeId, $leaveType, $startDate, $endDate, $reason, $status);
+    }
     $stmt->execute();
 } elseif ($type === 'overtime') {
     $otType = trim((string)($body['otType'] ?? 'Regular Overtime'));
@@ -74,6 +171,12 @@ if ($type === 'leave') {
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !preg_match('/^\d{2}:\d{2}$/', $startTime) || !preg_match('/^\d{2}:\d{2}$/', $endTime)) {
         http_response_code(422);
         echo json_encode(["error" => "Valid overtime date and times are required."]);
+        exit;
+    }
+
+    if (!validateDateNotInPast($date, false)) {
+        http_response_code(422);
+        echo json_encode(["error" => "Overtime requests must be filed for a future date."]);
         exit;
     }
 
@@ -90,6 +193,12 @@ if ($type === 'leave') {
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $disputeDate)) {
         http_response_code(422);
         echo json_encode(["error" => "Valid dispute date is required."]);
+        exit;
+    }
+
+    if (!validateDateNotInPast($disputeDate)) {
+        http_response_code(422);
+        echo json_encode(["error" => "Dispute dates cannot be earlier than today."]);
         exit;
     }
 
@@ -115,5 +224,11 @@ if ($conn->errno) {
     echo json_encode(["error" => "Unable to submit request."]);
     exit;
 }
+
+logCurrentUserAction(
+    $conn,
+    'request_create',
+    buildAuditTarget($type, $stmt->insert_id ?? null, 'status=' . $status)
+);
 
 echo json_encode(["success" => true]);

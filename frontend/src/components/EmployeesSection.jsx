@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "../api/api";
+import { useFeedback } from "./FeedbackProvider";
 import usePermissions from "../hooks/usePermissions";
 
 const initialEmployeeForm = {
@@ -108,6 +109,34 @@ const employmentAccounts = [
 ];
 
 const employeeTypes = ["Regular", "Probationary", "Contractual", "Intern"];
+const employeeNameFields = new Set(["first_name", "middle_name", "last_name"]);
+const employeePersonalRequiredFields = [
+  "first_name",
+  "last_name",
+  "address",
+  "birthdate",
+  "contact_number",
+  "civil_status",
+  "personal_email",
+  "work_email"
+];
+const employeeEmploymentRequiredFields = ["position", "account", "employee_type"];
+const employeeFieldLabels = {
+  first_name: "First name",
+  last_name: "Last name",
+  address: "Address",
+  birthdate: "Birthdate",
+  contact_number: "Contact number",
+  civil_status: "Civil status",
+  personal_email: "Personal email",
+  work_email: "Work email",
+  position: "Position",
+  account: "Account",
+  employee_type: "Employee type"
+};
+const hasDigitPattern = /\d/;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const sanitizeEmployeeName = value => value.replace(/\d+/g, "");
 
 const formatDate = dateString => {
   if (!dateString) return "—";
@@ -133,8 +162,81 @@ const mapEmployeeToForm = employee => ({
   date_hired: employee?.date_hired ?? ""
 });
 
+const getMissingEmployeeFields = (form, fields) =>
+  fields.filter(field => String(form?.[field] ?? "").trim() === "");
+
+const buildEmployeeSectionValidationMessage = (sectionLabel, missingFields) =>
+  `Please complete the ${sectionLabel} fields: ${missingFields.map(field => employeeFieldLabels[field]).join(", ")}.`;
+
+const validateEmployeePersonalSection = form => {
+  const missingFields = getMissingEmployeeFields(form, employeePersonalRequiredFields);
+  if (missingFields.length > 0) {
+    return buildEmployeeSectionValidationMessage("Personal Information", missingFields);
+  }
+
+  const contactNumber = String(form?.contact_number ?? "").trim();
+  if (!/^09\d{9}$/.test(contactNumber)) {
+    return "Contact number must start with 09 and be exactly 11 digits.";
+  }
+
+  const personalEmail = String(form?.personal_email ?? "").trim();
+  if (!emailPattern.test(personalEmail)) {
+    return "Personal email must be a valid email address.";
+  }
+
+  const workEmail = String(form?.work_email ?? "").trim();
+  if (!emailPattern.test(workEmail)) {
+    return "Work email must be a valid email address.";
+  }
+
+  return "";
+};
+
+const validateEmployeeEmploymentSection = form => {
+  const missingFields = getMissingEmployeeFields(form, employeeEmploymentRequiredFields);
+  if (missingFields.length > 0) {
+    return buildEmployeeSectionValidationMessage("Employment Details", missingFields);
+  }
+
+  return "";
+};
+
+const employeeTableColumns = [
+  { key: "id", label: "ID", sortable: true },
+  { key: "fullname", label: "Name", sortable: true },
+  { key: "position", label: "Position", sortable: true },
+  { key: "account", label: "Account", sortable: true },
+  { key: "employee_type", label: "Type", sortable: true },
+  { key: "employment_status", label: "Status", sortable: true },
+  { key: "date_hired", label: "Hired", sortable: true },
+  { key: "info", label: "Info", sortable: false },
+  { key: "actions", label: "Actions", sortable: false, className: "employee-actions-cell" }
+];
+
+const getEmployeeSortValue = (employee, sortKey) => {
+  if (sortKey === "id") return Number(employee?.id ?? 0);
+
+  if (sortKey === "date_hired") {
+    const timestamp = new Date(employee?.date_hired ?? "").getTime();
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+  }
+
+  return String(employee?.[sortKey] ?? "").trim().toLowerCase();
+};
+
+const compareEmployeeValues = (leftValue, rightValue, direction) => {
+  const multiplier = direction === "asc" ? 1 : -1;
+
+  if (typeof leftValue === "number" && typeof rightValue === "number") {
+    return (leftValue - rightValue) * multiplier;
+  }
+
+  return leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: "base" }) * multiplier;
+};
+
 export default function EmployeesSection() {
   const { hasPermission } = usePermissions();
+  const { confirm, showMessage, showToast } = useFeedback();
   const canViewEmployeeList = hasPermission("View Employee List");
   const canAddEmployee = hasPermission("Add Employee");
   const canEditEmployee = hasPermission("Edit Employee");
@@ -143,6 +245,11 @@ export default function EmployeesSection() {
   const [employees, setEmployees] = useState([]);
   const [employeeError, setEmployeeError] = useState("");
   const [employeeLoading, setEmployeeLoading] = useState(false);
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
+  const [employeeSortKey, setEmployeeSortKey] = useState("id");
+  const [employeeSortDirection, setEmployeeSortDirection] = useState("desc");
+  const [employeeRowsPerPageInput, setEmployeeRowsPerPageInput] = useState("10");
+  const [employeeCurrentPage, setEmployeeCurrentPage] = useState(1);
 
   const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);
   const [isAddingEmployee, setIsAddingEmployee] = useState(false);
@@ -197,8 +304,52 @@ export default function EmployeesSection() {
     fetchEmployees();
   }, [fetchEmployees]);
 
+  useEffect(() => {
+    setEmployeeCurrentPage(1);
+  }, [employeeSearchTerm, employeeRowsPerPageInput]);
+
+  const handleEmployeeNameKeyDown = event => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key.length === 1 && hasDigitPattern.test(event.key)) {
+      event.preventDefault();
+    }
+  };
+
+  const handleEmployeeSort = sortKey => {
+    if (employeeSortKey === sortKey) {
+      setEmployeeSortDirection(current => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setEmployeeSortKey(sortKey);
+    setEmployeeSortDirection(sortKey === "id" || sortKey === "date_hired" ? "desc" : "asc");
+  };
+
+  const handleEmployeeRowsPerPageChange = event => {
+    const digitsOnly = event.target.value.replace(/\D/g, "");
+    setEmployeeRowsPerPageInput(digitsOnly);
+  };
+
+  const handleEmployeeRowsPerPageBlur = () => {
+    const parsedValue = Number.parseInt(employeeRowsPerPageInput, 10);
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+      setEmployeeRowsPerPageInput("10");
+      return;
+    }
+
+    setEmployeeRowsPerPageInput(String(parsedValue));
+  };
+
   const handleAddEmployeeChange = event => {
     const { name, value } = event.target;
+
+    if (employeeNameFields.has(name)) {
+      setAddEmployeeForm(current => ({
+        ...current,
+        [name]: sanitizeEmployeeName(value)
+      }));
+      return;
+    }
 
     if (name === "contact_number") {
       let cleaned = value.replace(/\D/g, ""); // remove non-numbers
@@ -216,6 +367,48 @@ export default function EmployeesSection() {
     setAddEmployeeForm(current => ({ ...current, [name]: value }));
   };
 
+  const handleOpenAddEmployeeModal = async () => {
+    if (!canAddEmployee) return;
+
+    const shouldOpen = await confirm({
+      title: "Add employee?",
+      message: "Open the add employee form?",
+      confirmLabel: "Yes"
+    });
+    if (!shouldOpen) return;
+
+    setAddEmployeeActiveTab("personal");
+    setAddEmployeeError("");
+    setAddEmployeeForm(initialEmployeeForm);
+    setIsAddingEmployee(false);
+    setIsAddEmployeeModalOpen(true);
+  };
+
+  const handleAddEmployeeTabChange = nextTab => {
+    if (nextTab === addEmployeeActiveTab) return;
+
+    if (nextTab === "employment" || nextTab === "benefits") {
+      const personalValidationMessage = validateEmployeePersonalSection(addEmployeeForm);
+      if (personalValidationMessage) {
+        setAddEmployeeError(personalValidationMessage);
+        setAddEmployeeActiveTab("personal");
+        return;
+      }
+    }
+
+    if ((addEmployeeActiveTab === "employment" && nextTab !== "employment") || nextTab === "benefits") {
+      const employmentValidationMessage = validateEmployeeEmploymentSection(addEmployeeForm);
+      if (employmentValidationMessage) {
+        setAddEmployeeError(employmentValidationMessage);
+        setAddEmployeeActiveTab("employment");
+        return;
+      }
+    }
+
+    setAddEmployeeError("");
+    setAddEmployeeActiveTab(nextTab);
+  };
+
   const handleCloseAddEmployeeModal = () => {
     setIsAddEmployeeModalOpen(false);
     setIsAddingEmployee(false);
@@ -228,12 +421,31 @@ export default function EmployeesSection() {
     event.preventDefault();
     if (!canAddEmployee || isAddingEmployee) return;
 
-    const phone = addEmployeeForm.contact_number;
-
-    if (!/^09\d{9}$/.test(phone)) {
-      setAddEmployeeError("Contact number must start with 09 and be exactly 11 digits.");
+    const personalValidationMessage = validateEmployeePersonalSection(addEmployeeForm);
+    if (personalValidationMessage) {
+      setAddEmployeeError(personalValidationMessage);
+      setAddEmployeeActiveTab("personal");
       return;
     }
+
+    const employmentValidationMessage = validateEmployeeEmploymentSection(addEmployeeForm);
+    if (employmentValidationMessage) {
+      setAddEmployeeError(employmentValidationMessage);
+      setAddEmployeeActiveTab("employment");
+      return;
+    }
+
+    const employeeName = [addEmployeeForm.first_name, addEmployeeForm.middle_name, addEmployeeForm.last_name]
+      .map(value => value.trim())
+      .filter(Boolean)
+      .join(" ");
+    const shouldCreate = await confirm({
+      title: "Create employee?",
+      message: `Create ${employeeName || addEmployeeForm.work_email || "this employee"}?`,
+      confirmLabel: "Create"
+    });
+    if (!shouldCreate) return;
+
     setIsAddingEmployee(true);
     setAddEmployeeError("");
     try {
@@ -248,14 +460,28 @@ export default function EmployeesSection() {
 
       const generatedEmail = response?.generated_account?.email;
       const generatedPassword = response?.generated_account?.password;
+      showToast({
+        title: "Employee created",
+        message: `${employeeName || generatedEmail || "The employee"} was added successfully.`,
+        type: "success"
+      });
       if (generatedEmail && generatedPassword) {
-        window.alert(`Employee created.\nEmail: ${generatedEmail}\nPassword: ${generatedPassword}`);
+        await showMessage({
+          title: "Employee created",
+          message: `Email: ${generatedEmail}\nPassword: ${generatedPassword}`
+        });
       }
 
       handleCloseAddEmployeeModal();
       await fetchEmployees();
     } catch (error) {
-      setAddEmployeeError(error?.error ?? error?.message ?? "Unable to add employee.");
+      const message = error?.error ?? error?.message ?? "Unable to add employee.";
+      setAddEmployeeError(message);
+      showToast({
+        title: "Create failed",
+        message,
+        type: "error"
+      });
     } finally {
       setIsAddingEmployee(false);
     }
@@ -263,6 +489,14 @@ export default function EmployeesSection() {
 
   const handleEditEmployeeChange = event => {
     const { name, value } = event.target;
+
+    if (employeeNameFields.has(name)) {
+      setEditEmployeeForm(current => ({
+        ...current,
+        [name]: sanitizeEmployeeName(value)
+      }));
+      return;
+    }
 
     if (name === "contact_number") {
       let cleaned = value.replace(/\D/g, "");
@@ -286,6 +520,31 @@ export default function EmployeesSection() {
     setIsEditEmployeeModalOpen(true);
   };
 
+  const handleEditEmployeeTabChange = nextTab => {
+    if (nextTab === editEmployeeActiveTab) return;
+
+    if (nextTab === "employment") {
+      const personalValidationMessage = validateEmployeePersonalSection(editEmployeeForm);
+      if (personalValidationMessage) {
+        setEditEmployeeError(personalValidationMessage);
+        setEditEmployeeActiveTab("personal");
+        return;
+      }
+    }
+
+    if (editEmployeeActiveTab === "employment" && nextTab !== "employment") {
+      const employmentValidationMessage = validateEmployeeEmploymentSection(editEmployeeForm);
+      if (employmentValidationMessage) {
+        setEditEmployeeError(employmentValidationMessage);
+        setEditEmployeeActiveTab("employment");
+        return;
+      }
+    }
+
+    setEditEmployeeError("");
+    setEditEmployeeActiveTab(nextTab);
+  };
+
   const handleCloseEditEmployeeModal = () => {
     setIsEditEmployeeModalOpen(false);
     setEditingEmployeeId(null);
@@ -300,12 +559,30 @@ export default function EmployeesSection() {
 
     if (!canEditEmployee || isSavingEditEmployee || !editingEmployeeId) return;
 
-    const phone = editEmployeeForm.contact_number;
-
-    if (!/^09\d{9}$/.test(phone)) {
-      setEditEmployeeError("Contact number must start with 09 and be exactly 11 digits.");
+    const personalValidationMessage = validateEmployeePersonalSection(editEmployeeForm);
+    if (personalValidationMessage) {
+      setEditEmployeeError(personalValidationMessage);
+      setEditEmployeeActiveTab("personal");
       return;
     }
+
+    const employmentValidationMessage = validateEmployeeEmploymentSection(editEmployeeForm);
+    if (employmentValidationMessage) {
+      setEditEmployeeError(employmentValidationMessage);
+      setEditEmployeeActiveTab("employment");
+      return;
+    }
+
+    const employeeName = [editEmployeeForm.first_name, editEmployeeForm.middle_name, editEmployeeForm.last_name]
+      .map(value => value.trim())
+      .filter(Boolean)
+      .join(" ");
+    const shouldUpdate = await confirm({
+      title: "Save employee changes?",
+      message: `Update ${employeeName || editEmployeeForm.work_email || "this employee"}?`,
+      confirmLabel: "Save"
+    });
+    if (!shouldUpdate) return;
 
     setIsSavingEditEmployee(true);
     setEditEmployeeError("");
@@ -323,8 +600,19 @@ export default function EmployeesSection() {
 
       handleCloseEditEmployeeModal();
       await fetchEmployees();
+      showToast({
+        title: "Employee updated",
+        message: `${employeeName || editEmployeeForm.work_email || "The employee"} was updated successfully.`,
+        type: "success"
+      });
     } catch (error) {
-      setEditEmployeeError(error?.error ?? error?.message ?? "Unable to update employee.");
+      const message = error?.error ?? error?.message ?? "Unable to update employee.";
+      setEditEmployeeError(message);
+      showToast({
+        title: "Update failed",
+        message,
+        type: "error"
+      });
     } finally {
       setIsSavingEditEmployee(false);
     }
@@ -333,7 +621,12 @@ export default function EmployeesSection() {
   const handleDeleteEmployee = async employee => {
     if (!canDeleteEmployee || deletingEmployeeId) return;
 
-    const shouldDelete = window.confirm(`Archive ${employee.fullname || employee.email || "this employee"}?`);
+    const shouldDelete = await confirm({
+      title: "Archive employee?",
+      message: `Archive ${employee.fullname || employee.email || "this employee"}?`,
+      confirmLabel: "Archive",
+      variant: "danger"
+    });
     if (!shouldDelete) return;
 
     setDeletingEmployeeId(employee.id);
@@ -344,33 +637,115 @@ export default function EmployeesSection() {
         body: JSON.stringify({ employee_id: employee.id })
       });
       await fetchEmployees();
+      showToast({
+        title: "Employee archived",
+        message: `${employee.fullname || employee.email || "The employee"} was archived successfully.`,
+        type: "success"
+      });
     } catch (error) {
-      setEmployeeError(error?.error ?? error?.message ?? "Unable to archive employee.");
+      const message = error?.error ?? error?.message ?? "Unable to archive employee.";
+      setEmployeeError(message);
+      showToast({
+        title: "Archive failed",
+        message,
+        type: "error"
+      });
     } finally {
       setDeletingEmployeeId(null);
     }
   };
+
+  const normalizedEmployeeSearchTerm = employeeSearchTerm.trim().toLowerCase();
+  const parsedEmployeeRowsPerPage = Number.parseInt(employeeRowsPerPageInput, 10);
+  const employeeRowsPerPage = Number.isFinite(parsedEmployeeRowsPerPage) && parsedEmployeeRowsPerPage > 0
+    ? parsedEmployeeRowsPerPage
+    : 10;
+
+  const filteredEmployees = employees.filter(employee => {
+    if (!normalizedEmployeeSearchTerm) return true;
+
+    const searchableValues = [
+      employee.id,
+      employee.fullname,
+      employee.email,
+      employee.position,
+      employee.account,
+      employee.employee_type,
+      employee.employment_status,
+      employee.contact_number
+    ];
+
+    return searchableValues.some(value =>
+      String(value ?? "").toLowerCase().includes(normalizedEmployeeSearchTerm)
+    );
+  });
+
+  const sortedEmployees = [...filteredEmployees].sort((leftEmployee, rightEmployee) => {
+    const leftValue = getEmployeeSortValue(leftEmployee, employeeSortKey);
+    const rightValue = getEmployeeSortValue(rightEmployee, employeeSortKey);
+    const comparison = compareEmployeeValues(leftValue, rightValue, employeeSortDirection);
+
+    if (comparison !== 0) return comparison;
+    return Number(rightEmployee?.id ?? 0) - Number(leftEmployee?.id ?? 0);
+  });
+
+  const employeeTotalPages = Math.max(1, Math.ceil(sortedEmployees.length / employeeRowsPerPage));
+  const employeeSafeCurrentPage = Math.min(employeeCurrentPage, employeeTotalPages);
+  const employeePageStartIndex = (employeeSafeCurrentPage - 1) * employeeRowsPerPage;
+  const paginatedEmployees = sortedEmployees.slice(employeePageStartIndex, employeePageStartIndex + employeeRowsPerPage);
+  const employeeVisibleStart = sortedEmployees.length === 0 ? 0 : employeePageStartIndex + 1;
+  const employeeVisibleEnd = Math.min(employeePageStartIndex + employeeRowsPerPage, sortedEmployees.length);
+
+  useEffect(() => {
+    if (employeeCurrentPage !== employeeSafeCurrentPage) {
+      setEmployeeCurrentPage(employeeSafeCurrentPage);
+    }
+  }, [employeeCurrentPage, employeeSafeCurrentPage]);
 
   return (
     <section className="content">
       <div className="employee-list-toolbar">
         <div>
           <div className="section-title">EMPLOYEE LIST</div>
-          <div className="employee-list-count">{employees.length} Employees</div>
+          <div className="employee-list-count">
+            {normalizedEmployeeSearchTerm ? `${filteredEmployees.length} of ${employees.length} Employees` : `${employees.length} Employees`}
+          </div>
         </div>
         {canAddEmployee ? (
           <button
             className="btn primary"
             type="button"
-            onClick={() => {
-              setAddEmployeeActiveTab("personal");
-              setAddEmployeeError("");
-              setIsAddEmployeeModalOpen(true);
-            }}
+            onClick={handleOpenAddEmployeeModal}
           >
             + Add Employee
           </button>
         ) : null}
+      </div>
+
+      <div className="employee-list-controls">
+        <label className="employee-search-field" htmlFor="employee-search">
+          <span className="employee-control-label">Search</span>
+          <input
+            id="employee-search"
+            type="search"
+            placeholder="Search name, email, position, account..."
+            value={employeeSearchTerm}
+            onChange={event => setEmployeeSearchTerm(event.target.value)}
+          />
+        </label>
+
+        <label className="employee-rows-field" htmlFor="employee-rows-per-page">
+          <span className="employee-control-label">Rows per page</span>
+          <input
+            id="employee-rows-per-page"
+            type="text"
+            inputMode="numeric"
+            placeholder="10"
+            value={employeeRowsPerPageInput}
+            onChange={handleEmployeeRowsPerPageChange}
+            onBlur={handleEmployeeRowsPerPageBlur}
+          />
+        </label>
       </div>
 
       {employeeError && <div className="error">{employeeError}</div>}
@@ -381,20 +756,32 @@ export default function EmployeesSection() {
         <div className="empty-state">Loading employees...</div>
       ) : employees.length === 0 ? (
         <div className="empty-state">No employees found.</div>
+      ) : filteredEmployees.length === 0 ? (
+        <div className="empty-state">No matching employees found.</div>
       ) : (
-        <div className="table-card">
+        <div className="table-card employee-table-card">
           <div className="table-header employee-list-header">
-            <div>ID</div>
-            <div>Name</div>
-            <div>Position</div>
-            <div>Account</div>
-            <div>Type</div>
-            <div>Status</div>
-            <div>Hired</div>
-            <div>Info</div>
-            <div className="employee-actions-cell">Actions</div>
+            {employeeTableColumns.map(column => (
+              <div key={column.key} className={column.className ?? ""}>
+                {column.sortable ? (
+                  <button
+                    className="employee-sort-button"
+                    type="button"
+                    onClick={() => handleEmployeeSort(column.key)}
+                    aria-label={`Sort by ${column.label}`}
+                  >
+                    <span>{column.label}</span>
+                    <span className="employee-sort-indicator" aria-hidden="true">
+                      {employeeSortKey === column.key ? (employeeSortDirection === "asc" ? "^" : "v") : "-"}
+                    </span>
+                  </button>
+                ) : (
+                  <span>{column.label}</span>
+                )}
+              </div>
+            ))}
           </div>
-          {employees.map(employee => (
+          {paginatedEmployees.map(employee => (
             <div key={employee.id} className="table-row employee-list-row">
               <div className="table-cell">{employee.id}</div>
               <div className="table-cell">{employee.fullname || "—"}</div>
@@ -428,6 +815,32 @@ export default function EmployeesSection() {
               </div>
             </div>
           ))}
+          <div className="employee-table-pagination">
+            <div className="employee-pagination-summary">
+              Showing {employeeVisibleStart}-{employeeVisibleEnd} of {sortedEmployees.length}
+            </div>
+            <div className="employee-pagination-actions">
+              <button
+                className="btn secondary"
+                type="button"
+                onClick={() => setEmployeeCurrentPage(current => Math.max(1, current - 1))}
+                disabled={employeeSafeCurrentPage === 1}
+              >
+                Previous
+              </button>
+              <div className="employee-pagination-page">
+                Page {employeeSafeCurrentPage} of {employeeTotalPages}
+              </div>
+              <button
+                className="btn secondary"
+                type="button"
+                onClick={() => setEmployeeCurrentPage(current => Math.min(employeeTotalPages, current + 1))}
+                disabled={employeeSafeCurrentPage === employeeTotalPages}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -441,14 +854,10 @@ export default function EmployeesSection() {
                   View full employee details
                 </div>
               </div>
-              <button
-                className="btn link modal-close-btn"
-                type="button"
-                onClick={handleCloseInfoModal}
-              >
-                Close
-              </button>
             </div>
+
+            <hr />
+            <br />
 
             <div className="modal-body">
               <div className="add-employee-grid">
@@ -476,6 +885,8 @@ export default function EmployeesSection() {
               </div>
             </div>
 
+            <br />
+
             <div className="add-employee-footer-actions">
               <button className="btn primary" onClick={handleCloseInfoModal}>
                 Close
@@ -500,19 +911,19 @@ export default function EmployeesSection() {
             </div>
             <form className="modal-body add-employee-management-form" onSubmit={handleSubmitAddEmployee}>
               <div className="add-employee-tabs" role="tablist" aria-label="Add employee sections">
-                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "personal"} className={`add-employee-tab ${addEmployeeActiveTab === "personal" ? "active" : ""}`} onClick={() => setAddEmployeeActiveTab("personal")}>Personal Information</button>
-                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "employment"} className={`add-employee-tab ${addEmployeeActiveTab === "employment" ? "active" : ""}`} onClick={() => setAddEmployeeActiveTab("employment")}>Employment Details</button>
-                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "benefits"} className={`add-employee-tab ${addEmployeeActiveTab === "benefits" ? "active" : ""}`} onClick={() => setAddEmployeeActiveTab("benefits")}>Benefit Details</button>
+                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "personal"} className={`add-employee-tab ${addEmployeeActiveTab === "personal" ? "active" : ""}`} onClick={() => handleAddEmployeeTabChange("personal")}>Personal Information</button>
+                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "employment"} className={`add-employee-tab ${addEmployeeActiveTab === "employment" ? "active" : ""}`} onClick={() => handleAddEmployeeTabChange("employment")}>Employment Details</button>
+                <button type="button" role="tab" aria-selected={addEmployeeActiveTab === "benefits"} className={`add-employee-tab ${addEmployeeActiveTab === "benefits" ? "active" : ""}`} onClick={() => handleAddEmployeeTabChange("benefits")}>Benefit Details</button>
               </div>
 
               {addEmployeeActiveTab === "personal" && (
                 <div className="add-employee-tab-panel" role="tabpanel">
                   <div className="add-employee-grid">
-                    <label className="form-field" htmlFor="employee-first-name"><input id="employee-first-name" name="first_name" placeholder="First Name" value={addEmployeeForm.first_name} onChange={handleAddEmployeeChange} required /></label>
-                    <label className="form-field" htmlFor="employee-middle-name"><input id="employee-middle-name" name="middle_name" placeholder="Middle Name" value={addEmployeeForm.middle_name} onChange={handleAddEmployeeChange} /></label>
-                    <label className="form-field add-employee-last-name" htmlFor="employee-last-name"><input id="employee-last-name" name="last_name" placeholder="Last Name" value={addEmployeeForm.last_name} onChange={handleAddEmployeeChange} required /></label>
-                    <label className="form-field add-employee-full-width" htmlFor="employee-address"><input id="employee-address" name="address" placeholder="Address" value={addEmployeeForm.address} onChange={handleAddEmployeeChange} /></label>
-                    <label className="form-field" htmlFor="employee-birthdate"><input id="employee-birthdate" type="date" name="birthdate" value={addEmployeeForm.birthdate} onChange={handleAddEmployeeChange} /></label>
+                    <label className="form-field" htmlFor="employee-first-name"><input id="employee-first-name" name="first_name" placeholder="First Name" value={addEmployeeForm.first_name} onChange={handleAddEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." required /></label>
+                    <label className="form-field" htmlFor="employee-middle-name"><input id="employee-middle-name" name="middle_name" placeholder="Middle Name" value={addEmployeeForm.middle_name} onChange={handleAddEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." /></label>
+                    <label className="form-field add-employee-last-name" htmlFor="employee-last-name"><input id="employee-last-name" name="last_name" placeholder="Last Name" value={addEmployeeForm.last_name} onChange={handleAddEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." required /></label>
+                    <label className="form-field add-employee-full-width" htmlFor="employee-address"><input id="employee-address" name="address" placeholder="Address" value={addEmployeeForm.address} onChange={handleAddEmployeeChange} required /></label>
+                    <label className="form-field" htmlFor="employee-birthdate"><input id="employee-birthdate" type="date" name="birthdate" value={addEmployeeForm.birthdate} onChange={handleAddEmployeeChange} required /></label>
                     <label className="form-field" htmlFor="employee-contact-number">
                     <input
                         id="employee-contact-number"
@@ -524,14 +935,15 @@ export default function EmployeesSection() {
                         inputMode="numeric"
                         pattern="09[0-9]{9}"
                         title="Contact number must start with 09 and be 11 digits"
+                        required
                       />
                       </label>
                     <label className="form-field" htmlFor="employee-civil-status">
-                      <select id="employee-civil-status" name="civil_status" value={addEmployeeForm.civil_status} onChange={handleAddEmployeeChange}>
+                      <select id="employee-civil-status" name="civil_status" value={addEmployeeForm.civil_status} onChange={handleAddEmployeeChange} required>
                         <option value="">Civil Status</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option>
                       </select>
                     </label>
-                    <label className="form-field" htmlFor="employee-personal-email"><input id="employee-personal-email" type="email" name="personal_email" placeholder="Personal Email" value={addEmployeeForm.personal_email} onChange={handleAddEmployeeChange} /></label>
+                    <label className="form-field" htmlFor="employee-personal-email"><input id="employee-personal-email" type="email" name="personal_email" placeholder="Personal Email" value={addEmployeeForm.personal_email} onChange={handleAddEmployeeChange} required /></label>
                     <label className="form-field" htmlFor="employee-work-email"><input id="employee-work-email" type="email" name="work_email" placeholder="Work Email" value={addEmployeeForm.work_email} onChange={handleAddEmployeeChange} required /></label>
                   </div>
                 </div>
@@ -541,7 +953,7 @@ export default function EmployeesSection() {
                 <div className="add-employee-tab-panel" role="tabpanel">
                   <div className="add-employee-grid">
                     <label className="form-field" htmlFor="employee-position">
-                      <select id="employee-position" name="position" value={addEmployeeForm.position} onChange={handleAddEmployeeChange}>
+                      <select id="employee-position" name="position" value={addEmployeeForm.position} onChange={handleAddEmployeeChange} required>
                         <option value="">Select Position</option>
                         {employmentPositions.map(position => (
                           <option key={position} value={position}>{position}</option>
@@ -549,7 +961,7 @@ export default function EmployeesSection() {
                       </select>
                     </label>
                     <label className="form-field" htmlFor="employee-account">
-                      <select id="employee-account" name="account" value={addEmployeeForm.account} onChange={handleAddEmployeeChange}>
+                      <select id="employee-account" name="account" value={addEmployeeForm.account} onChange={handleAddEmployeeChange} required>
                         <option value="">Select Account</option>
                         {employmentAccounts.map(account => (
                           <option key={account} value={account}>{account}</option>
@@ -557,7 +969,7 @@ export default function EmployeesSection() {
                       </select>
                     </label>
                     <label className="form-field" htmlFor="employee-type">
-                      <select id="employee-type" name="employee_type" value={addEmployeeForm.employee_type} onChange={handleAddEmployeeChange}>
+                      <select id="employee-type" name="employee_type" value={addEmployeeForm.employee_type} onChange={handleAddEmployeeChange} required>
                         <option value="">Select Employee Type</option>
                         {employeeTypes.map(employeeType => (
                           <option key={employeeType} value={employeeType}>{employeeType}</option>
@@ -588,22 +1000,21 @@ export default function EmployeesSection() {
                 <div id="edit-employee-title" className="modal-title">Edit Employee</div>
                 <div className="modal-subtitle">Update employee profile details.</div>
               </div>
-              <button className="btn link modal-close-btn" type="button" onClick={handleCloseEditEmployeeModal}>Close</button>
             </div>
             <form className="modal-body add-employee-management-form" onSubmit={handleSubmitEditEmployee}>
               <div className="add-employee-tabs" role="tablist" aria-label="Edit employee sections">
-                <button type="button" role="tab" aria-selected={editEmployeeActiveTab === "personal"} className={`add-employee-tab ${editEmployeeActiveTab === "personal" ? "active" : ""}`} onClick={() => setEditEmployeeActiveTab("personal")}>Personal Information</button>
-                <button type="button" role="tab" aria-selected={editEmployeeActiveTab === "employment"} className={`add-employee-tab ${editEmployeeActiveTab === "employment" ? "active" : ""}`} onClick={() => setEditEmployeeActiveTab("employment")}>Employment Details</button>
+                <button type="button" role="tab" aria-selected={editEmployeeActiveTab === "personal"} className={`add-employee-tab ${editEmployeeActiveTab === "personal" ? "active" : ""}`} onClick={() => handleEditEmployeeTabChange("personal")}>Personal Information</button>
+                <button type="button" role="tab" aria-selected={editEmployeeActiveTab === "employment"} className={`add-employee-tab ${editEmployeeActiveTab === "employment" ? "active" : ""}`} onClick={() => handleEditEmployeeTabChange("employment")}>Employment Details</button>
               </div>
 
               {editEmployeeActiveTab === "personal" && (
                 <div className="add-employee-tab-panel" role="tabpanel">
                   <div className="add-employee-grid">
-                    <label className="form-field" htmlFor="edit-employee-first-name"><input id="edit-employee-first-name" name="first_name" placeholder="First Name" value={editEmployeeForm.first_name} onChange={handleEditEmployeeChange} required /></label>
-                    <label className="form-field" htmlFor="edit-employee-middle-name"><input id="edit-employee-middle-name" name="middle_name" placeholder="Middle Name" value={editEmployeeForm.middle_name} onChange={handleEditEmployeeChange} /></label>
-                    <label className="form-field add-employee-last-name" htmlFor="edit-employee-last-name"><input id="edit-employee-last-name" name="last_name" placeholder="Last Name" value={editEmployeeForm.last_name} onChange={handleEditEmployeeChange} required /></label>
-                    <label className="form-field add-employee-full-width" htmlFor="edit-employee-address"><input id="edit-employee-address" name="address" placeholder="Address" value={editEmployeeForm.address} onChange={handleEditEmployeeChange} /></label>
-                    <label className="form-field" htmlFor="edit-employee-birthdate"><input id="edit-employee-birthdate" type="date" name="birthdate" value={editEmployeeForm.birthdate} onChange={handleEditEmployeeChange} /></label>
+                    <label className="form-field" htmlFor="edit-employee-first-name"><input id="edit-employee-first-name" name="first_name" placeholder="First Name" value={editEmployeeForm.first_name} onChange={handleEditEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." required /></label>
+                    <label className="form-field" htmlFor="edit-employee-middle-name"><input id="edit-employee-middle-name" name="middle_name" placeholder="Middle Name" value={editEmployeeForm.middle_name} onChange={handleEditEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." /></label>
+                    <label className="form-field add-employee-last-name" htmlFor="edit-employee-last-name"><input id="edit-employee-last-name" name="last_name" placeholder="Last Name" value={editEmployeeForm.last_name} onChange={handleEditEmployeeChange} onKeyDown={handleEmployeeNameKeyDown} title="Names cannot contain numbers." required /></label>
+                    <label className="form-field add-employee-full-width" htmlFor="edit-employee-address"><input id="edit-employee-address" name="address" placeholder="Address" value={editEmployeeForm.address} onChange={handleEditEmployeeChange} required /></label>
+                    <label className="form-field" htmlFor="edit-employee-birthdate"><input id="edit-employee-birthdate" type="date" name="birthdate" value={editEmployeeForm.birthdate} onChange={handleEditEmployeeChange} required /></label>
                     <label className="form-field" htmlFor="edit-employee-contact-number">
                     <input
                       id="edit-employee-contact-number"
@@ -615,13 +1026,14 @@ export default function EmployeesSection() {
                       inputMode="numeric"
                       pattern="09[0-9]{9}"
                       title="Contact number must start with 09 and be 11 digits"
+                      required
                     /></label>
                     <label className="form-field" htmlFor="edit-employee-civil-status">
-                      <select id="edit-employee-civil-status" name="civil_status" value={editEmployeeForm.civil_status} onChange={handleEditEmployeeChange}>
+                      <select id="edit-employee-civil-status" name="civil_status" value={editEmployeeForm.civil_status} onChange={handleEditEmployeeChange} required>
                         <option value="">Civil Status</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option>
                       </select>
                     </label>
-                    <label className="form-field" htmlFor="edit-employee-personal-email"><input id="edit-employee-personal-email" type="email" name="personal_email" placeholder="Personal Email" value={editEmployeeForm.personal_email} onChange={handleEditEmployeeChange} /></label>
+                    <label className="form-field" htmlFor="edit-employee-personal-email"><input id="edit-employee-personal-email" type="email" name="personal_email" placeholder="Personal Email" value={editEmployeeForm.personal_email} onChange={handleEditEmployeeChange} required /></label>
                     <label className="form-field" htmlFor="edit-employee-work-email"><input id="edit-employee-work-email" type="email" name="work_email" placeholder="Work Email" value={editEmployeeForm.work_email} onChange={handleEditEmployeeChange} required /></label>
                   </div>
                 </div>
@@ -631,7 +1043,7 @@ export default function EmployeesSection() {
                 <div className="add-employee-tab-panel" role="tabpanel">
                   <div className="add-employee-grid">
                     <label className="form-field" htmlFor="edit-employee-position">
-                      <select id="edit-employee-position" name="position" value={editEmployeeForm.position} onChange={handleEditEmployeeChange}>
+                      <select id="edit-employee-position" name="position" value={editEmployeeForm.position} onChange={handleEditEmployeeChange} required>
                         <option value="">Select Position</option>
                         {employmentPositions.map(position => (
                           <option key={position} value={position}>{position}</option>
@@ -639,7 +1051,7 @@ export default function EmployeesSection() {
                       </select>
                     </label>
                     <label className="form-field" htmlFor="edit-employee-account">
-                      <select id="edit-employee-account" name="account" value={editEmployeeForm.account} onChange={handleEditEmployeeChange}>
+                      <select id="edit-employee-account" name="account" value={editEmployeeForm.account} onChange={handleEditEmployeeChange} required>
                         <option value="">Select Account</option>
                         {employmentAccounts.map(account => (
                           <option key={account} value={account}>{account}</option>
@@ -647,7 +1059,7 @@ export default function EmployeesSection() {
                       </select>
                     </label>
                     <label className="form-field" htmlFor="edit-employee-type">
-                      <select id="edit-employee-type" name="employee_type" value={editEmployeeForm.employee_type} onChange={handleEditEmployeeChange}>
+                      <select id="edit-employee-type" name="employee_type" value={editEmployeeForm.employee_type} onChange={handleEditEmployeeChange} required>
                         <option value="">Select Employee Type</option>
                         {employeeTypes.map(employeeType => (
                           <option key={employeeType} value={employeeType}>{employeeType}</option>

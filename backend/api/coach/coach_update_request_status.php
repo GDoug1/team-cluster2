@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 requireRole("coach");
 
 function hasTable(mysqli $conn, string $table): bool {
@@ -18,6 +19,41 @@ function getColumns(mysqli $conn, string $table): array {
         }
     }
     return $columns;
+}
+
+
+function getRequesterRoleExpression(mysqli $conn, string $requesterIdExpr, bool $requesterIsUserId): string {
+    if (!hasTable($conn, 'users')) {
+        return "''";
+    }
+
+    $userColumns = getColumns($conn, 'users');
+    $usersIdColumn = in_array('id', $userColumns, true) ? 'id' : (in_array('user_id', $userColumns, true) ? 'user_id' : null);
+    $roleColumn = in_array('role', $userColumns, true) ? 'role' : null;
+    $roleIdColumn = in_array('role_id', $userColumns, true) ? 'role_id' : null;
+
+    if ($usersIdColumn === null) {
+        return "''";
+    }
+
+    $userIdExpr = $requesterIsUserId
+        ? $requesterIdExpr
+        : "(SELECT employee_user.user_id FROM employees employee_user WHERE employee_user.employee_id = {$requesterIdExpr} LIMIT 1)";
+
+    if ($roleColumn !== null) {
+        return "LOWER(COALESCE((SELECT request_role_user.$roleColumn FROM users request_role_user WHERE request_role_user.$usersIdColumn = {$userIdExpr} LIMIT 1), ''))";
+    }
+
+    if ($roleIdColumn !== null && hasTable($conn, 'roles')) {
+        $roleColumns = getColumns($conn, 'roles');
+        $rolesIdColumn = in_array('role_id', $roleColumns, true) ? 'role_id' : null;
+        $roleNameColumn = in_array('role_name', $roleColumns, true) ? 'role_name' : null;
+        if ($rolesIdColumn !== null && $roleNameColumn !== null) {
+            return "LOWER(COALESCE((SELECT request_role.$roleNameColumn FROM users request_role_user LEFT JOIN roles request_role ON request_role.$rolesIdColumn = request_role_user.$roleIdColumn WHERE request_role_user.$usersIdColumn = {$userIdExpr} LIMIT 1), ''))";
+        }
+    }
+
+    return "''";
 }
 
 function getClusterMemberEmployeeReference(mysqli $conn): ?string {
@@ -49,11 +85,13 @@ $source = trim((string)($body['request_source'] ?? ''));
 $requestId = (int)($body['request_id'] ?? 0);
 $status = trim((string)($body['status'] ?? ''));
 
-if ($status === 'Approved') {
+if ($status === 'Approved' && $source !== 'dispute') {
     $status = 'Endorsed';
 }
 
-if (!in_array($source, ['leave', 'overtime', 'dispute'], true) || $requestId <= 0 || $status !== 'Endorsed') {
+$allowedStatuses = $source === 'dispute' ? ['Approved', 'Denied'] : ['Endorsed', 'Denied'];
+
+if (!in_array($source, ['leave', 'overtime', 'dispute'], true) || $requestId <= 0 || !in_array($status, $allowedStatuses, true)) {
     http_response_code(422);
     echo json_encode(["error" => "Invalid request update payload."]);
     exit;
@@ -82,12 +120,20 @@ if ($requestEmployeeReference === 'users' && $canJoinEmployees) {
     $employeeJoinSql = ' LEFT JOIN employees emp ON emp.user_id = req.employee_id';
 }
 
+$roleJoinSql = '';
+$roleConditionSql = '';
+if ($source === 'dispute') {
+    $requesterRoleExpr = getRequesterRoleExpression($conn, 'req.employee_id', $requestEmployeeReference === 'users');
+    $roleConditionSql = " AND {$requesterRoleExpr} = 'employee'";
+}
+
 $checkSql = "SELECT $requestEmployeeExpr AS employee_id
              FROM $table req
              $employeeJoinSql
              INNER JOIN cluster_members cm ON cm.employee_id = $requestEmployeeExpr
              INNER JOIN clusters c ON c.$clusterIdColumn = cm.cluster_id
-             WHERE req.$idColumn = ? AND c.$clusterOwnerColumn = ? AND c.status = 'active'
+             $roleJoinSql
+             WHERE req.$idColumn = ? AND c.$clusterOwnerColumn = ? AND c.status = 'active'$roleConditionSql
              LIMIT 1";
 $checkStmt = $conn->prepare($checkSql);
 $checkStmt->bind_param('ii', $requestId, $coachId);
@@ -99,8 +145,19 @@ if (!$allowed || $allowed->num_rows === 0) {
     exit;
 }
 
-$updateStmt = $conn->prepare("UPDATE $table SET status = ? WHERE $idColumn = ?");
-$updateStmt->bind_param('si', $status, $requestId);
+$hasReviewedBy = false;
+$reviewedColumnsRes = $conn->query("SHOW COLUMNS FROM $table LIKE 'reviewed_by'");
+if ($reviewedColumnsRes && $reviewedColumnsRes->num_rows > 0) {
+    $hasReviewedBy = true;
+}
+
+if ($hasReviewedBy) {
+    $updateStmt = $conn->prepare("UPDATE $table SET status = ?, reviewed_by = ? WHERE $idColumn = ?");
+    $updateStmt->bind_param('sii', $status, $coachId, $requestId);
+} else {
+    $updateStmt = $conn->prepare("UPDATE $table SET status = ? WHERE $idColumn = ?");
+    $updateStmt->bind_param('si', $status, $requestId);
+}
 $updateStmt->execute();
 
 if ($conn->errno) {
@@ -108,5 +165,11 @@ if ($conn->errno) {
     echo json_encode(["error" => "Unable to update request status."]);
     exit;
 }
+
+logCurrentUserAction(
+    $conn,
+    'request_endorse',
+    buildAuditTarget($source, $requestId, 'status=' . $status)
+);
 
 echo json_encode(["success" => true]);

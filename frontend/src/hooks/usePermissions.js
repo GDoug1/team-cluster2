@@ -9,6 +9,10 @@ export default function usePermissions() {
     let mounted = true;
 
     const loadPermissions = async () => {
+      if (mounted) {
+        setLoading(true);
+      }
+
       try {
         const response = await apiFetch("auth/my_permissions.php");
         if (!mounted) return;
@@ -23,8 +27,15 @@ export default function usePermissions() {
 
     loadPermissions();
 
+    const handlePermissionsUpdated = () => {
+      loadPermissions();
+    };
+
+    window.addEventListener("permissions-updated", handlePermissionsUpdated);
+
     return () => {
       mounted = false;
+      window.removeEventListener("permissions-updated", handlePermissionsUpdated);
     };
   }, []);
 

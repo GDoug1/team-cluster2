@@ -1,7 +1,101 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 requireRole(["admin", "super admin"]);
+
+
+function hasTable(mysqli $conn, string $table): bool {
+    $safe = $conn->real_escape_string($table);
+    $result = $conn->query("SHOW TABLES LIKE '{$safe}'");
+    return $result && $result->num_rows > 0;
+}
+
+function getColumns(mysqli $conn, string $table): array {
+    $columns = [];
+    $result = $conn->query("SHOW COLUMNS FROM $table");
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $columns[] = $row['Field'];
+        }
+    }
+    return $columns;
+}
+
+function getUserRoleByReference(mysqli $conn, int $referenceId, bool $referenceIsUserId): string {
+    if ($referenceId <= 0 || !hasTable($conn, 'users')) {
+        return '';
+    }
+
+    $userId = $referenceId;
+    if (!$referenceIsUserId) {
+        if (!hasTable($conn, 'employees')) {
+            return '';
+        }
+
+        $employeeColumns = getColumns($conn, 'employees');
+        if (!in_array('employee_id', $employeeColumns, true) || !in_array('user_id', $employeeColumns, true)) {
+            return '';
+        }
+
+        $employeeStmt = $conn->prepare("SELECT user_id FROM employees WHERE employee_id = ? LIMIT 1");
+        if (!$employeeStmt) {
+            return '';
+        }
+        $employeeStmt->bind_param('i', $referenceId);
+        $employeeStmt->execute();
+        $employeeResult = $employeeStmt->get_result();
+        if (!$employeeResult || $employeeResult->num_rows === 0) {
+            return '';
+        }
+        $userId = (int)($employeeResult->fetch_assoc()['user_id'] ?? 0);
+    }
+
+    if ($userId <= 0) {
+        return '';
+    }
+
+    $userColumns = getColumns($conn, 'users');
+    $usersIdColumn = in_array('id', $userColumns, true) ? 'id' : (in_array('user_id', $userColumns, true) ? 'user_id' : null);
+    $roleColumn = in_array('role', $userColumns, true) ? 'role' : null;
+    $roleIdColumn = in_array('role_id', $userColumns, true) ? 'role_id' : null;
+
+    if ($usersIdColumn === null) {
+        return '';
+    }
+
+    if ($roleColumn !== null) {
+        $stmt = $conn->prepare("SELECT LOWER(COALESCE($roleColumn, '')) AS role_name FROM users WHERE $usersIdColumn = ? LIMIT 1");
+        if ($stmt) {
+            $stmt->bind_param('i', $userId);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($result && $result->num_rows > 0) {
+                return (string)($result->fetch_assoc()['role_name'] ?? '');
+            }
+        }
+        return '';
+    }
+
+    if ($roleIdColumn !== null && hasTable($conn, 'roles')) {
+        $roleColumns = getColumns($conn, 'roles');
+        $rolesIdColumn = in_array('role_id', $roleColumns, true) ? 'role_id' : null;
+        $roleNameColumn = in_array('role_name', $roleColumns, true) ? 'role_name' : null;
+        if ($rolesIdColumn !== null && $roleNameColumn !== null) {
+            $stmt = $conn->prepare("SELECT LOWER(COALESCE(r.$roleNameColumn, '')) AS role_name FROM users u LEFT JOIN roles r ON r.$rolesIdColumn = u.$roleIdColumn WHERE u.$usersIdColumn = ? LIMIT 1");
+            if ($stmt) {
+                $stmt->bind_param('i', $userId);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                if ($result && $result->num_rows > 0) {
+                    return (string)($result->fetch_assoc()['role_name'] ?? '');
+                }
+            }
+        }
+    }
+
+    return '';
+}
 
 function getEmployeeReferenceTable(mysqli $conn, string $table): ?string {
     $safeTable = $conn->real_escape_string($table);
@@ -79,6 +173,16 @@ if ($currentStatus !== 'endorsed') {
 }
 
 $requesterEmployeeId = (int)($existing['employee_id'] ?? 0);
+$requesterRole = '';
+if ($source === 'dispute') {
+    $requesterRole = getUserRoleByReference($conn, $requesterEmployeeId, $requestEmployeeReference === 'users');
+    if (!in_array($requesterRole, ['coach', 'admin', 'super admin'], true)) {
+        http_response_code(403);
+        echo json_encode(["error" => "Attendance disputes can only be finalized for coach, admin, or super admin requesters."]);
+        exit;
+    }
+}
+
 $currentEmployeeId = $adminId;
 $employeeStmt = $conn->prepare("SELECT employee_id FROM employees WHERE user_id = ? LIMIT 1");
 if ($employeeStmt) {
@@ -118,5 +222,11 @@ if ($conn->errno) {
     echo json_encode(["error" => "Unable to update request status."]);
     exit;
 }
+
+logCurrentUserAction(
+    $conn,
+    'request_finalize',
+    buildAuditTarget($source, $requestId, 'status=' . $status)
+);
 
 echo json_encode(["success" => true]);

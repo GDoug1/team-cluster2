@@ -1,6 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
+include __DIR__ . "/../utils/logger.php";
 
 
 
@@ -81,6 +82,75 @@ function resolveEmployeeRoleId(mysqli $conn): ?int {
     $result = $stmt->get_result();
     $row = $result ? $result->fetch_assoc() : null;
     return isset($row['role_id']) ? (int)$row['role_id'] : null;
+}
+
+function validateEmployeeNameFields(string $firstName, string $middleName, string $lastName): ?string {
+    $nameFields = [
+        "First name" => $firstName,
+        "Middle name" => $middleName,
+        "Last name" => $lastName
+    ];
+
+    foreach ($nameFields as $label => $value) {
+        if ($value !== '' && preg_match('/\d/', $value) === 1) {
+            return "{$label} cannot contain numbers.";
+        }
+    }
+
+    return null;
+}
+
+function validateEmployeeRequiredFields(
+    string $firstName,
+    string $lastName,
+    string $address,
+    string $birthdate,
+    string $civilStatus,
+    string $email,
+    string $personalEmail,
+    string $position,
+    string $account,
+    string $contactNumber,
+    string $employeeType
+): ?string {
+    $requiredFields = [
+        "First name" => $firstName,
+        "Last name" => $lastName,
+        "Address" => $address,
+        "Birthdate" => $birthdate,
+        "Contact number" => $contactNumber,
+        "Civil status" => $civilStatus,
+        "Personal email" => $personalEmail,
+        "Work email" => $email,
+        "Position" => $position,
+        "Account" => $account,
+        "Employee type" => $employeeType
+    ];
+
+    $missingFields = [];
+    foreach ($requiredFields as $label => $value) {
+        if (trim($value) === '') {
+            $missingFields[] = $label;
+        }
+    }
+
+    if (!empty($missingFields)) {
+        return "Please complete all required employee fields: " . implode(", ", $missingFields) . ".";
+    }
+
+    if (preg_match('/^09\d{9}$/', $contactNumber) !== 1) {
+        return "Contact number must start with 09 and be exactly 11 digits.";
+    }
+
+    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        return "Work email must be a valid email address.";
+    }
+
+    if (filter_var($personalEmail, FILTER_VALIDATE_EMAIL) === false) {
+        return "Personal email must be a valid email address.";
+    }
+
+    return null;
 }
 
 $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -185,6 +255,7 @@ if ($requestMethod === 'PATCH') {
             exit(json_encode(["success" => false, "message" => "Archived employee not found."]));
         }
 
+        logCurrentUserAction($conn, 'employee_restore', buildAuditTarget('employee', $employeeId));
         echo json_encode(["success" => true]);
         exit;
     }
@@ -207,6 +278,7 @@ if ($requestMethod === 'PATCH') {
             exit(json_encode(["success" => false, "message" => "Archived employee not found."]));
         }
 
+        logCurrentUserAction($conn, 'employee_delete_permanent', buildAuditTarget('employee', $employeeId));
         echo json_encode(["success" => true]);
         exit;
     }
@@ -248,6 +320,30 @@ if ($requestMethod === 'PUT') {
     if ($firstName === '' || $lastName === '' || $email === '') {
         http_response_code(400);
         exit(json_encode(["success" => false, "message" => "First name, last name, and email are required."]));
+    }
+
+    $nameValidationError = validateEmployeeNameFields($firstName, $middleName, $lastName);
+    if ($nameValidationError !== null) {
+        http_response_code(400);
+        exit(json_encode(["success" => false, "message" => $nameValidationError]));
+    }
+
+    $requiredFieldsValidationError = validateEmployeeRequiredFields(
+        $firstName,
+        $lastName,
+        $address,
+        $birthdate,
+        $civilStatus,
+        $email,
+        $personalEmail,
+        $position,
+        $account,
+        $contactNumber,
+        $employeeType
+    );
+    if ($requiredFieldsValidationError !== null) {
+        http_response_code(400);
+        exit(json_encode(["success" => false, "message" => $requiredFieldsValidationError]));
     }
 
     $conn->begin_transaction();
@@ -347,6 +443,11 @@ if ($requestMethod === 'PUT') {
         }
 
         $conn->commit();
+        logCurrentUserAction(
+            $conn,
+            'employee_update',
+            buildAuditTarget('employee', $employeeId, $email)
+        );
         echo json_encode(["success" => true]);
     } catch (Throwable $error) {
         $conn->rollback();
@@ -386,6 +487,7 @@ if ($requestMethod === 'DELETE') {
         exit(json_encode(["success" => false, "message" => "Employee not found."]));
     }
 
+    logCurrentUserAction($conn, 'employee_archive', buildAuditTarget('employee', $employeeId));
     echo json_encode(["success" => true]);
     exit;
 }
@@ -419,6 +521,30 @@ $employeeType = trim((string)($data['employee_type'] ?? ''));
 if ($firstName === '' || $lastName === '' || $email === '') {
     http_response_code(400);
     exit(json_encode(["success" => false, "message" => "First name, last name, and email are required."]));
+}
+
+$nameValidationError = validateEmployeeNameFields($firstName, $middleName, $lastName);
+if ($nameValidationError !== null) {
+    http_response_code(400);
+    exit(json_encode(["success" => false, "message" => $nameValidationError]));
+}
+
+$requiredFieldsValidationError = validateEmployeeRequiredFields(
+    $firstName,
+    $lastName,
+    $address,
+    $birthdate,
+    $civilStatus,
+    $email,
+    $personalEmail,
+    $position,
+    $account,
+    $contactNumber,
+    $employeeType
+);
+if ($requiredFieldsValidationError !== null) {
+    http_response_code(400);
+    exit(json_encode(["success" => false, "message" => $requiredFieldsValidationError]));
 }
 
 $employeeRoleId = resolveEmployeeRoleId($conn);
@@ -512,6 +638,12 @@ try {
     }
 
     $conn->commit();
+    $employeeId = (int)$stmtEmp->insert_id;
+    logCurrentUserAction(
+        $conn,
+        'employee_create',
+        buildAuditTarget('employee', $employeeId, $email)
+    );
 
     echo json_encode([
         "success" => true,

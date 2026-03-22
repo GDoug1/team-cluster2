@@ -1,7 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
-requireRole("employee");
+requirePermission($conn, "View Team");
 
 function getColumns(mysqli $conn, string $table): array {
     $columns = [];
