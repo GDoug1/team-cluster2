@@ -52,6 +52,20 @@ const formatDateTimeLabel = value => {
   });
 };
 
+
+const formatRequestActionDate = value => {
+  if (!value) return "—";
+  const date = new Date(String(value).replace(" ", "T"));
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+};
+
 const formatAttendanceDate = value => {
   if (!value) return "—";
   const parsed = parseSqlDateTime(value) ?? new Date(String(value).replace(" ", "T"));
@@ -162,7 +176,8 @@ export default function DataPanel({
           item.username,
           item.user_name,
           item.request_action_by_name,
-          item.request_action_by_role
+          item.request_action_by_role,
+          item.request_action_at
         ]
           .filter(Boolean)
           .join(" ")
@@ -329,6 +344,7 @@ export default function DataPanel({
             <span role="columnheader">Schedule / Period</span>
             <span role="columnheader">Status</span>
             {showRequestActionBy && <span role="columnheader">Accepted / Rejected By</span>}
+            {showRequestActionBy && <span role="columnheader">Accepted / Rejected Date</span>}
             {personField && <span role="columnheader">{personLabel}</span>}
             {onRequestAction && <span role="columnheader">Actions</span>}
           </div>
@@ -377,6 +393,11 @@ export default function DataPanel({
                   <span role="cell" className="team-attendance-employee-cell">
                     <span>{getPersonPrimaryValue(item, 'request_action_by_name')}</span>
                     {item?.request_action_by_role ? <small>{item.request_action_by_role}</small> : null}
+                  </span>
+                )}
+                {showRequestActionBy && (
+                  <span role="cell">
+                    {formatRequestActionDate(item.request_action_at)}
                   </span>
                 )}
                 {personField && (

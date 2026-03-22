@@ -84,6 +84,57 @@ function resolveRequestActorName(mysqli $conn, ?int $userId): string {
     return '';
 }
 
+
+function resolveRequestActionLog(mysqli $conn, string $source, array $row): array {
+    $requestId = (int)($row['source_id'] ?? 0);
+    $normalizedStatus = strtolower(trim((string)($row['status'] ?? '')));
+    $reviewedBy = isset($row['reviewed_by']) ? (int)$row['reviewed_by'] : 0;
+    $approvedBy = isset($row['approved_by']) ? (int)$row['approved_by'] : 0;
+
+    if (!hasTable($conn, 'activity_logs') || $requestId <= 0 || $normalizedStatus === '') {
+        return ['request_action_at' => '', 'request_action_label' => ''];
+    }
+
+    $action = '';
+    if ($normalizedStatus === 'endorsed') {
+        $action = 'request_endorse';
+    } elseif ($normalizedStatus === 'approved') {
+        $action = 'request_finalize';
+    } elseif ($normalizedStatus === 'denied') {
+        $action = $approvedBy > 0 ? 'request_finalize' : ($reviewedBy > 0 ? 'request_endorse' : '');
+    }
+
+    if ($action === '') {
+        return ['request_action_at' => '', 'request_action_label' => ''];
+    }
+
+    $targetPrefix = $source . ':' . $requestId . ' | status=' . ucfirst($normalizedStatus);
+    $stmt = $conn->prepare(
+        "SELECT created_at
+         FROM activity_logs
+         WHERE action = ?
+           AND target LIKE CONCAT(?, '%')
+         ORDER BY created_at DESC
+         LIMIT 1"
+    );
+
+    if (!$stmt) {
+        return ['request_action_at' => '', 'request_action_label' => ''];
+    }
+
+    $stmt->bind_param('ss', $action, $targetPrefix);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if (!$result || $result->num_rows === 0) {
+        return ['request_action_at' => '', 'request_action_label' => ''];
+    }
+
+    return [
+        'request_action_at' => (string)($result->fetch_assoc()['created_at'] ?? ''),
+        'request_action_label' => $normalizedStatus === 'endorsed' ? 'Endorsed on' : 'Reviewed on'
+    ];
+}
+
 function resolveRequestActor(mysqli $conn, string $table, array $row): array {
     $status = strtolower(trim((string)($row['status'] ?? '')));
     $reviewedBy = isset($row['reviewed_by']) ? (int)$row['reviewed_by'] : 0;
@@ -151,6 +202,7 @@ if (hasTable($conn, 'leave_requests')) {
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
         $actor = resolveRequestActor($conn, 'leave_requests', $row);
+        $actionMeta = resolveRequestActionLog($conn, 'leave', $row);
         $items[] = [
             'id' => 'leave-' . $row['source_id'],
             'request_source' => 'leave',
@@ -161,7 +213,9 @@ if (hasTable($conn, 'leave_requests')) {
             'schedule_period' => trim((string)$row['schedule_period']) ?: '—',
             'status' => $row['status'] ?: 'Pending',
             'request_action_by_name' => $actor['request_action_by_name'],
-            'request_action_by_role' => $actor['request_action_by_role']
+            'request_action_by_role' => $actor['request_action_by_role'],
+            'request_action_at' => $actionMeta['request_action_at'],
+            'request_action_label' => $actionMeta['request_action_label']
         ];
     }
 }
@@ -184,6 +238,7 @@ if (hasTable($conn, 'overtime_requests')) {
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
         $actorName = resolveRequestActorName($conn, isset($row['approved_by']) ? (int)$row['approved_by'] : 0);
+        $actionMeta = resolveRequestActionLog($conn, 'overtime', $row);
         $items[] = [
             'id' => 'ot-' . $row['source_id'],
             'request_source' => 'overtime',
@@ -194,7 +249,9 @@ if (hasTable($conn, 'overtime_requests')) {
             'schedule_period' => trim((string)$row['schedule_period']) ?: '—',
             'status' => $row['status'] ?: 'Pending',
             'request_action_by_name' => $actorName,
-            'request_action_by_role' => ''
+            'request_action_by_role' => '',
+            'request_action_at' => $actionMeta['request_action_at'],
+            'request_action_label' => $actionMeta['request_action_label']
         ];
     }
 }
@@ -215,6 +272,7 @@ if (hasTable($conn, 'attendance_disputes')) {
     $stmt->execute();
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
+        $actionMeta = resolveRequestActionLog($conn, 'dispute', $row);
         $items[] = [
             'id' => 'dispute-' . $row['source_id'],
             'request_source' => 'dispute',
@@ -224,7 +282,9 @@ if (hasTable($conn, 'attendance_disputes')) {
             'schedule_period' => $row['schedule_period'] ?: '—',
             'status' => $row['status'] ?: 'Pending',
             'request_action_by_name' => '',
-            'request_action_by_role' => ''
+            'request_action_by_role' => '',
+            'request_action_at' => $actionMeta['request_action_at'],
+            'request_action_label' => $actionMeta['request_action_label']
         ];
     }
 }
