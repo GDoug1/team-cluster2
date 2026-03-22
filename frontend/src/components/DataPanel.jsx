@@ -146,6 +146,8 @@ export default function DataPanel({
   const [requestTypeFilter, setRequestTypeFilter] = useState("all");
   const [requestStatusFilter, setRequestStatusFilter] = useState("all");
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [rowsPerPageInput, setRowsPerPageInput] = useState("10");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const requestTypeOptions = useMemo(() => ([
     "all",
@@ -156,6 +158,20 @@ export default function DataPanel({
     "all",
     ...new Set(records.map(item => String(item.status ?? "").trim()).filter(Boolean))
   ]), [records]);
+
+  const parsedRowsPerPage = Number.parseInt(rowsPerPageInput, 10);
+  const rowsPerPage = Number.isFinite(parsedRowsPerPage) && parsedRowsPerPage > 0 ? parsedRowsPerPage : 10;
+
+  const handleRowsPerPageChange = event => {
+    const nextValue = event.target.value.replace(/[^0-9]/g, "");
+    setRowsPerPageInput(nextValue);
+    setCurrentPage(1);
+  };
+
+  const handleRowsPerPageBlur = () => {
+    const normalizedValue = Number.parseInt(rowsPerPageInput, 10);
+    setRowsPerPageInput(String(Number.isFinite(normalizedValue) && normalizedValue > 0 ? normalizedValue : 10));
+  };
 
   const filteredRecords = useMemo(() => {
     if (type === "requests") {
@@ -212,6 +228,14 @@ export default function DataPanel({
       return true;
     });
   }, [type, records, dateStartFilter, dateEndFilter, externalDateFilter, searchQuery, personField, enableRequestFilters, requestTypeFilter, requestStatusFilter]);
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / rowsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * rowsPerPage;
+  const paginatedRecords = filteredRecords.slice(pageStartIndex, pageStartIndex + rowsPerPage);
+  const visibleStart = filteredRecords.length === 0 ? 0 : pageStartIndex + 1;
+  const visibleEnd = Math.min(pageStartIndex + rowsPerPage, filteredRecords.length);
+
+
 
   if (type === "attendance") {
     const attendanceColumnCount = 7 + (personField ? 1 : 0) + (onEditRow ? 1 : 0);
@@ -239,7 +263,11 @@ export default function DataPanel({
           )}
           <label className="attendance-history-filter" style={{ minWidth: "260px" }}>
             <span>Search</span>
-            <input type="text" value={searchQuery} placeholder={config.searchPlaceholder} onChange={event => setSearchQuery(event.target.value)} />
+            <input type="text" value={searchQuery} placeholder={config.searchPlaceholder} onChange={event => { setSearchQuery(event.target.value); setCurrentPage(1); }} />
+          </label>
+          <label className="attendance-history-filter attendance-history-rows-filter">
+            <span>Rows per page</span>
+            <input type="text" inputMode="numeric" placeholder="10" value={rowsPerPageInput} onChange={handleRowsPerPageChange} onBlur={handleRowsPerPageBlur} />
           </label>
         </div>
 
@@ -255,7 +283,7 @@ export default function DataPanel({
             {personField && <span role="columnheader">{personLabel}</span>}
             {onEditRow && <span role="columnheader">Action</span>}
           </div>
-          {filteredRecords.length > 0 ? filteredRecords.map(item => {
+          {filteredRecords.length > 0 ? paginatedRecords.map(item => {
             const normalizedAttendance = normalizeAttendanceHistoryRecord(item);
             const attendanceDateValue = item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at;
 
@@ -290,6 +318,21 @@ export default function DataPanel({
             <div className="empty-state">No attendance records match the selected filters.</div>
           )}
         </div>
+
+        <div className="employee-table-pagination employee-attendance-pagination">
+          <div className="employee-pagination-summary">
+            Showing {visibleStart}-{visibleEnd} of {filteredRecords.length}
+          </div>
+          <div className="employee-pagination-actions">
+            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={safeCurrentPage === 1}>
+              Previous
+            </button>
+            <div className="employee-pagination-page">Page {safeCurrentPage} of {totalPages}</div>
+            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))} disabled={safeCurrentPage === totalPages}>
+              Next
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -302,7 +345,7 @@ export default function DataPanel({
             <>
               <label className="attendance-history-filter">
                 <span>Request Type</span>
-                <select value={requestTypeFilter} onChange={event => setRequestTypeFilter(event.target.value)}>
+                <select value={requestTypeFilter} onChange={event => { setRequestTypeFilter(event.target.value); setCurrentPage(1); }}>
                   {requestTypeOptions.map(option => (
                     <option key={option} value={option}>
                       {option === "all" ? "All request types" : option}
@@ -312,7 +355,7 @@ export default function DataPanel({
               </label>
               <label className="attendance-history-filter">
                 <span>Status</span>
-                <select value={requestStatusFilter} onChange={event => setRequestStatusFilter(event.target.value)}>
+                <select value={requestStatusFilter} onChange={event => { setRequestStatusFilter(event.target.value); setCurrentPage(1); }}>
                   {requestStatusOptions.map(option => (
                     <option key={option} value={option}>
                       {option === "all" ? "All statuses" : option}
@@ -328,8 +371,12 @@ export default function DataPanel({
               type="text"
               value={searchQuery}
               placeholder={config.searchPlaceholder}
-              onChange={event => setSearchQuery(event.target.value)}
+              onChange={event => { setSearchQuery(event.target.value); setCurrentPage(1); }}
             />
+          </label>
+          <label className="attendance-history-filter attendance-history-rows-filter">
+            <span>Rows per page</span>
+            <input type="text" inputMode="numeric" placeholder="10" value={rowsPerPageInput} onChange={handleRowsPerPageChange} onBlur={handleRowsPerPageBlur} />
           </label>
         </div>
 
@@ -349,7 +396,7 @@ export default function DataPanel({
             {onRequestAction && <span role="columnheader">Actions</span>}
           </div>
 
-          {filteredRecords.length > 0 ? filteredRecords.map(item => {
+          {filteredRecords.length > 0 ? paginatedRecords.map(item => {
             const photoUrl = resolveRequestPhotoUrl(item.photo_url ?? item.photo_path);
 
             return (
@@ -442,6 +489,21 @@ export default function DataPanel({
           }) : (
             <div className="empty-state">No requests found.</div>
           )}
+        </div>
+
+        <div className="employee-table-pagination employee-attendance-pagination">
+          <div className="employee-pagination-summary">
+            Showing {visibleStart}-{visibleEnd} of {filteredRecords.length}
+          </div>
+          <div className="employee-pagination-actions">
+            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={safeCurrentPage === 1}>
+              Previous
+            </button>
+            <div className="employee-pagination-page">Page {safeCurrentPage} of {totalPages}</div>
+            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))} disabled={safeCurrentPage === totalPages}>
+              Next
+            </button>
+          </div>
         </div>
 
         {selectedRequest && (

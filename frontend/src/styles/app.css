@@ -2239,6 +2239,18 @@ body {
   background: #ffffff;
 }
 
+.attendance-history-rows-filter {
+  min-width: 140px;
+}
+
+.attendance-history-rows-filter input {
+  width: 100%;
+}
+
+.employee-attendance-pagination {
+  border-top: 1px solid #e5e7eb;
+}
+
 .attendance-history-list {
   display: grid;
   gap: 10px;
