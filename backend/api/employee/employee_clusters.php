@@ -92,14 +92,17 @@ if (
     }
 }
 
+$coachNameExpr = "COALESCE(NULLIF(TRIM(CONCAT_WS(' ', coach_emp.first_name, coach_emp.last_name)), ''), $userNameExpr)";
+
 $clusterStmt = $conn->prepare(
     "SELECT
         c.$clusterIdColumn AS cluster_id,
         c.name AS cluster_name,
-        $userNameExpr AS coach_name
+        $coachNameExpr AS coach_name
      FROM cluster_members cm
      JOIN clusters c ON cm.cluster_id = c.$clusterIdColumn
      JOIN users u ON c.$ownerColumn = u.$userIdColumn
+     LEFT JOIN employees coach_emp ON u.$userIdColumn = coach_emp.user_id
      WHERE cm.employee_id = ?
        AND c.status = 'active'"
 );
