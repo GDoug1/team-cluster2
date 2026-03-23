@@ -18,6 +18,7 @@ import { normalizeSchedule as normalizeAttendanceSchedule, parseDateValue, resol
 import { getFeatureAccess } from "../utils/featureAccess";
 import { logout } from "../utils/logout";
 import { useFeedback } from "../components/FeedbackProvider";
+import { formatFullDate, formatDateTime } from "../utils/dateUtils";
 
 const attendanceSortOptions = {
   newestAttendanceFirst: "newestAttendanceFirst",
@@ -87,12 +88,6 @@ const toDateTimeLocalValue = value => {
 const toSqlDateTimeValue = value => {
   if (!value) return null;
   return `${value.replace("T", " ")}:00`;
-};
-
-const formatDateTimeLabel = value => {
-  if (!value) return "—";
-  const parsedDate = parseDateTimeValue(value);
-  return parsedDate ? parsedDate.toLocaleString() : value;
 };
 
 export default function CoachDashboard() {
@@ -745,6 +740,13 @@ export default function CoachDashboard() {
 
   const handleCoachTimeOut = async () => {
     if (!canSetAttendance || !dashboardCluster?.id || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
+    const hasConfirmed = await confirm({
+      title: "Time Out?",
+      message: "Are you sure you want to log your time out for today?",
+      confirmLabel: "Time Out",
+      variant: "primary"
+    });
+    if (!hasConfirmed) return;
     await persistAttendance({ ...attendanceLog, timeOutAt: new Date() });
   };
 
@@ -809,13 +811,6 @@ export default function CoachDashboard() {
   const handleChange = event => {
     const { name, value } = event.target;
     setFormValues(prev => ({ ...prev, [name]: value }));
-  };
-
-  const formatDate = value => {
-    if (!value) return "—";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toISOString().slice(0, 10);
   };
 
   const handleSubmit = async event => {
@@ -1680,8 +1675,8 @@ export default function CoachDashboard() {
                                     <div>{member.fullname}</div>
                                     <div className="attendance-current-schedule">{getMemberCurrentDaySchedule(member)}</div>
                                   </div>
-                                  <div className="table-cell">{formatDateTimeLabel(member.time_in_at)}</div>
-                                  <div className="table-cell">{formatDateTimeLabel(member.time_out_at)}</div>
+                                  <div className="table-cell">{formatDateTime(member.time_in_at)}</div>
+                                  <div className="table-cell">{formatDateTime(member.time_out_at)}</div>
                                   <div className="table-cell attendance-main-tag-cell">
                                     <span className={`member-status-tag ${getAttendanceMainTag(member) ? "is-active" : ""}`}>{getAttendanceMainTag(member)}</span>
                                     <div className="attendance-subtag-list">
@@ -1743,10 +1738,10 @@ export default function CoachDashboard() {
                                     role="row"
                                     onClick={() => canEditAttendance && openAttendanceEditModal(entry)}
                                   >
-                                    <span role="cell">{formatDateTimeLabel(entry.time_in_at ?? entry.time_out_at)}</span>
+                                    <span role="cell">{formatDateTime(entry.time_in_at ?? entry.time_out_at)}</span>
                                     <span role="cell">{dashboardCluster?.name ?? "—"}</span>
-                                    <span role="cell">{formatDateTimeLabel(entry.time_in_at)}</span>
-                                    <span role="cell">{formatDateTimeLabel(entry.time_out_at)}</span>
+                                    <span role="cell">{formatDateTime(entry.time_in_at)}</span>
+                                    <span role="cell">{formatDateTime(entry.time_out_at)}</span>
                                     <span role="cell" className="attendance-tag-cell">
                                       <span className={`member-status-tag ${historyTag ? "is-active" : ""}`}>{historyTag}</span>
                                       <span className="btn attendance-tag-edit-button">{canEditAttendance ? "Edit" : "View"}</span>
@@ -1971,7 +1966,7 @@ export default function CoachDashboard() {
                     {c.description || "—"}
                   </div>
                   <div className="table-cell">{c.members ?? 0}</div>
-                  <div className="table-cell">{formatDate(c.created_at)}</div>
+                  <div className="table-cell">{formatFullDate(c.created_at)}</div>
                   <div className="table-cell">
                     <span className={`badge ${c.status}`}>{c.status}</span>
                   </div>

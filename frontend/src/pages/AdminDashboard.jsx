@@ -18,6 +18,7 @@ import { logout } from "../utils/logout";
 import { parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 import { useFeedback } from "../components/FeedbackProvider";
+import { formatFullDate, formatDateTime } from "../utils/dateUtils";
 
 const attendanceTagOptions = ["On Time", "Late", "Scheduled", "Off Scheduled"];
 
@@ -176,6 +177,13 @@ export default function AdminDashboard() {
 
   const handleAdminTimeOut = async () => {
     if (!attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
+    const hasConfirmed = await confirm({
+      title: "Time Out?",
+      message: "Are you sure you want to log your time out for today?",
+      confirmLabel: "Time Out",
+      variant: "primary"
+    });
+    if (!hasConfirmed) return;
     await persistAttendance({
       ...attendanceLog,
       timeOutAt: new Date()
@@ -851,13 +859,6 @@ const handleOpenRejectModal = cluster => {
   const teamRequestHighlights = buildRequestHighlights(teamRequests);
   const allAttendanceHighlights = useMemo(() => buildAllAttendanceHighlights(allAttendance), [allAttendance]);
 
-  const formatDate = dateString => {
-    if (!dateString) return "—";
-    const parsed = new Date(dateString);
-    if (Number.isNaN(parsed.valueOf())) return dateString;
-    return parsed.toISOString().slice(0, 10);
-  };
-
   return (
     <div className="dashboard">
       <DashboardSidebar
@@ -926,7 +927,7 @@ const handleOpenRejectModal = cluster => {
                       <div className="table-cell">{c.name}</div>
                       <div className="table-cell muted">{c.description}</div>
                       <div className="table-cell">{c.members ?? 0}</div>
-                      <div className="table-cell">{formatDate(c.created_at)}</div>
+                      <div className="table-cell">{formatFullDate(c.created_at)}</div>
                       <div className="table-cell">
                         <span className={`badge ${c.status}`}>{c.status}</span>
                       </div>
