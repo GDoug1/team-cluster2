@@ -430,13 +430,19 @@ body {
 }
 
 .content {
-  background: var(--surface);
-  border-radius: 16px;
-  padding: 20px;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-8);
   min-height: 480px;
   min-width: 0;
-  border: 1px solid var(--border);
-  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-md);
+}
+
+@media (max-width: 768px) {
+  .content {
+    padding: var(--space-4);
+  }
 }
 
 .section-title {
@@ -481,14 +487,16 @@ body {
 }
 
 .card {
-  background: #f3f4f6;
-  padding: 16px;
-  border-radius: 10px;
-  margin-bottom: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-3);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .cluster-form {
