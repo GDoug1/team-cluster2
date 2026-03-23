@@ -78,6 +78,14 @@ This file serves as the foundational context for interaction with the **Team Clu
 
 ---
 
+## ⚡ Efficiency Mandates
+
+- **Turn Limit:** If a task requires more than 5 consecutive tool calls or high-volume data processing that may exceed a few minutes, the agent MUST stop and provide a progress report to the user.
+- **Background Tasks:** For any command that might take significant time (e.g., complex builds), the agent must explicitly ask to run it with `is_background: true`.
+- **Parallelization:** Always execute independent search or read operations in parallel to minimize latency.
+
+---
+
 ## 📖 Key Documentation
 - **Backend API Guide:** `docs/BACKEND_API_GUIDE.md`
 - **Frontend Guide:** `docs/FRONTEND_GUIDE.md`

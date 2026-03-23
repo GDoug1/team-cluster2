@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchMyProfile, saveMyProfile } from "../api/profile";
-import { useFeedback } from "./FeedbackProvider";
+import { useFeedback } from "./FeedbackContext";
 
 const initialProfileForm = {
   first_name: "",
