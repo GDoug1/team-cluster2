@@ -174,20 +174,19 @@ export default function DataPanel({
   const handleActionClick = async (item, action) => {
     if (!onRequestAction) return;
 
+    const isApproval = action.status === "Approved" || action.status === "Endorsed";
     const isDenial =
       action.status.toLowerCase().includes("reject") ||
       action.status.toLowerCase().includes("denied") ||
       action.status.toLowerCase().includes("decline");
 
-    if (isDenial) {
-      const ok = await confirm({
-        title: `Confirm ${action.label}`,
-        message: `Are you sure you want to ${action.label.toLowerCase()} this request?`,
-        confirmLabel: action.label,
-        variant: "danger",
-      });
-      if (!ok) return;
-    }
+    const hasConfirmedAction = await confirm({
+      title: isApproval ? `Confirm ${action.label}` : isDenial ? `Confirm ${action.label}` : "Confirm request action",
+      message: `Are you sure you want to ${action.label.toLowerCase()} this request?`,
+      confirmLabel: action.label,
+      variant: isDenial ? "danger" : "primary"
+    });
+    if (!hasConfirmedAction) return;
 
     onRequestAction(item, action.status);
   };
