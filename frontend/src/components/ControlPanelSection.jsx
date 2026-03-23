@@ -569,5 +569,3 @@ export default function ControlPanelSection() {
     </section>
   );
 }
-
-

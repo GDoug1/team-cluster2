@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Search, Calendar, Clock, CheckCircle2, AlertCircle, ArrowUpRight, Loader2, ListTodo } from 'lucide-react';
 import { useAttendanceHistory } from '../hooks/useAttendanceHistory';
 import { normalizeAttendanceHistoryRecords } from '../api/attendance';
@@ -35,9 +35,12 @@ export default function AttendanceModule({
   records = null,
   loading: loadingProp = false,
   error: errorProp = null,
+  onDisputeClick = null,
 }) {
   const historyState = useAttendanceHistory();
   const [searchQuery, setSearchQuery] = useState('');
+  const [rowsPerPageInput, setRowsPerPageInput] = useState('10');
+  const [currentPage, setCurrentPage] = useState(1);
   const isControlled = Array.isArray(records);
   const rawData = isControlled ? records : historyState.data;
   const data = useMemo(() => normalizeAttendanceHistoryRecords(rawData), [rawData]);
@@ -66,6 +69,27 @@ export default function AttendanceModule({
       r.status?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [data, searchQuery]);
+
+  const parsedRowsPerPage = Number.parseInt(rowsPerPageInput, 10);
+  const rowsPerPage = Number.isFinite(parsedRowsPerPage) && parsedRowsPerPage > 0 ? parsedRowsPerPage : 10;
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / rowsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * rowsPerPage;
+  const paginatedData = filteredData.slice(pageStartIndex, pageStartIndex + rowsPerPage);
+  const visibleStart = filteredData.length === 0 ? 0 : pageStartIndex + 1;
+  const visibleEnd = Math.min(pageStartIndex + rowsPerPage, filteredData.length);
+
+  const handleRowsPerPageChange = event => {
+    const nextValue = event.target.value.replace(/[^0-9]/g, '');
+    setRowsPerPageInput(nextValue);
+    setCurrentPage(1);
+  };
+
+  const handleRowsPerPageBlur = () => {
+    const normalizedValue = Number.parseInt(rowsPerPageInput, 10);
+    setRowsPerPageInput(String(Number.isFinite(normalizedValue) && normalizedValue > 0 ? normalizedValue : 10));
+  };
+
 
   if (loading) {
     return (
@@ -106,10 +130,24 @@ export default function AttendanceModule({
                 placeholder="Search logs..."
                 className="am-search-input"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               />
               <Search className="am-search-icon" />
             </div>
+            <label className="am-rows-field" htmlFor="attendance-rows-per-page">
+              <span className="am-rows-label">Rows per page</span>
+              <input
+                id="attendance-rows-per-page"
+                type="text"
+                inputMode="numeric"
+                disabled={!!error}
+                placeholder="10"
+                className="am-rows-input"
+                value={rowsPerPageInput}
+                onChange={handleRowsPerPageChange}
+                onBlur={handleRowsPerPageBlur}
+              />
+            </label>
           </div>
         </div>
 
@@ -120,8 +158,6 @@ export default function AttendanceModule({
                 <th>Date</th>
                 <th>Time In</th>
                 <th>Time Out</th>
-                <th>Break In</th>
-                <th>Break Out</th>
                 <th>Total Hours</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -130,20 +166,18 @@ export default function AttendanceModule({
             <tbody>
               {error ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '60px' }}>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '60px' }}>
                     <ListTodo size={48} color="#cbd5e1" style={{ marginBottom: '16px' }} />
                     <p style={{ color: '#475569', fontWeight: 'bold' }}>Server Connection Lost</p>
                   </td>
                 </tr>
               ) : filteredData.length === 0 ? (
-                <tr><td colSpan={8} className="am-empty">No records found.</td></tr>
-              ) : filteredData.map((record, i) => (
+                <tr><td colSpan={6} className="am-empty">No records found.</td></tr>
+              ) : paginatedData.map((record, i) => (
                 <tr key={i}>
                   <td className="am-td-date">{record.date}</td>
                   <td className="am-td-time">{record.time_in}</td>
                   <td className="am-td-time">{record.time_out}</td>
-                  <td className="am-td-break">{record.break_in}</td>
-                  <td className="am-td-break">{record.break_out}</td>
                   <td className="am-td-total">{record.total_hours}h</td>
                   <td>
                     <div className="am-status-cell">
@@ -153,15 +187,33 @@ export default function AttendanceModule({
                   </td>
                   <td>
                     <div className="am-actions-hover">
-                      <button className="am-action-btn primary">Dispute</button>
-                      <div className="am-divider" />
-                      <button className="am-action-btn secondary">Details</button>
+                      <button
+                        className="am-action-btn primary"
+                        onClick={() => onDisputeClick?.(record)}
+                      >
+                        Dispute
+                      </button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="employee-table-pagination am-table-pagination">
+          <div className="employee-pagination-summary">
+            Showing {visibleStart}-{visibleEnd} of {filteredData.length}
+          </div>
+          <div className="employee-pagination-actions">
+            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={safeCurrentPage === 1 || !!error}>
+              Previous
+            </button>
+            <div className="employee-pagination-page">Page {safeCurrentPage} of {totalPages}</div>
+            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))} disabled={safeCurrentPage === totalPages || !!error}>
+              Next
+            </button>
+          </div>
         </div>
       </div>
     </div>

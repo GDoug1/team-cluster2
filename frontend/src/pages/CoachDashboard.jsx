@@ -17,6 +17,7 @@ import usePermissions from "../hooks/usePermissions";
 import { normalizeSchedule as normalizeAttendanceSchedule, parseDateValue, resolveAttendanceMainTag } from "../utils/attendanceTags";
 import { getFeatureAccess } from "../utils/featureAccess";
 import { logout } from "../utils/logout";
+import { useFeedback } from "../components/FeedbackProvider";
 
 const attendanceSortOptions = {
   newestAttendanceFirst: "newestAttendanceFirst",
@@ -176,6 +177,7 @@ export default function CoachDashboard() {
   });
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
+  const { confirm } = useFeedback();
   const { hasPermission } = usePermissions();
   const {
     canViewDashboard,
@@ -186,8 +188,9 @@ export default function CoachDashboard() {
     canAccessControlPanel,
     canAccessEmployeesTab
   } = getFeatureAccess(hasPermission);
-  const attendanceNavItems = ["My Attendance", "Team Cluster Attendance", "My Requests", "My Filing Center", "Team Request"];
+  const attendanceNavItems = ["My Attendance", "Team Cluster Attendance", "My Requests", "My Filing Center", "File Request"];
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
+  const [filingCenterInitialTab, setFilingCenterInitialTab] = useState("leave");
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
   const navItems = [
     ...(canViewDashboard ? [{ label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") }] : []),
@@ -741,7 +744,7 @@ export default function CoachDashboard() {
   };
 
   const handleCoachTimeOut = async () => {
-    if (!canSetAttendance || !dashboardCluster?.id || !todayCoachSchedule || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
+    if (!canSetAttendance || !dashboardCluster?.id || !attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
     await persistAttendance({ ...attendanceLog, timeOutAt: new Date() });
   };
 
@@ -1291,7 +1294,7 @@ export default function CoachDashboard() {
 
   const isTeamClusterAttendanceView = activeNav === "Team Cluster Attendance";
   const isMyRequestsView = activeNav === "My Requests";
-  const isTeamRequestView = activeNav === "Team Request";
+  const isTeamRequestView = activeNav === "File Request";
   const myRequestHighlights = buildRequestHighlights(myRequests);
   const teamRequestHighlights = buildRequestHighlights(teamRequests);
   const isFilingCenterView = activeNav === "My Filing Center";
@@ -1499,7 +1502,7 @@ export default function CoachDashboard() {
 
 
   useEffect(() => {
-    if (!isTeamRequestView) return;
+    if (!canViewAttendance || !["Dashboard", "File Request"].includes(activeNav)) return;
 
     fetchTeamRequests()
       .then(response => {
@@ -1508,12 +1511,28 @@ export default function CoachDashboard() {
       })
       .catch(() => {
         setTeamRequests([]);
-        setTeamRequestsError("Unable to load team requests.");
+        setTeamRequestsError("Unable to load file requests.");
       });
-  }, [isTeamRequestView]);
+  }, [activeNav, canViewAttendance]);
+
+  const getTeamRequestActionConfirmationMessage = (request, status) => {
+    const requestType = request?.request_type ?? "this request";
+    if (status === "Endorsed") return `Are you sure you want to endorse ${requestType} to admin?`;
+    if (status === "Approved") return `Are you sure you want to accept ${requestType}?`;
+    if (status === "Denied") return `Are you sure you want to reject ${requestType}?`;
+    return `Are you sure you want to update ${requestType}?`;
+  };
 
   const handleTeamRequestAction = async (request, status) => {
     if (!request?.id || !request?.request_source) return;
+
+    const hasConfirmedAction = await confirm({
+      title: status === "Endorsed" ? "Endorse request to admin?" : status === "Approved" ? "Accept request?" : status === "Denied" ? "Reject request?" : "Confirm request action",
+      message: getTeamRequestActionConfirmationMessage(request, status),
+      confirmLabel: status === "Endorsed" ? "Endorse" : status === "Approved" ? "Accept" : status === "Denied" ? "Reject" : "Confirm",
+      variant: status === "Denied" ? "danger" : "primary"
+    });
+    if (!hasConfirmedAction) return;
 
     setRequestActionLoadingId(request.id);
     setTeamRequestsError("");
@@ -1526,7 +1545,7 @@ export default function CoachDashboard() {
 
       setTeamRequests(prev => prev.map(item => (item.id === request.id ? { ...item, status } : item)));
     } catch (error) {
-      setTeamRequestsError(error?.error ?? "Unable to update team request status.");
+      setTeamRequestsError(error?.error ?? "Unable to update file request status.");
     } finally {
       setRequestActionLoadingId("");
     }
@@ -1547,12 +1566,14 @@ export default function CoachDashboard() {
           <section className="content">
             <MainDashboard
               showMemberStatusCard
+              fileRequests={teamRequests}
+              onViewFileRequests={() => setActiveNav("File Request")}
               schedule={activeCoachSchedule}
               attendanceControls={{
                 timeInAt: attendanceLog.timeInAt,
                 timeOutAt: attendanceLog.timeOutAt,
                 canClickTimeIn: canSetAttendance && Boolean(dashboardCluster?.id) && Boolean(todayCoachSchedule) && !hasActiveTimeIn,
-                canClickTimeOut: canSetAttendance && Boolean(todayCoachSchedule) && hasActiveTimeIn,
+                canClickTimeOut: canSetAttendance && Boolean(dashboardCluster?.id) && hasActiveTimeIn,
                 hasCompletedShift,
                 onTimeIn: handleCoachTimeIn,
                 onTimeOut: handleCoachTimeOut
@@ -1563,12 +1584,12 @@ export default function CoachDashboard() {
         ) : isAttendanceView && canViewAttendance ? (
           <section className="content">
             {isFilingCenterView ? (
-              <FilingCenterPanel onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
+              <FilingCenterPanel initialTab={filingCenterInitialTab} onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
             ) : (
               <div className="employee-card employee-attendance-history-card">
                 <div className="employee-card-header">
                   <div>
-                    <div className="employee-card-title">{isMyRequestsView ? "My Requests" : isTeamRequestView ? "Team Request" : attendanceViewTitle}</div>
+                    <div className="employee-card-title">{isMyRequestsView ? "My Requests" : isTeamRequestView ? "File Request" : attendanceViewTitle}</div>
                     <p className="employee-card-subtitle">
                       {isTeamClusterAttendanceView
                         ? "Review and edit your team members' attendance history."
@@ -1582,7 +1603,7 @@ export default function CoachDashboard() {
                   {isMyRequestsView ? (
                     <>
                       <AttendanceHistoryHighlights highlights={myRequestHighlights} />
-                      <DataPanel type="requests" records={myRequests} />
+                      <DataPanel type="requests" records={myRequests} enableRequestFilters showRequestActionBy />
                     </>
                   ) : isTeamRequestView ? (
                     <>
@@ -1594,8 +1615,13 @@ export default function CoachDashboard() {
                         onRequestAction={handleTeamRequestAction}
                         requestActionLoadingId={requestActionLoadingId}
                         requestActions={[
-                          { label: "Endorse to Admin", status: "Endorsed", variant: "btn", allowedStatuses: ["pending"] }
+                          { label: "Endorse to Admin", status: "Endorsed", variant: "btn", allowedStatuses: ["pending"], isVisible: item => item?.request_source !== 'dispute' },
+                          { label: "Accept", status: "Approved", variant: "btn", allowedStatuses: ["pending"], isVisible: item => item?.request_source === 'dispute' },
+                          { label: "Reject", status: "Denied", variant: "btn secondary", allowedStatuses: ["pending"] }
                         ]}
+                        enableRequestFilters
+                        personField="employee_name"
+                        personLabel="Name"
                       />
                     </>
                   ) : isTeamClusterAttendanceView ? (
@@ -1673,7 +1699,7 @@ export default function CoachDashboard() {
                     <>
                       <div className="employee-card">
                         <div className="employee-card-body employee-card-body-flush">
-                          <AttendanceModule records={coachAttendanceHistory} />
+                          <AttendanceModule records={coachAttendanceHistory} onDisputeClick={() => { setFilingCenterInitialTab("dispute"); setActiveNav("My Filing Center"); }} />
                         </div>
                       </div>
                     </>
@@ -1837,10 +1863,6 @@ export default function CoachDashboard() {
         ) : (
           <>
         <header className="topbar">
-          <div>
-            <h2>DASHBOARD</h2>
-            <div className="nav-item">Team Coach Dashboard</div>
-          </div>
           <div className="toolbar">
             <span className="datetime">{dateTimeLabel}</span>
            {clusters.length === 0 && (

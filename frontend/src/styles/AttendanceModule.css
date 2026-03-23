@@ -301,3 +301,34 @@
   gap: 8px;
   border: 1px solid #ffa39e;
 }
+
+
+.am-rows-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.am-rows-label {
+  font-size: 12px;
+  color: #334155;
+}
+
+.am-rows-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.am-rows-input:focus {
+  border-color: #1890ff;
+}
+
+.am-table-pagination {
+  border-top: 1px solid #f1f5f9;
+}

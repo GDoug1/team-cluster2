@@ -44,6 +44,7 @@ export default function EmployeeDashboard() {
   const [data, setData] = useState([]);
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
+  const [filingCenterInitialTab, setFilingCenterInitialTab] = useState("leave");
   const isAttendanceView = attendanceNavItems.includes(activeNav);
   const sidebarNavItems = navItems.map(item => {
     if (item === "Attendance") {
@@ -344,7 +345,7 @@ export default function EmployeeDashboard() {
   };
 
   const handleTimeOut = async () => {
-    if (!canManageOwnAttendance || !hasTeamCluster || !hasScheduleToday || isSavingAttendance) return;
+    if (!canManageOwnAttendance || !hasTeamCluster || isSavingAttendance) return;
     if (!attendanceLog.timeInAt || attendanceLog.timeOutAt) return;
 
     const nextAttendance = {
@@ -386,13 +387,19 @@ export default function EmployeeDashboard() {
     timeInAt: attendanceLog.timeInAt,
     fallbackTag: getStatusTag(currentStatus.label, hasScheduleToday)
   });
+  const hasAttendanceRecordToday = isSameCalendarDay(
+    attendanceLog.timeInAt ?? attendanceLog.timeOutAt,
+    new Date()
+  );
+  const visibleAttendanceTag = hasAttendanceRecordToday ? activeAttendanceTag : null;
   const hasActiveTimeIn = Boolean(attendanceLog.timeInAt && !attendanceLog.timeOutAt);
   const hasTeamCluster = Boolean(activeCluster?.cluster_id);
   const canUseAttendanceControls = hasTeamCluster && hasScheduleToday;
+  const canUseTimeOutControls = hasTeamCluster;
   const hasTimedOutToday = isSameCalendarDay(attendanceLog.timeOutAt, new Date());
   const hasCompletedShift = hasTimedOutToday && !hasActiveTimeIn;
   const canClickTimeIn = canManageOwnAttendance && canUseAttendanceControls && !hasActiveTimeIn && !isSavingAttendance;
-  const canClickTimeOut = canManageOwnAttendance && canUseAttendanceControls && hasActiveTimeIn && !isSavingAttendance;
+  const canClickTimeOut = canManageOwnAttendance && canUseTimeOutControls && hasActiveTimeIn && !isSavingAttendance;
   const breakTimeToday = todaySchedule
     ? formatBreakTimeRange(
         todaySchedule.breakStartTime,
@@ -459,23 +466,6 @@ export default function EmployeeDashboard() {
       />
 
       <main className="main">
-        <header className="topbar">
-          <div>
-            <h2>{activeNav.toUpperCase()}</h2>
-            <div className="section-title">
-              {activeNav === "Dashboard"
-                ? "Employee time tracking"
-                : activeNav === "My Attendance"
-                  ? "Attendance history"
-                  : activeNav === "My Requests"
-                    ? "My requests"
-                    : activeNav === "My Filing Center"
-                      ? "My filing center"
-                      : "My team cluster overview"}
-            </div>
-          </div>
-          <span className="datetime">{dateTimeLabel}</span>
-        </header>
 
         <section className="content content-muted">
             {activeNav === "Dashboard" && canViewDashboard && (
@@ -510,7 +500,7 @@ export default function EmployeeDashboard() {
               {activeNav === "My Attendance" && (
                 <div className="employee-card">
                   <div className="employee-card-body employee-card-body-flush">
-                    <AttendanceModule />
+                    <AttendanceModule onDisputeClick={() => { setFilingCenterInitialTab("dispute"); setActiveNav("My Filing Center"); }} />
                   </div>
                 </div>
               )}
@@ -522,13 +512,13 @@ export default function EmployeeDashboard() {
                   </div>
                   <div className="employee-card-body">
                     <AttendanceHistoryHighlights highlights={myRequestHighlights} />
-                    <DataPanel type="requests" records={myRequests} />
+                    <DataPanel type="requests" records={myRequests} enableRequestFilters showRequestActionBy />
                   </div>
                 </div>
               )}
 
               {activeNav === "My Filing Center" && (
-                <FilingCenterPanel onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
+                <FilingCenterPanel initialTab={filingCenterInitialTab} onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
               )}
 
               {activeNav === "Employees" && (
@@ -616,11 +606,13 @@ export default function EmployeeDashboard() {
                         <span className={`member-status-pill ${currentStatus.className}`}>
                           {currentStatus.label}
                         </span>
-                        <div className="member-status-tag-list" aria-label="Status tags">
-                          <span className="member-status-tag is-active">
-                            {activeAttendanceTag ?? "Pending"}
-                          </span>
-                        </div>
+                        {visibleAttendanceTag ? (
+                          <div className="member-status-tag-list" aria-label="Status tags">
+                            <span className="member-status-tag is-active">
+                              {visibleAttendanceTag}
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>
