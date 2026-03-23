@@ -87,7 +87,11 @@ const getPersonSecondaryValue = (item, field) => {
 
 const toDateInputValue = value => {
   if (!value) return null;
-  const parsed = new Date(String(value).replace(" ", "T"));
+  const str = String(value).trim();
+  if (str.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(str)) {
+    return str.slice(0, 10);
+  }
+  const parsed = new Date(str.replace(" ", "T"));
   if (Number.isNaN(parsed.getTime())) return null;
   const year = parsed.getFullYear();
   const month = `${parsed.getMonth() + 1}`.padStart(2, "0");
@@ -224,6 +228,10 @@ export default function DataPanel({
     let result = [];
     if (type === "requests") {
       result = records.filter(item => {
+        const entryDate = toDateInputValue(item.date_filed);
+        if (dateStartFilter && (!entryDate || entryDate < dateStartFilter)) return false;
+        if (dateEndFilter && (!entryDate || entryDate > dateEndFilter)) return false;
+
         const normalizedRequestType = String(item.request_type ?? "").trim().toLowerCase();
         const normalizedStatus = String(item.status ?? "").trim().toLowerCase();
 
