@@ -53,31 +53,22 @@
 
 
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .dashboard {
-    flex-direction: column;
     height: auto;
     min-height: 100vh;
     overflow: visible;
   }
 
   .sidebar {
-    width: 100%;
-    flex-direction: row;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .nav {
-    grid-auto-flow: column;
-    grid-auto-columns: max-content;
-    overflow-x: auto;
+    align-self: auto;
   }
 
   .main {
-    padding: 16px;
     height: auto;
+    min-height: auto;
     overflow: visible;
+    overscroll-behavior: auto;
   }
 
   .topbar {
@@ -86,11 +77,6 @@
 
   .topbar .datetime {
     width: 100%;
-  }
-
-  .card {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }
 

@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { createAnnouncement, fetchAnnouncements } from "../api/announcement";
 import "../styles/MainDashboard.css";
 
-function DashboardHeader({ headerTime, headerDate }) {
+function DashboardHeader({ dateTimeLabel }) {
   return (
     <section className="dashboard-header">
-      <div className="datetime">{headerTime}&nbsp;&nbsp;&nbsp;{headerDate}</div>
+      <div className="datetime">{dateTimeLabel}</div>
     </section>
   );
 }
@@ -37,6 +37,13 @@ function TimeCard({
             {hasActiveTimeIn ? "Time Out" : "Time In"}
           </button>
         )}
+
+        <blockquote className="time-quote">
+          <p className="time-quote-text">
+            "Challenges are what make life interesting and overcoming them is what makes life meaningful."
+          </p>
+          <footer className="time-quote-author">Joshua J. Marine</footer>
+        </blockquote>
       </div>
     </div>
   );
@@ -286,17 +293,6 @@ function FileRequestCard({ requests = [], onViewRequest = null }) {
   );
 }
 
-function DateTimeSection({ now }) {
-  return (
-    <div className="time-datetime-section" aria-live="polite">
-      <div className="time-datetime-display">
-        {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" })}{" "}
-        {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-      </div>
-    </div>
-  );
-}
-
 export default function MainDashboard({
   attendanceControls = null,
   showMemberStatusCard = false,
@@ -407,6 +403,11 @@ export default function MainDashboard({
     return (diffInSeconds / 3600).toFixed(1);
   }, [activeTimeIn, activeTimeOut, now]);
 
+  const dateTimeLabel = useMemo(() => (
+    `${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" })} `
+    + `${now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`
+  ), [now]);
+
   const executeTimeOut = () => {
     if (attendanceControls) {
       attendanceControls.onTimeOut();
@@ -502,13 +503,9 @@ export default function MainDashboard({
 
   return (
     <>
-      <DashboardHeader
-        headerTime=""
-        headerDate=""
-      />
+      <DashboardHeader dateTimeLabel={dateTimeLabel} />
 
       <div className={`dashboard-grid ${showMemberStatusCard ? "has-member-status" : "no-member-status"}`}>
-        <DateTimeSection now={now} />
         <TimeCard
           counterDisplay={counterDisplay}
           hasActiveTimeIn={hasActiveTimeIn}

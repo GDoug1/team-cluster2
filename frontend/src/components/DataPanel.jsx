@@ -303,8 +303,6 @@ export default function DataPanel({
   const visibleStart = filteredAndSortedRecords.length === 0 ? 0 : pageStartIndex + 1;
   const visibleEnd = Math.min(pageStartIndex + rowsPerPage, filteredAndSortedRecords.length);
 
-
-
   const handleClearFilters = () => {
     setSearchQuery("");
     setDateStartFilter("");

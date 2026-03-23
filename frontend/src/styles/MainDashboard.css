@@ -20,14 +20,14 @@
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1.35fr 1.1fr 1.1fr;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1.1fr) minmax(280px, 1.1fr);
   grid-template-areas:
     "time announcement announcement"
     "shift calendar holiday"
     "summary summary member";
   column-gap: 8px;
-  row-gap: 6px;
-  align-items: start;
+  row-gap: 10px;
+  align-items: stretch;
 }
 
 .dashboard-grid.no-member-status {
@@ -55,11 +55,12 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
   border-radius: 8px;
   overflow: hidden;
+  min-width: 0;
 }
 
 @media (min-width: 1201px) {
   .dashboard-grid {
-    grid-template-rows: 190px 168px minmax(112px, auto);
+    grid-template-rows: minmax(220px, auto) minmax(220px, auto) minmax(180px, auto);
     align-items: stretch;
     align-content: start;
   }
@@ -71,13 +72,12 @@
   .dashboard-grid .holiday-card,
   .dashboard-grid .summary-card,
   .dashboard-grid .member-card {
-    height: auto;
-    min-height: 0;
+    height: 100%;
   }
 
   .dashboard-grid .summary-card {
     display: flex;
-    align-content: center;
+    align-content: stretch;
   }
 }
 
@@ -88,7 +88,7 @@
 
   .dashboard-grid {
     grid-template-columns: 1.35fr 1.12fr 1.12fr;
-    grid-template-rows: 236px 176px minmax(148px, auto);
+    grid-template-rows: minmax(232px, auto) minmax(232px, auto) minmax(188px, auto);
     column-gap: 12px;
     row-gap: 12px;
   }
@@ -114,7 +114,7 @@
 
   .dashboard-grid {
     grid-template-columns: 1.36fr 1.14fr 1.14fr;
-    grid-template-rows: 266px 194px minmax(160px, auto);
+    grid-template-rows: minmax(250px, auto) minmax(250px, auto) minmax(200px, auto);
     column-gap: 14px;
     row-gap: 12px;
   }
@@ -133,7 +133,7 @@
   }
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1380px) and (min-width: 1101px) {
   .app-shell > .content {
     padding: 14px;
   }
@@ -143,22 +143,22 @@
     grid-template-areas:
       "time announcement"
       "shift calendar"
-      "summary member"
-      "holiday holiday";
-    column-gap: 8px;
-    row-gap: 8px;
+      "holiday member"
+      "summary summary";
+    column-gap: 10px;
+    row-gap: 10px;
   }
 
   .dashboard-grid.no-member-status {
     grid-template-areas:
       "time announcement"
       "shift calendar"
-      "summary summary"
-      "holiday holiday";
+      "holiday holiday"
+      "summary summary";
   }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1100px) {
   .app-shell {
     flex-direction: column;
   }
@@ -179,7 +179,7 @@
       "summary"
       "member";
     column-gap: 0;
-    row-gap: 8px;
+    row-gap: 12px;
   }
 
   .dashboard-grid.no-member-status {
@@ -192,7 +192,7 @@
       "summary";
   }
   
-  .card {
+  .dashboard-grid > .card {
     padding: 10px;
   }
 }
@@ -201,7 +201,8 @@
 /* AnnouncementCard.css */
 .announcement-card {
   grid-area: announcement;
-  height: 190px;
+  min-height: 220px;
+  height: auto;
   position: relative;
   background: linear-gradient(180deg, #d8d8d8 0%, #d2d2d2 100%);
   padding-bottom: 28px;
@@ -236,7 +237,7 @@
 .announcement-list {
   padding-right: 12px;
   margin-bottom: 0;
-  max-height: 138px;
+  max-height: 165px;
   overflow-y: auto;
 }
 
@@ -364,8 +365,8 @@
 /* CalendarCard.css */
 .calendar-card {
   grid-area: calendar;
-  height: 200px;
-  align-self: start;
+  min-height: 220px;
+  height: auto;
 }
 
 .calendar-month {
@@ -414,7 +415,7 @@
 .dashboard-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   margin-bottom: 14px;
 }
 
@@ -434,6 +435,7 @@
   font-size: 12px;
   letter-spacing: 0.8px;
   font-weight: 500;
+  text-align: left;
 }
 
 @media (max-width: 980px) {
@@ -452,9 +454,12 @@
 /* HolidayCard.css */
 .holiday-card {
   grid-area: holiday;
-  height: 200px;
+  min-height: 220px;
+  height: auto;
   position: relative;
   padding-bottom: 28px;
+  display: flex;
+  flex-direction: column;
 }
 
 .plus {
@@ -471,6 +476,7 @@
   max-height: 145px;
   overflow-y: auto;
   padding-right: 2px;
+  flex: 1;
 }
 
 .holiday-item {
@@ -546,7 +552,8 @@
 /* MemberStatusCard.css */
 .member-card {
   grid-area: member;
-  height: 112px;
+  min-height: 140px;
+  height: auto;
   display: flex;
   flex-direction: column;
 }
@@ -643,7 +650,7 @@
 /* ShiftCard.css */
 .shift-card {
   grid-area: shift;
-  min-height: 106px;
+  min-height: 220px;
   height: auto;
   display: flex;
   flex-direction: column;
@@ -721,13 +728,20 @@
   }
 
   .shift-card {
-    min-height: 118px;
+    min-height: 210px;
   }
 }
 
 @media (max-width: 980px) {
+  .shift-columns {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
   .value {
     font-size: 36px;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .remaining {
@@ -740,7 +754,7 @@
 .summary-card {
   grid-area: summary;
   min-height: 150px;
-  height: 100%;
+  height: auto;
   display: grid;
   grid-template-columns: 1.2fr 1fr 1fr;
   gap: 0;
@@ -875,19 +889,20 @@
 /* TimeCard.css */
 .time-card {
   grid-area: time;
-  height: 190px;
+  min-height: 220px;
+  height: auto;
   padding: 0;
   background: #ececec;
   overflow: hidden;
 }
 
 .time-panel {
-  height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 18px 16px;
 }
 
 .time-counter {
@@ -924,6 +939,26 @@
   font-weight: 600;
   color: #1b3d76;
   text-align: center;
+}
+
+.time-quote {
+  margin: 8px auto 0;
+  max-width: 360px;
+  text-align: center;
+}
+
+.time-quote-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #4b5b7c;
+}
+
+.time-quote-author {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #233968;
 }
 
 
@@ -1006,7 +1041,7 @@
 @media (max-width: 1200px) {
   .time-card {
     height: auto;
-    min-height: 180px;
+    min-height: 210px;
   }
 
   .time-counter {
@@ -1014,13 +1049,106 @@
   }
 }
 
+@media (max-width: 1100px) {
+  .time-card,
+  .announcement-card,
+  .shift-card,
+  .calendar-card,
+  .holiday-card,
+  .summary-card,
+  .member-card {
+    min-height: unset;
+    height: auto;
+  }
+}
+
 @media (max-width: 980px) {
   .time-panel {
     gap: 8px;
-    padding: 10px 12px;
+    padding: 16px 12px;
   }
 
   .time-counter {
     font-size: 32px;
+  }
+
+  .time-quote {
+    max-width: 100%;
+  }
+
+  .time-quote-text {
+    font-size: 11px;
+  }
+
+  .announcement-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .announcement-list {
+    max-height: none;
+  }
+
+  .calendar-grid {
+    gap: 4px;
+  }
+
+  .calendar-cell {
+    font-size: 11px;
+    padding: 6px 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-grid {
+    row-gap: 10px;
+  }
+
+  .card-top {
+    gap: 8px;
+  }
+
+  .pill-btn {
+    font-size: 9px;
+    padding: 4px 8px;
+  }
+
+  .summary-row {
+    font-size: 14px;
+    gap: 12px;
+  }
+
+  .summary-section {
+    padding: 8px 10px;
+  }
+
+  .big-value {
+    font-size: 32px;
+  }
+
+  .member-card {
+    min-height: 120px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .dashboard-header {
+    margin-bottom: 10px;
+  }
+
+  .dashboard-header .datetime {
+    font-size: 13px;
+    width: 100%;
+    text-align: left;
+  }
+
+  .dashboard-grid > .card {
+    border-radius: 14px;
+  }
+
+  .announcement-item,
+  .shift-stat {
+    border-radius: 12px;
   }
 }

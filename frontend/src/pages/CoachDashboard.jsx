@@ -2,7 +2,7 @@ import "../styles/DashboardLayout.css";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
 import { parseSqlDateTime, saveDashboardAttendance } from "../api/attendance";
-import DashboardSidebar from "../components/DashboardSidebar";
+import DashboardSidebar from "../components/ResponsiveDashboardSidebar";
 import AttendanceHistoryHighlights from "../components/AttendanceHistoryHighlights";
 import AttendanceModule from "../components/AttendanceModule";
 import MainDashboard from "./MainDashboard";
@@ -10,6 +10,7 @@ import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
 import ControlPanelSection from "../components/ControlPanelSection";
 import EmployeesSection from "../components/EmployeesSection";
+import ProfileSection from "../components/ProfileSection";
 import { buildRequestHighlights, fetchMyRequests, fetchTeamRequests, updateTeamRequestStatus } from "../api/requests";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
@@ -189,6 +190,7 @@ export default function CoachDashboard() {
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
   const navItems = [
     ...(canViewDashboard ? [{ label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") }] : []),
+    { label: "Profile", active: activeNav === "Profile", onClick: () => setActiveNav("Profile") },
     ...(canViewTeam ? [{ label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") }] : []),
     ...(canViewAttendance ? [{
       label: "Attendance",
@@ -211,6 +213,7 @@ export default function CoachDashboard() {
   useEffect(() => {
     const canAccessActiveNav = (
       (activeNav === "Dashboard" && canViewDashboard)
+      || activeNav === "Profile"
       || ((activeNav === "Team" || activeNav === "Schedule") && canViewTeam)
       || ((activeNav === "Attendance" || attendanceNavItems.includes(activeNav)) && canViewAttendance)
       || (activeNav === "Employees" && canAccessEmployeesTab)
@@ -243,7 +246,10 @@ export default function CoachDashboard() {
 
     if (canAccessControlPanel) {
       setActiveNav("Control Panel");
+      return;
     }
+
+    setActiveNav("Profile");
   }, [activeNav, attendanceNavItems, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
 
   useEffect(() => {
@@ -1855,6 +1861,8 @@ export default function CoachDashboard() {
               </div>
             </section>
           </>
+        ) : activeNav === "Profile" ? (
+          <ProfileSection />
         ) : activeNav === "Employees" ? (
           <EmployeesSection />
         ) : canAccessControlPanel && activeNav === "Control Panel" ? (

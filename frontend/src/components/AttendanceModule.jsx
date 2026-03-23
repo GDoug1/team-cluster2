@@ -180,7 +180,6 @@ export default function AttendanceModule({
     setCurrentPage(1);
   };
 
-
   if (loading) {
     return (
       <div className="am-loading">

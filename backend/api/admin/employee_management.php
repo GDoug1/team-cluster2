@@ -316,6 +316,8 @@ if ($requestMethod === 'PUT') {
     $employeeType = trim((string)($data['employee_type'] ?? ''));
     $employmentStatus = trim((string)($data['employment_status'] ?? 'Active'));
     $dateHired = trim((string)($data['date_hired'] ?? ''));
+    $newPassword = (string)($data['new_password'] ?? '');
+    $confirmNewPassword = (string)($data['confirm_new_password'] ?? '');
 
     if ($firstName === '' || $lastName === '' || $email === '') {
         http_response_code(400);
@@ -344,6 +346,24 @@ if ($requestMethod === 'PUT') {
     if ($requiredFieldsValidationError !== null) {
         http_response_code(400);
         exit(json_encode(["success" => false, "message" => $requiredFieldsValidationError]));
+    }
+
+    $isUpdatingPassword = $newPassword !== '' || $confirmNewPassword !== '';
+    if ($isUpdatingPassword) {
+        if ($newPassword === '' || $confirmNewPassword === '') {
+            http_response_code(400);
+            exit(json_encode(["success" => false, "message" => "New password and confirm password are required when resetting a password."]));
+        }
+
+        if (strlen($newPassword) < 8) {
+            http_response_code(400);
+            exit(json_encode(["success" => false, "message" => "New password must be at least 8 characters long."]));
+        }
+
+        if ($newPassword !== $confirmNewPassword) {
+            http_response_code(400);
+            exit(json_encode(["success" => false, "message" => "New password and confirm password do not match."]));
+        }
     }
 
     $conn->begin_transaction();
@@ -386,14 +406,27 @@ if ($requestMethod === 'PUT') {
         }
 
         if ($linkedUserId > 0) {
-            $updateUserStmt = $conn->prepare("UPDATE users SET email = ? WHERE user_id = ?");
-            if (!$updateUserStmt) {
-                throw new Exception("Unable to update linked user account.");
-            }
+            if ($isUpdatingPassword) {
+                $passwordHash = password_hash($newPassword, PASSWORD_BCRYPT);
+                $updateUserStmt = $conn->prepare("UPDATE users SET email = ?, password = ? WHERE user_id = ?");
+                if (!$updateUserStmt) {
+                    throw new Exception("Unable to update linked user account.");
+                }
 
-            $updateUserStmt->bind_param("si", $email, $linkedUserId);
-            if (!$updateUserStmt->execute()) {
-                throw new Exception("Unable to update linked user account.");
+                $updateUserStmt->bind_param("ssi", $email, $passwordHash, $linkedUserId);
+                if (!$updateUserStmt->execute()) {
+                    throw new Exception("Unable to update linked user account.");
+                }
+            } else {
+                $updateUserStmt = $conn->prepare("UPDATE users SET email = ? WHERE user_id = ?");
+                if (!$updateUserStmt) {
+                    throw new Exception("Unable to update linked user account.");
+                }
+
+                $updateUserStmt->bind_param("si", $email, $linkedUserId);
+                if (!$updateUserStmt->execute()) {
+                    throw new Exception("Unable to update linked user account.");
+                }
             }
         }
 
