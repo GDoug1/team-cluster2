@@ -3391,4 +3391,18 @@ body {
   .table-row {
     min-width: 860px;
   }
-}
+  }
+
+  .confirm-modal-btn.is-danger {
+  background: #D93025;
+  color: #FFFFFF;
+  border: 1px solid #a5241c;
+  }
+  .confirm-modal-btn.is-danger:hover {
+  background: #b71c1c;
+  }
+  .confirm-modal-btn.is-primary {
+  background: #357AF4;
+  color: #FFFFFF;
+  border: 1px solid #285ec1;
+  }

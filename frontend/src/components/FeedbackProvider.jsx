@@ -59,14 +59,14 @@ export function FeedbackProvider({ children }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [closeDialog, dialogState]);
 
-  const confirm = useCallback(options => new Promise(resolve => {
+  const confirm = useCallback(({ title, message, confirmLabel, cancelLabel, variant = "primary" } = {}) => new Promise(resolve => {
     setDialogState({
       kind: "confirm",
-      title: options?.title || "Confirm action",
-      message: options?.message || "",
-      confirmLabel: options?.confirmLabel || "Confirm",
-      cancelLabel: options?.cancelLabel || "Cancel",
-      variant: options?.variant || "primary",
+      title: title || "Confirm action",
+      message: message || "",
+      confirmLabel: confirmLabel || "Confirm",
+      cancelLabel: cancelLabel || "Cancel",
+      variant,
       resolve
     });
   }), []);
@@ -122,7 +122,7 @@ export function FeedbackProvider({ children }) {
               ) : null}
 
               <button
-                className={`btn ${dialogState.variant === "danger" ? "confirm-danger-btn" : "primary"}`}
+                className={`confirm-modal-btn is-${dialogState.variant}`}
                 type="button"
                 onClick={() => closeDialog(true)}
               >
