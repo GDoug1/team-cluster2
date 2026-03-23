@@ -519,7 +519,7 @@ export default function EmployeeDashboard() {
                 <FilingCenterPanel initialTab={filingCenterInitialTab} onSubmitted={() => fetchMyRequests().then(response => setMyRequests(Array.isArray(response) ? response : [])).catch(() => setMyRequests([]))} />
               )}
 
-              {activeNav === "Employees" && (
+              {canAccessEmployeesTab && activeNav === "Employees" && (
                 <EmployeesSection />
               )}
 

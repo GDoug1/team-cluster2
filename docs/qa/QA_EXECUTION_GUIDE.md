@@ -101,7 +101,23 @@ This document provides step-by-step instructions for performing Quality Assuranc
 
 ---
 
-## 🚩 5. Bug Reporting Protocol
+## 🔐 5. Security & RBAC Verification
+*Objective: Ensure that unauthorized users cannot access administrative tools or data.*
+
+### 1. Control Panel Isolation
+*   **Target:** `EmployeeDashboard`, `CoachDashboard`.
+*   **Execution:** Login as **Employee** (`qa_employee@mail.com`).
+*   **Verification:** Confirm that "Control Panel" is NOT visible in the sidebar and that navigating manually to `/employee` (while activeNav is "Control Panel") does not show the section.
+*   **Success Criteria:** Administrative tools must be completely hidden from non-admin roles.
+
+### 2. Employee List Protection
+*   **Execution:** Login as **Employee** or **Coach**.
+*   **Verification:** Confirm that the "Employees" tab/section is either hidden or shows an "Access Denied" state if permissions are missing.
+*   **Success Criteria:** Standard employees must not be able to view the full list of other employees.
+
+---
+
+## 🚩 6. Bug Reporting Protocol
 
 If a test case fails (Status: **Need Revisions**):
 1.  **Capture Console Logs:** Press **F12**, go to **Console**, and take a screenshot of any red errors.
