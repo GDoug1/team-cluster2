@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
 import { normalizeAttendanceHistoryRecord, parseSqlDateTime } from "../api/attendance";
 import { formatDateTime } from "../utils/dateUtils";
 import { useFeedback } from "./FeedbackContext";
@@ -95,6 +95,23 @@ const toDateInputValue = value => {
   return `${year}-${month}-${day}`;
 };
 
+const SortableHeader = ({ label, sortKey, currentSortKey, direction, onSort }) => {
+  const isActive = currentSortKey === sortKey;
+  return (
+    <button
+      type="button"
+      className={`table-sort-btn ${isActive ? "is-active" : ""}`}
+      onClick={() => onSort(sortKey)}
+      aria-label={`Sort by ${label}`}
+    >
+      <span>{label}</span>
+      <span className="table-sort-icon">
+        {!isActive ? <ArrowUpDown size={14} /> : direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+      </span>
+    </button>
+  );
+};
+
 export default function DataPanel({
   type = "attendance",
   records = [],
@@ -125,6 +142,38 @@ export default function DataPanel({
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [rowsPerPageInput, setRowsPerPageInput] = useState("10");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortKey, setSortKey] = useState(type === "attendance" ? "Date" : "Date Filed");
+  const [sortDirection, setSortDirection] = useState("desc");
+
+  const handleSort = key => {
+    if (sortKey === key) {
+      setSortDirection(current => (current === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDirection("desc");
+    }
+  };
+
+  const getSortValue = (item, key) => {
+    if (type === "attendance") {
+      if (key === "Date") return new Date(item.time_in_at ?? item.time_out_at ?? 0).getTime();
+      if (key === "Time In") return new Date(item.time_in_at ?? 0).getTime();
+      if (key === "Time Out") return new Date(item.time_out_at ?? 0).getTime();
+      if (key === "Total Hours") return Number(normalizeAttendanceHistoryRecord(item).total_hours || 0);
+      if (key === "Status") return String(item.attendance_tag ?? item.tag ?? "").toLowerCase();
+      if (key === "Cluster") return String(item.cluster_name ?? "").toLowerCase();
+      if (key === personLabel) return String(item[personField] ?? "").toLowerCase();
+      return String(item[key.toLowerCase().replace(/ /g, "_")] ?? "").toLowerCase();
+    }
+    if (type === "requests") {
+      if (key === "Date Filed") return new Date(item.date_filed ?? 0).getTime();
+      if (key === personLabel) return String(item[personField] ?? "").toLowerCase();
+      if (key === "Status") return String(item.status ?? "").toLowerCase();
+      if (key === "Request Type") return String(item.request_type ?? "").toLowerCase();
+      return String(item[key.toLowerCase().replace(/ /g, "_")] ?? "").toLowerCase();
+    }
+    return "";
+  };
 
   const handleActionClick = async (item, action) => {
     if (!onRequestAction) return;
@@ -171,9 +220,10 @@ export default function DataPanel({
     setRowsPerPageInput(String(Number.isFinite(normalizedValue) && normalizedValue > 0 ? normalizedValue : 10));
   };
 
-  const filteredRecords = useMemo(() => {
+  const filteredAndSortedRecords = useMemo(() => {
+    let result = [];
     if (type === "requests") {
-      return records.filter(item => {
+      result = records.filter(item => {
         const normalizedRequestType = String(item.request_type ?? "").trim().toLowerCase();
         const normalizedStatus = String(item.status ?? "").trim().toLowerCase();
 
@@ -198,40 +248,54 @@ export default function DataPanel({
           .toLowerCase();
         return !searchQuery || haystack.includes(searchQuery.toLowerCase());
       });
+    } else if (type === "attendance") {
+      result = records.filter(item => {
+        const entryDate = toDateInputValue(item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at);
+        if (dateStartFilter && (!entryDate || entryDate < dateStartFilter)) return false;
+        if (dateEndFilter && (!entryDate || entryDate > dateEndFilter)) return false;
+        if (externalDateFilter && (!entryDate || entryDate !== externalDateFilter)) return false;
+
+        const haystack = [
+          item.cluster_name,
+          item.attendance_tag,
+          item.tag,
+          item.attendance_note,
+          item.note,
+          item.employee_username,
+          item.username,
+          personField ? item[personField] : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        if (searchQuery && !haystack.includes(searchQuery.toLowerCase())) return false;
+        return true;
+      });
     }
 
-    if (type !== "attendance") return [];
+    if (sortKey) {
+      result.sort((a, b) => {
+        const valA = getSortValue(a, sortKey);
+        const valB = getSortValue(b, sortKey);
+        const multiplier = sortDirection === "asc" ? 1 : -1;
 
-    return records.filter(item => {
-      const entryDate = toDateInputValue(item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at);
-      if (dateStartFilter && (!entryDate || entryDate < dateStartFilter)) return false;
-      if (dateEndFilter && (!entryDate || entryDate > dateEndFilter)) return false;
-      if (externalDateFilter && (!entryDate || entryDate !== externalDateFilter)) return false;
+        if (typeof valA === "number" && typeof valB === "number") {
+          return (valA - valB) * multiplier;
+        }
+        return String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: "base" }) * multiplier;
+      });
+    }
 
-      const haystack = [
-        item.cluster_name,
-        item.attendance_tag,
-        item.tag,
-        item.attendance_note,
-        item.note,
-        item.employee_username,
-        item.username,
-        personField ? item[personField] : "",
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+    return result;
+  }, [type, records, dateStartFilter, dateEndFilter, externalDateFilter, searchQuery, personField, enableRequestFilters, requestTypeFilter, requestStatusFilter, sortKey, sortDirection]);
 
-      if (searchQuery && !haystack.includes(searchQuery.toLowerCase())) return false;
-      return true;
-    });
-  }, [type, records, dateStartFilter, dateEndFilter, externalDateFilter, searchQuery, personField, enableRequestFilters, requestTypeFilter, requestStatusFilter]);
-  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / rowsPerPage));
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedRecords.length / rowsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStartIndex = (safeCurrentPage - 1) * rowsPerPage;
-  const paginatedRecords = filteredRecords.slice(pageStartIndex, pageStartIndex + rowsPerPage);
-  const visibleStart = filteredRecords.length === 0 ? 0 : pageStartIndex + 1;
-  const visibleEnd = Math.min(pageStartIndex + rowsPerPage, filteredRecords.length);
+  const paginatedRecords = filteredAndSortedRecords.slice(pageStartIndex, pageStartIndex + rowsPerPage);
+  const visibleStart = filteredAndSortedRecords.length === 0 ? 0 : pageStartIndex + 1;
+  const visibleEnd = Math.min(pageStartIndex + rowsPerPage, filteredAndSortedRecords.length);
 
 
 
@@ -245,40 +309,56 @@ export default function DataPanel({
     return (
       <div className="employee-attendance-history-table" role="table" aria-label={config.title}>
         <div className="attendance-history-range-filter" role="group" aria-label="Filter attendance history">
-          <div className="attendance-history-filter">
-            <label htmlFor="att-from">From</label>
+          <label className="employee-search-field" htmlFor="att-from">
+            <span className="employee-control-label">From</span>
             <input id="att-from" type="date" value={dateStartFilter} onChange={event => setDateStartFilter(event.target.value)} />
-          </div>
-          <div className="attendance-history-filter">
-            <label htmlFor="att-to">To</label>
+          </label>
+          <label className="employee-search-field" htmlFor="att-to">
+            <span className="employee-control-label">To</span>
             <input id="att-to" type="date" value={dateEndFilter} onChange={event => setDateEndFilter(event.target.value)} />
-          </div>
+          </label>
           {typeof onExternalDateFilterChange === "function" && (
-            <div className="attendance-history-filter">
-              <label htmlFor="att-ext-date">Date</label>
+            <label className="employee-search-field" htmlFor="att-ext-date">
+              <span className="employee-control-label">Date</span>
               <input id="att-ext-date" type="date" value={externalDateFilter ?? ""} onChange={event => onExternalDateFilterChange(event.target.value)} />
-            </div>
+            </label>
           )}
-          <div className="attendance-history-filter" style={{ minWidth: "260px" }}>
-            <label htmlFor="att-search">Search</label>
+          <label className="employee-search-field" htmlFor="att-search" style={{ flex: "1 1 260px" }}>
+            <span className="employee-control-label">Search</span>
             <input id="att-search" type="text" value={searchQuery} placeholder={config.searchPlaceholder} onChange={event => { setSearchQuery(event.target.value); setCurrentPage(1); }} />
-          </div>
-          <div className="attendance-history-filter attendance-history-rows-filter">
-            <label htmlFor="att-rows">Rows per page</label>
+          </label>
+          <label className="employee-rows-field" htmlFor="att-rows">
+            <span className="employee-control-label">Rows per page</span>
             <input id="att-rows" type="text" inputMode="numeric" placeholder="10" value={rowsPerPageInput} onChange={handleRowsPerPageChange} onBlur={handleRowsPerPageBlur} />
-          </div>
+          </label>
         </div>
 
         <div className="employee-attendance-history-scroll">
           <div className="employee-attendance-history-header" role="row" style={attendanceGridStyle}>
-            <span role="columnheader">Date</span>
-            <span role="columnheader">Time In</span>
-            <span role="columnheader">Time Out</span>
-            <span role="columnheader">Total Hours</span>
-            <span role="columnheader">Status</span>
-            <span role="columnheader">Cluster</span>
+            <span role="columnheader">
+              <SortableHeader label="Date" sortKey="Date" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
+            </span>
+            <span role="columnheader">
+              <SortableHeader label="Time In" sortKey="Time In" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
+            </span>
+            <span role="columnheader">
+              <SortableHeader label="Time Out" sortKey="Time Out" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
+            </span>
+            <span role="columnheader">
+              <SortableHeader label="Total Hours" sortKey="Total Hours" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
+            </span>
+            <span role="columnheader">
+              <SortableHeader label="Status" sortKey="Status" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
+            </span>
+            <span role="columnheader">
+              <SortableHeader label="Cluster" sortKey="Cluster" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
+            </span>
             <span role="columnheader">Note</span>
-            {personField && <span role="columnheader">{personLabel}</span>}
+            {personField && (
+              <span role="columnheader">
+                <SortableHeader label={personLabel} sortKey={personLabel} currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
+              </span>
+            )}
             {onEditRow && <span role="columnheader">Action</span>}
           </div>
           {filteredRecords.length > 0 ? paginatedRecords.map(item => {
@@ -391,12 +471,22 @@ export default function DataPanel({
             className={`employee-attendance-history-header ${showRequestActionBy ? "employee-attendance-history-header-actor" : ""} ${personField ? "employee-attendance-history-header-person" : ""} ${onRequestAction ? "employee-attendance-history-header-actions" : ""}`.trim()}
             role="row"
           >
-            <span role="columnheader">Date Filed</span>
-            {personField && <span role="columnheader">{personLabel}</span>}
-            <span role="columnheader">Request Type</span>
+            <span role="columnheader">
+              <SortableHeader label="Date Filed" sortKey="Date Filed" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
+            </span>
+            {personField && (
+              <span role="columnheader">
+                <SortableHeader label={personLabel} sortKey={personLabel} currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
+              </span>
+            )}
+            <span role="columnheader">
+              <SortableHeader label="Request Type" sortKey="Request Type" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
+            </span>
             <span role="columnheader">Details</span>
             <span role="columnheader">Schedule / Period</span>
-            <span role="columnheader">Status</span>
+            <span role="columnheader">
+              <SortableHeader label="Status" sortKey="Status" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
+            </span>
             {showRequestActionBy && <span role="columnheader">Accepted / Rejected By</span>}
             {showRequestActionBy && <span role="columnheader">Accepted / Rejected Date</span>}
             {onRequestAction && <span role="columnheader">Actions</span>}

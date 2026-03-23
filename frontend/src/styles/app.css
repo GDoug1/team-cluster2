@@ -2436,8 +2436,38 @@ body {
 
 .employee-request-actions-cell {
   display: flex;
-  justify-content: flex-start;
+  justify-content: flex-end;
 }
+
+.table-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.table-sort-icon {
+  display: inline-flex;
+  color: #94a3b8;
+  transition: color 0.2s ease;
+}
+
+.table-sort-btn.is-active .table-sort-icon {
+  color: #357AF4;
+}
+
+.table-sort-btn:hover .table-sort-icon {
+  color: #64748b;
+}
+
 
 .employee-request-actions {
   display: flex;
