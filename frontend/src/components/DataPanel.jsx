@@ -229,8 +229,14 @@ export default function DataPanel({
     if (type === "requests") {
       result = records.filter(item => {
         const entryDate = toDateInputValue(item.date_filed);
-        if (dateStartFilter && (!entryDate || entryDate < dateStartFilter)) return false;
-        if (dateEndFilter && (!entryDate || entryDate > dateEndFilter)) return false;
+        
+        // Prioritize external filter if present, otherwise use range
+        if (externalDateFilter) {
+          if (!entryDate || entryDate !== externalDateFilter) return false;
+        } else {
+          if (dateStartFilter && (!entryDate || entryDate < dateStartFilter)) return false;
+          if (dateEndFilter && (!entryDate || entryDate > dateEndFilter)) return false;
+        }
 
         const normalizedRequestType = String(item.request_type ?? "").trim().toLowerCase();
         const normalizedStatus = String(item.status ?? "").trim().toLowerCase();
@@ -307,6 +313,18 @@ export default function DataPanel({
 
 
 
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setDateStartFilter("");
+    setDateEndFilter("");
+    setRequestTypeFilter("all");
+    setRequestStatusFilter("all");
+    if (typeof onExternalDateFilterChange === "function") {
+      onExternalDateFilterChange("");
+    }
+    setCurrentPage(1);
+  };
+
   if (type === "attendance") {
     const attendanceColumnCount = 7 + (personField ? 1 : 0) + (onEditRow ? 1 : 0);
     const attendanceGridStyle = {
@@ -319,16 +337,16 @@ export default function DataPanel({
         <div className="attendance-history-range-filter" role="group" aria-label="Filter attendance history">
           <label className="employee-search-field" htmlFor="att-from">
             <span className="employee-control-label">From</span>
-            <input id="att-from" type="date" value={dateStartFilter} onChange={event => setDateStartFilter(event.target.value)} />
+            <input id="att-from" type="date" value={dateStartFilter} onChange={event => { setDateStartFilter(event.target.value); setCurrentPage(1); }} />
           </label>
           <label className="employee-search-field" htmlFor="att-to">
             <span className="employee-control-label">To</span>
-            <input id="att-to" type="date" value={dateEndFilter} onChange={event => setDateEndFilter(event.target.value)} />
+            <input id="att-to" type="date" value={dateEndFilter} onChange={event => { setDateEndFilter(event.target.value); setCurrentPage(1); }} />
           </label>
           {typeof onExternalDateFilterChange === "function" && (
             <label className="employee-search-field" htmlFor="att-ext-date">
-              <span className="employee-control-label">Date</span>
-              <input id="att-ext-date" type="date" value={externalDateFilter ?? ""} onChange={event => onExternalDateFilterChange(event.target.value)} />
+              <span className="employee-control-label">Single Date</span>
+              <input id="att-ext-date" type="date" value={externalDateFilter ?? ""} onChange={event => { onExternalDateFilterChange(event.target.value); setCurrentPage(1); }} />
             </label>
           )}
           <label className="employee-search-field" htmlFor="att-search" style={{ flex: "1 1 260px" }}>
@@ -339,6 +357,11 @@ export default function DataPanel({
             <span className="employee-control-label">Rows per page</span>
             <input id="att-rows" type="text" inputMode="numeric" placeholder="10" value={rowsPerPageInput} onChange={handleRowsPerPageChange} onBlur={handleRowsPerPageBlur} />
           </label>
+          <div className="employee-filter-actions">
+            <button className="btn secondary" type="button" onClick={handleClearFilters}>
+              Clear
+            </button>
+          </div>
         </div>
 
         <div className="employee-attendance-history-scroll">
@@ -434,10 +457,18 @@ export default function DataPanel({
     return (
       <div className="employee-attendance-history-table" role="table" aria-label={config.title}>
         <div className="attendance-history-range-filter" role="group" aria-label="Filter requests">
+          <label className="employee-search-field" htmlFor="req-from">
+            <span className="employee-control-label">From</span>
+            <input id="req-from" type="date" value={dateStartFilter} onChange={event => { setDateStartFilter(event.target.value); setCurrentPage(1); }} />
+          </label>
+          <label className="employee-search-field" htmlFor="req-to">
+            <span className="employee-control-label">To</span>
+            <input id="req-to" type="date" value={dateEndFilter} onChange={event => { setDateEndFilter(event.target.value); setCurrentPage(1); }} />
+          </label>
           {enableRequestFilters && (
             <>
-              <div className="attendance-history-filter">
-                <label htmlFor="req-type">Request Type</label>
+              <label className="employee-search-field" htmlFor="req-type">
+                <span className="employee-control-label">Request Type</span>
                 <select id="req-type" value={requestTypeFilter} onChange={event => { setRequestTypeFilter(event.target.value); setCurrentPage(1); }}>
                   {requestTypeOptions.map(option => (
                     <option key={option} value={option}>
@@ -445,9 +476,9 @@ export default function DataPanel({
                     </option>
                   ))}
                 </select>
-              </div>
-              <div className="attendance-history-filter">
-                <label htmlFor="req-status">Status</label>
+              </label>
+              <label className="employee-search-field" htmlFor="req-status">
+                <span className="employee-control-label">Status</span>
                 <select id="req-status" value={requestStatusFilter} onChange={event => { setRequestStatusFilter(event.target.value); setCurrentPage(1); }}>
                   {requestStatusOptions.map(option => (
                     <option key={option} value={option}>
@@ -455,11 +486,11 @@ export default function DataPanel({
                     </option>
                   ))}
                 </select>
-              </div>
+              </label>
             </>
           )}
-          <div className="attendance-history-filter" style={{ minWidth: "280px" }}>
-            <label htmlFor="req-search">Search</label>
+          <label className="employee-search-field" htmlFor="req-search" style={{ flex: "1 1 280px" }}>
+            <span className="employee-control-label">Search</span>
             <input
               id="req-search"
               type="text"
@@ -467,10 +498,15 @@ export default function DataPanel({
               placeholder={config.searchPlaceholder}
               onChange={event => { setSearchQuery(event.target.value); setCurrentPage(1); }}
             />
-          </div>
-          <div className="attendance-history-filter attendance-history-rows-filter">
-            <label htmlFor="req-rows">Rows per page</label>
+          </label>
+          <label className="employee-rows-field" htmlFor="req-rows">
+            <span className="employee-control-label">Rows per page</span>
             <input id="req-rows" type="text" inputMode="numeric" placeholder="10" value={rowsPerPageInput} onChange={handleRowsPerPageChange} onBlur={handleRowsPerPageBlur} />
+          </label>
+          <div className="employee-filter-actions">
+            <button className="btn secondary" type="button" onClick={handleClearFilters}>
+              Clear
+            </button>
           </div>
         </div>
 

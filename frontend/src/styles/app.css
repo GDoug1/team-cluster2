@@ -643,13 +643,20 @@ body {
   margin-bottom: 14px;
 }
 
-.employee-list-controls {
+.employee-list-controls,
+.attendance-history-range-filter {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: flex-end;
   gap: 12px;
   margin-bottom: 14px;
   flex-wrap: wrap;
+}
+
+.employee-filter-actions {
+  display: flex;
+  align-items: flex-end;
+  height: 40px;
 }
 
 .employee-search-field,

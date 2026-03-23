@@ -1634,17 +1634,17 @@ export default function CoachDashboard() {
                             <div className="overview-card"><div className="overview-label">Timed In</div><div className="overview-value">{attendanceSummary.timedIn}</div></div>
                             <div className="overview-card"><div className="overview-label">Completed Shift</div><div className="overview-value">{attendanceSummary.completed}</div></div>
                           </div>
-                          <div className="attendance-controls">
-                            <label className="attendance-search" htmlFor="attendance-search-input">
-                              <span>Search</span>
+                          <div className="employee-list-controls">
+                            <label className="employee-search-field" htmlFor="attendance-search-input">
+                              <span className="employee-control-label">Search</span>
                               <input id="attendance-search-input" type="search" placeholder="Search by name or attendance tag" value={attendanceQuery} onChange={event => setAttendanceQuery(event.target.value)} />
                             </label>
-                            <label className="attendance-date" htmlFor="attendance-date-filter">
-                              <span>Date</span>
+                            <label className="employee-search-field" htmlFor="attendance-date-filter" style={{ flex: "0 0 180px" }}>
+                              <span className="employee-control-label">Date</span>
                               <input id="attendance-date-filter" type="date" value={attendanceDateFilter} onChange={event => setAttendanceDateFilter(event.target.value || getTodayDateInputValue())} />
                             </label>
-                            <label className="attendance-sort" htmlFor="attendance-sort-select">
-                              <span>Sort</span>
+                            <label className="employee-rows-field" htmlFor="attendance-sort-select" style={{ flex: "0 0 240px" }}>
+                              <span className="employee-control-label">Sort</span>
                               <select id="attendance-sort-select" value={attendanceSort} onChange={event => setAttendanceSort(event.target.value)}>
                                 <option value={attendanceSortOptions.newestAttendanceFirst}>Newest attendance first</option>
                                 <option value={attendanceSortOptions.latestAttendanceFirst}>Latest attendance first</option>
