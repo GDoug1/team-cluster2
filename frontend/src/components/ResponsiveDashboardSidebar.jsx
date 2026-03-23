@@ -20,6 +20,8 @@ export default function ResponsiveDashboardSidebar({
   const [isMobileViewport, setIsMobileViewport] = useState(getIsMobileViewport);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDesktopSidebarHidden, setIsDesktopSidebarHidden] = useState(false);
+  const [restoreDesktopAfterModal, setRestoreDesktopAfterModal] = useState(false);
+  const [restoreMobileAfterModal, setRestoreMobileAfterModal] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
@@ -45,6 +47,53 @@ export default function ResponsiveDashboardSidebar({
     mediaQuery.addListener(handleViewportChange);
     return () => mediaQuery.removeListener(handleViewportChange);
   }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || typeof MutationObserver === "undefined") {
+      return undefined;
+    }
+
+    const syncSidebarWithModalState = () => {
+      const hasOpenModal = Boolean(document.querySelector(".modal-overlay"));
+
+      if (hasOpenModal) {
+        if (!isDesktopSidebarHidden) {
+          setRestoreDesktopAfterModal(true);
+          setIsDesktopSidebarHidden(true);
+        }
+
+        if (isMobileSidebarOpen) {
+          setRestoreMobileAfterModal(true);
+          setIsMobileSidebarOpen(false);
+        }
+
+        return;
+      }
+
+      if (restoreDesktopAfterModal) {
+        setIsDesktopSidebarHidden(false);
+        setRestoreDesktopAfterModal(false);
+      }
+
+      if (restoreMobileAfterModal) {
+        setIsMobileSidebarOpen(true);
+        setRestoreMobileAfterModal(false);
+      }
+    };
+
+    syncSidebarWithModalState();
+
+    const observer = new MutationObserver(() => {
+      syncSidebarWithModalState();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    return () => observer.disconnect();
+  }, [isDesktopSidebarHidden, isMobileSidebarOpen, restoreDesktopAfterModal, restoreMobileAfterModal]);
 
   const isSidebarVisible = isMobileViewport ? isMobileSidebarOpen : !isDesktopSidebarHidden;
 

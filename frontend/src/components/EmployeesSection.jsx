@@ -17,7 +17,9 @@ const initialEmployeeForm = {
   account: "",
   employee_type: "",
   employment_status: "Active",
-  date_hired: ""
+  date_hired: "",
+  new_password: "",
+  confirm_new_password: ""
 };
 
 const employmentPositions = [
@@ -159,7 +161,9 @@ const mapEmployeeToForm = employee => ({
   account: employee?.account ?? "",
   employee_type: employee?.employee_type ?? "",
   employment_status: employee?.employment_status || "Active",
-  date_hired: employee?.date_hired ?? ""
+  date_hired: employee?.date_hired ?? "",
+  new_password: "",
+  confirm_new_password: ""
 });
 
 const getMissingEmployeeFields = (form, fields) =>
@@ -196,6 +200,24 @@ const validateEmployeeEmploymentSection = form => {
   const missingFields = getMissingEmployeeFields(form, employeeEmploymentRequiredFields);
   if (missingFields.length > 0) {
     return buildEmployeeSectionValidationMessage("Employment Details", missingFields);
+  }
+
+  const newPassword = String(form?.new_password ?? "");
+  const confirmNewPassword = String(form?.confirm_new_password ?? "");
+  const isChangingPassword = newPassword !== "" || confirmNewPassword !== "";
+
+  if (isChangingPassword) {
+    if (newPassword === "" || confirmNewPassword === "") {
+      return "New password and confirm password are required when resetting a password.";
+    }
+
+    if (newPassword.length < 8) {
+      return "New password must be at least 8 characters long.";
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      return "New password and confirm password do not match.";
+    }
   }
 
   return "";
@@ -1065,6 +1087,12 @@ export default function EmployeesSection() {
                           <option key={employeeType} value={employeeType}>{employeeType}</option>
                         ))}
                       </select>
+                    </label>
+                    <label className="form-field" htmlFor="edit-employee-new-password">
+                      <input id="edit-employee-new-password" type="password" name="new_password" placeholder="New Password (optional)" value={editEmployeeForm.new_password} onChange={handleEditEmployeeChange} />
+                    </label>
+                    <label className="form-field" htmlFor="edit-employee-confirm-password">
+                      <input id="edit-employee-confirm-password" type="password" name="confirm_new_password" placeholder="Confirm Password" value={editEmployeeForm.confirm_new_password} onChange={handleEditEmployeeChange} />
                     </label>
                   </div>
                 </div>

@@ -564,6 +564,75 @@ body {
   padding: 0 16px 12px;
 }
 
+.profile-shell {
+  display: grid;
+  gap: 20px;
+}
+
+.profile-header h2 {
+  margin: 0;
+  font-size: 28px;
+  color: #102544;
+}
+
+.profile-header p {
+  margin: 6px 0 0;
+  color: #5b6b84;
+  font-size: 14px;
+}
+
+.profile-form {
+  display: grid;
+  gap: 20px;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.profile-field {
+  display: grid;
+  gap: 8px;
+}
+
+.profile-field span {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7a90;
+}
+
+.profile-field input,
+.profile-field select {
+  width: 100%;
+  border: 1px solid #d7deea;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: #12233d;
+  background: #f8fbff;
+}
+
+.profile-field input:focus,
+.profile-field select:focus {
+  outline: none;
+  border-color: #4b83f5;
+  box-shadow: 0 0 0 3px rgba(75, 131, 245, 0.16);
+  background: #ffffff;
+}
+
+.profile-field-wide {
+  grid-column: 1 / -1;
+}
+
+.profile-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .employee-field {
   display: grid;
   gap: 6px;
@@ -2109,6 +2178,14 @@ body {
 @media (max-width: 900px) {
   .employee-overview-grid {
     grid-template-columns: 1fr;
+  }
+
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-actions .btn {
+    width: 100%;
   }
 }
 

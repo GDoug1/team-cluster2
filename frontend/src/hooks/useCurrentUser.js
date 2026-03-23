@@ -33,8 +33,15 @@ export default function useCurrentUser() {
 
     fetchUser();
 
+    const handleCurrentUserUpdated = () => {
+      fetchUser();
+    };
+
+    window.addEventListener("current-user-updated", handleCurrentUserUpdated);
+
     return () => {
       isActive = false;
+      window.removeEventListener("current-user-updated", handleCurrentUserUpdated);
     };
   }, [location.pathname]);
 

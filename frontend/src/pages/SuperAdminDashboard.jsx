@@ -13,6 +13,7 @@ import DataPanel from "../components/DataPanel";
 import ControlPanelSection from "../components/ControlPanelSection";
 import EmployeesSection from "../components/EmployeesSection";
 import AttendanceModule from "../components/AttendanceModule";
+import ProfileSection from "../components/ProfileSection";
 import { buildRequestHighlights, fetchAdminTeamRequests, fetchMyRequests, updateAdminTeamRequestStatus } from "../api/requests";
 import { logout } from "../utils/logout";
 import { parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
@@ -147,6 +148,7 @@ export default function AdminDashboard() {
   const isAttendanceView = activeNav === "Attendance" || attendanceNavItems.includes(activeNav);
   const navItems = [
     ...(canViewDashboard ? [{ label: "Dashboard", active: activeNav === "Dashboard", onClick: () => setActiveNav("Dashboard") }] : []),
+    { label: "Profile", active: activeNav === "Profile", onClick: () => setActiveNav("Profile") },
     ...(canViewTeam ? [{ label: "Team", active: activeNav === "Team", onClick: () => setActiveNav("Team") }] : []),
     ...(canViewAttendance ? [{
       label: "Attendance",
@@ -167,6 +169,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const canAccessActiveNav = (
       (activeNav === "Dashboard" && canViewDashboard)
+      || activeNav === "Profile"
       || ((activeNav === "Team" || activeNav === "Schedule") && canViewTeam)
       || ((activeNav === "Attendance" || attendanceNavItems.includes(activeNav)) && canViewAttendance)
       || (activeNav === "Employees" && canAccessEmployeesTab)
@@ -199,7 +202,10 @@ export default function AdminDashboard() {
 
     if (canAccessControlPanel) {
       setActiveNav("Control Panel");
+      return;
     }
+
+    setActiveNav("Profile");
   }, [activeNav, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
 
   const normalizeScheduleForm = coachSchedule => {
@@ -964,6 +970,8 @@ const handleOpenRejectModal = cluster => {
               personLabel="Name"
             />
           </section>
+        ) : activeNav === "Profile" ? (
+          <ProfileSection />
         ) : activeNav === "Employees" && canAccessEmployeesTab ? (
           <EmployeesSection />
         ) : activeNav === "Schedule" && canViewTeam ? (

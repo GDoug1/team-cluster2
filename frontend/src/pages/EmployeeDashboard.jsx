@@ -11,6 +11,7 @@ import FilingCenterPanel from "../components/FilingCenterPanel";
 import DataPanel from "../components/DataPanel";
 import EmployeesSection from "../components/EmployeesSection";
 import AttendanceModule from "../components/AttendanceModule";
+import ProfileSection from "../components/ProfileSection";
 import { buildRequestHighlights, fetchMyRequests } from "../api/requests";
 import useLiveDateTime from "../hooks/useLiveDateTime";
 import useCurrentUser from "../hooks/useCurrentUser";
@@ -35,6 +36,7 @@ export default function EmployeeDashboard() {
 
   const navItems = [
     ...(canViewDashboard ? ["Dashboard"] : []),
+    "Profile",
     ...(canViewTeam ? ["Team"] : []),
     ...(canViewAttendance ? ["Attendance"] : []),
     ...(canAccessEmployeesTab ? ["Employees"] : []),
@@ -82,6 +84,7 @@ export default function EmployeeDashboard() {
     const canAccessActiveNav = (
       (activeNav === "Dashboard" && canViewDashboard)
       || ((activeNav === "Team" || activeNav === "Schedule") && canViewTeam)
+      || (activeNav === "Profile")
       || (attendanceNavItems.includes(activeNav) && canViewAttendance)
       || (activeNav === "Employees" && canAccessEmployeesTab)
       || (activeNav === "Control Panel" && canAccessControlPanel)
@@ -113,7 +116,10 @@ export default function EmployeeDashboard() {
 
     if (canAccessControlPanel) {
       setActiveNav("Control Panel");
+      return;
     }
+
+    setActiveNav("Profile");
   }, [activeNav, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
 
   const normalizeSchedule = schedule => {
@@ -491,12 +497,16 @@ export default function EmployeeDashboard() {
             />
           )}
 
-          {data.length === 0 && !isAttendanceView && (
+          {data.length === 0 && !isAttendanceView && activeNav !== "Profile" && (
             <div className="empty-state">No team cluster details available.</div>
           )}
 
-          {((isAttendanceView || data.length > 0 || activeNav === "Employees" || activeNav === "Control Panel") && activeNav !== "Dashboard") && (
+          {((isAttendanceView || data.length > 0 || activeNav === "Employees" || activeNav === "Control Panel" || activeNav === "Profile") && activeNav !== "Dashboard") && (
             <div className="employee-panel">
+              {activeNav === "Profile" && (
+                <ProfileSection />
+              )}
+
               {activeNav === "My Attendance" && (
                 <div className="employee-card">
                   <div className="employee-card-body employee-card-body-flush">
@@ -529,7 +539,7 @@ export default function EmployeeDashboard() {
                 <ControlPanelSection />
               )}
 
-              {!isAttendanceView && activeNav !== "Control Panel" && activeNav !== "Employees" && canViewTeam && (
+              {!isAttendanceView && activeNav !== "Control Panel" && activeNav !== "Employees" && activeNav !== "Profile" && canViewTeam && (
                 <>
               <div className="employee-card">
                 <div className="employee-card-header">
