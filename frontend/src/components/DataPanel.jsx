@@ -361,7 +361,7 @@ export default function DataPanel({
             )}
             {onEditRow && <span role="columnheader">Action</span>}
           </div>
-          {filteredRecords.length > 0 ? paginatedRecords.map(item => {
+          {filteredAndSortedRecords.length > 0 ? paginatedRecords.map(item => {
             const normalizedAttendance = normalizeAttendanceHistoryRecord(item);
             const attendanceDateValue = item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at;
 
@@ -406,7 +406,7 @@ export default function DataPanel({
 
         <div className="employee-table-pagination employee-attendance-pagination">
           <div className="employee-pagination-summary">
-            Showing {visibleStart}-{visibleEnd} of {filteredRecords.length}
+            Showing {visibleStart}-{visibleEnd} of {filteredAndSortedRecords.length}
           </div>
           <div className="employee-pagination-actions">
             <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={safeCurrentPage === 1}>
@@ -492,7 +492,7 @@ export default function DataPanel({
             {onRequestAction && <span role="columnheader">Actions</span>}
           </div>
 
-          {filteredRecords.length > 0 ? paginatedRecords.map(item => {
+          {filteredAndSortedRecords.length > 0 ? paginatedRecords.map(item => {
             const photoUrl = resolveRequestPhotoUrl(item.photo_url ?? item.photo_path);
 
             return (
@@ -602,7 +602,7 @@ export default function DataPanel({
 
         <div className="employee-table-pagination employee-attendance-pagination">
           <div className="employee-pagination-summary">
-            Showing {visibleStart}-{visibleEnd} of {filteredRecords.length}
+            Showing {visibleStart}-{visibleEnd} of {filteredAndSortedRecords.length}
           </div>
           <div className="employee-pagination-actions">
             <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={safeCurrentPage === 1}>
