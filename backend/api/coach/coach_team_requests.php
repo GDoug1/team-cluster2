@@ -1,7 +1,7 @@
 <?php
 include __DIR__ . "/../../config/database.php";
 include __DIR__ . "/../../config/auth.php";
-requireRole("coach");
+requireRoleOrPermission(["admin", "super admin", "coach"], $conn, "View Team");
 
 function hasTable(mysqli $conn, string $table): bool {
     $safe = $conn->real_escape_string($table);
@@ -158,6 +158,15 @@ $items = [];
 
 $loadRequests = function (string $table, string $idColumn, string $typeColumn, string $detailsColumn, string $scheduleExpr, string $alias, string $defaultType, string $extraJoinSql = '', string $extraWhereSql = '') use ($conn, $coachId, $clusterIdColumn, $clusterOwnerColumn, $requestEmployeeExpr, $employeeJoinSql, $employeeDetailsJoinSql, $userJoinSql, $employeeNameExpr, $employeeSecondaryExpr, &$items) {
     $photoSelect = resolvePhotoSelect($conn, $table);
+    $tableColumns = getColumns($conn, $table);
+    $hasReviewedBy = in_array('reviewed_by', $tableColumns, true);
+    $hasApprovedBy = in_array('approved_by', $tableColumns, true);
+
+    $reviewedByExpr = $hasReviewedBy ? 'req.reviewed_by' : 'NULL';
+    $approvedByExpr = $hasApprovedBy ? 'req.approved_by' : 'NULL';
+
+    $userDisplayColumnName = $userDisplayColumn ?? 'email';
+    $userSecondaryColumnName = $userSecondaryColumn ?? 'email';
 
     $sql = "SELECT DISTINCT
                 req.$idColumn AS source_id,
@@ -169,16 +178,22 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
                 req.status,
                 $requestEmployeeExpr AS employee_id,
                 $employeeNameExpr AS employee_name,
-                $employeeSecondaryExpr AS employee_username
+                $employeeSecondaryExpr AS employee_username,
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', eb_emp.first_name, eb_emp.last_name)), ''), eb_u.$userDisplayColumnName, eb_u.$userSecondaryColumnName, '') AS endorsed_by_name,
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', ab_emp.first_name, ab_emp.last_name)), ''), ab_u.$userDisplayColumnName, ab_u.$userSecondaryColumnName, '') AS approved_by_name
             FROM $table req
             $employeeJoinSql
             $employeeDetailsJoinSql
-            INNER JOIN cluster_members cm ON cm.employee_id = $requestEmployeeExpr
-            INNER JOIN clusters c ON c.$clusterIdColumn = cm.cluster_id
+            LEFT JOIN cluster_members cm ON cm.employee_id = $requestEmployeeExpr
+            LEFT JOIN clusters c ON c.$clusterIdColumn = cm.cluster_id
             $userJoinSql
+            LEFT JOIN users eb_u ON eb_u.$usersIdColumn = $reviewedByExpr
+            LEFT JOIN employees eb_emp ON eb_emp.user_id = eb_u.$usersIdColumn
+            LEFT JOIN users ab_u ON ab_u.$usersIdColumn = $approvedByExpr
+            LEFT JOIN employees ab_emp ON ab_emp.user_id = ab_u.$usersIdColumn
             $extraJoinSql
-            WHERE c.$clusterOwnerColumn = ?
-              AND c.status = 'active'
+            WHERE (c.$clusterOwnerColumn = ? OR req.employee_id = ?)
+              AND (c.status = 'active' OR c.status IS NULL)
               $extraWhereSql";
 
     $stmt = $conn->prepare($sql);
@@ -186,7 +201,7 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
         return;
     }
 
-    $stmt->bind_param('i', $coachId);
+    $stmt->bind_param('ii', $coachId, $coachId);
     $stmt->execute();
     $res = $stmt->get_result();
 
@@ -203,7 +218,9 @@ $loadRequests = function (string $table, string $idColumn, string $typeColumn, s
             'status' => $row['status'] ?: 'Pending',
             'employee_id' => (int)$row['employee_id'],
             'employee_name' => $row['employee_name'] ?: 'Employee',
-            'employee_username' => trim((string)($row['employee_username'] ?? ''))
+            'employee_username' => trim((string)($row['employee_username'] ?? '')),
+            'endorsed_by_name' => trim((string)($row['endorsed_by_name'] ?? '')),
+            'approved_by_name' => trim((string)($row['approved_by_name'] ?? ''))
         ];
     }
 };
