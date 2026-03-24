@@ -20,7 +20,7 @@ import { getFeatureAccess } from "../utils/featureAccess";
 import { logout } from "../utils/logout";
 import { useFeedback } from "../components/FeedbackContext";
 import { formatFullDate, formatDateTime } from "../utils/dateUtils";
-import { buildAttendanceHighlights, buildRequestHighlights, HIGHLIGHT_IDS } from "../utils/highlightUtils";
+import { buildRequestHighlights, HIGHLIGHT_IDS } from "../utils/highlightUtils";
 import { Users, LogIn, CheckCircle } from "lucide-react";
 
 const attendanceSortOptions = {
@@ -1308,6 +1308,8 @@ export default function CoachDashboard() {
   const myRequestHighlights = useMemo(() => buildRequestHighlights(myRequests), [myRequests]);
   const teamRequestHighlights = useMemo(() => buildRequestHighlights(teamRequests), [teamRequests]);
 
+  const isMyRequestsView = activeNav === "My Requests";
+  const isTeamRequestView = activeNav === "File Request";
   const isFilingCenterView = activeNav === "My Filing Center";
   const attendanceViewTitle = activeNav === "Team Cluster Attendance" ? "Team Cluster Attendance" : "My Attendance";
 
@@ -1319,7 +1321,6 @@ export default function CoachDashboard() {
     const total = attendanceRows.length;
     const timedIn = attendanceRows.filter(member => member.time_in_at && !member.time_out_at).length;
     const completed = attendanceRows.filter(member => member.time_in_at && member.time_out_at).length;
-    const pending = total - (timedIn + completed);
 
     return [
       { key: 'total', label: 'Employees', value: total, icon: Users, accentClass: 'is-slate', subValue: 'Total roster' },
@@ -1351,7 +1352,7 @@ export default function CoachDashboard() {
 
     const compareNames = (a, b) => (a.fullname ?? "").localeCompare(b.fullname ?? "");
 
-    return [...filteredRows].sort((a, b) => {
+    return [...baseFiltered].sort((a, b) => {
       if (attendanceSort === attendanceSortOptions.nameAz) return compareNames(a, b);
       if (attendanceSort === attendanceSortOptions.nameZa) return compareNames(b, a);
 
@@ -1363,7 +1364,7 @@ export default function CoachDashboard() {
       if (attendanceSort === attendanceSortOptions.latestAttendanceFirst) return aTimestamp - bTimestamp;
       return bTimestamp - aTimestamp;
     });
-  }, [attendanceQuery, attendanceRows, attendanceSort]);
+  }, [attendanceQuery, attendanceRows, attendanceSort, teamAttendanceFilter]);
 
   const getMemberCurrentDayScheduleDetails = member => {
     const normalizedSchedule = normalizeAttendanceSchedule(member?.schedule);
@@ -1443,13 +1444,6 @@ export default function CoachDashboard() {
 
     return [...new Set(subTags)].filter(subTag => subTag !== "Off Scheduled");
   };
-
-  const attendanceSummary = useMemo(() => {
-    const total = attendanceRows.length;
-    const timedIn = attendanceRows.filter(member => member.time_in_at && !member.time_out_at).length;
-    const completed = attendanceRows.filter(member => member.time_in_at && member.time_out_at).length;
-    return { total, timedIn, completed };
-  }, [attendanceRows]);
 
   const filteredAttendanceHistory = useMemo(() => {
     if (!selectedMember || !Array.isArray(selectedMember.attendance_history)) return [];

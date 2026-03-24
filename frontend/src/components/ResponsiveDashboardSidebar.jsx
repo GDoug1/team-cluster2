@@ -37,8 +37,6 @@ export default function ResponsiveDashboardSidebar({
       }
     };
 
-    setIsMobileViewport(mediaQuery.matches);
-
     if (typeof mediaQuery.addEventListener === "function") {
       mediaQuery.addEventListener("change", handleViewportChange);
       return () => mediaQuery.removeEventListener("change", handleViewportChange);

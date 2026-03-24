@@ -97,8 +97,8 @@ export default function AdminDashboard() {
 
   const adminStats = useMemo(() => {
     const totals = (Array.isArray(coachAttendance) ? coachAttendance : []).reduce((acc, row) => {
-      const timeIn = parseAttendanceDate(row?.time_in_at);
-      const timeOut = parseAttendanceDate(row?.time_out_at);
+      const timeIn = parseSqlDateTime(row?.time_in_at);
+      const timeOut = parseSqlDateTime(row?.time_out_at);
       const status = String(row?.attendance_tag ?? row?.tag ?? "").toLowerCase();
 
       if (timeIn && timeOut && timeOut >= timeIn) {

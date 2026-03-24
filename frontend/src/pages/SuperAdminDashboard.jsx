@@ -19,6 +19,9 @@ import { logout } from "../utils/logout";
 import { normalizeAttendanceHistoryRecords, parseSqlDateTime, toLocalSqlDateTime } from "../api/attendance";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 import { useFeedback } from "../components/FeedbackContext";
+import { buildAttendanceHighlights, buildRequestHighlights, HIGHLIGHT_IDS } from "../utils/highlightUtils";
+
+const attendanceTagOptions = ["On Time", "Late", "Scheduled", "Off Scheduled"];
 
 export default function SuperAdminDashboard() {
   const dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -772,6 +775,28 @@ const handleOpenRejectModal = cluster => {
       return true;
     });
   }, [allAttendance, allAttendanceFilter]);
+
+  const filteredMyRequests = useMemo(() => {
+    if (!myRequestsFilter || myRequestsFilter === HIGHLIGHT_IDS.TOTAL_REQUESTS) return myRequests;
+    return myRequests.filter(item => {
+      const status = String(item.status ?? "").toLowerCase();
+      if (myRequestsFilter === HIGHLIGHT_IDS.PENDING) return status.includes("pending") || status.includes("endorsed");
+      if (myRequestsFilter === HIGHLIGHT_IDS.APPROVED) return status.includes("approve");
+      if (myRequestsFilter === HIGHLIGHT_IDS.REJECTED) return status.includes("reject") || status.includes("deny");
+      return true;
+    });
+  }, [myRequests, myRequestsFilter]);
+
+  const filteredTeamRequests = useMemo(() => {
+    if (!teamRequestsFilter || teamRequestsFilter === HIGHLIGHT_IDS.TOTAL_REQUESTS) return teamRequests;
+    return teamRequests.filter(item => {
+      const status = String(item.status ?? "").toLowerCase();
+      if (teamRequestsFilter === HIGHLIGHT_IDS.PENDING) return status.includes("pending") || status.includes("endorsed");
+      if (teamRequestsFilter === HIGHLIGHT_IDS.APPROVED) return status.includes("approve");
+      if (teamRequestsFilter === HIGHLIGHT_IDS.REJECTED) return status.includes("reject") || status.includes("deny");
+      return true;
+    });
+  }, [teamRequests, teamRequestsFilter]);
 
   const myRequestHighlights = useMemo(() => buildRequestHighlights(myRequests), [myRequests]);
   const teamRequestHighlights = useMemo(() => buildRequestHighlights(teamRequests), [teamRequests]);

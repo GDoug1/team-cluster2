@@ -12,13 +12,13 @@ import DataPanel from "../components/DataPanel";
 import EmployeesSection from "../components/EmployeesSection";
 import AttendanceModule from "../components/AttendanceModule";
 import ProfileSection from "../components/ProfileSection";
-import { buildRequestHighlights, fetchMyRequests } from "../api/requests";
+import { fetchMyRequests } from "../api/requests";
 import useCurrentUser from "../hooks/useCurrentUser";
 import usePermissions from "../hooks/usePermissions";
 import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 import { getFeatureAccess } from "../utils/featureAccess";
 import { logout } from "../utils/logout";
-import { buildAttendanceHighlights, HIGHLIGHT_IDS, buildRequestHighlights as buildUnifiedRequestHighlights } from "../utils/highlightUtils";
+import { HIGHLIGHT_IDS, buildRequestHighlights } from "../utils/highlightUtils";
 
 export default function EmployeeDashboard() {
   const { user } = useCurrentUser();
@@ -465,7 +465,7 @@ export default function EmployeeDashboard() {
   }, [canViewAttendance, canViewTeam]);
 
 
-  const myRequestHighlights = useMemo(() => buildUnifiedRequestHighlights(myRequests), [myRequests]);
+  const myRequestHighlights = useMemo(() => buildRequestHighlights(myRequests), [myRequests]);
 
   // const handleLogout = async () => {
   //   try {
