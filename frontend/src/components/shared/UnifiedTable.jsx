@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Search, ChevronUp, ChevronDown, ArrowUpDown, Loader2 } from 'lucide-react';
 import './UnifiedTable.css';
 

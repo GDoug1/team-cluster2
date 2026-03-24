@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React from 'react';
 import { Clock, CheckCircle2, AlertCircle, ArrowUpRight, Loader2, ListTodo } from 'lucide-react';
 import { useAttendanceHistory } from '../hooks/useAttendanceHistory';
 import { normalizeAttendanceHistoryRecords } from '../api/attendance';
@@ -40,24 +40,24 @@ export default function AttendanceModule({
 }) {
   const { showToast } = useFeedback();
   const historyState = useAttendanceHistory();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [dateStartFilter, setDateStartFilter] = useState("");
-  const [dateEndFilter, setDateEndFilter] = useState("");
-  const [rowsPerPageInput, setRowsPerPageInput] = useState('10');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortKey, setSortKey] = useState("Date");
-  const [sortDirection, setSortDirection] = useState("desc");
-  const [activeHighlightFilter, setActiveHighlightFilter] = useState(null);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [dateStartFilter, setDateStartFilter] = React.useState("");
+  const [dateEndFilter, setDateEndFilter] = React.useState("");
+  const [rowsPerPageInput, setRowsPerPageInput] = React.useState('10');
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [sortKey, setSortKey] = React.useState("Date");
+  const [sortDirection, setSortDirection] = React.useState("desc");
+  const [activeHighlightFilter, setActiveHighlightFilter] = React.useState(null);
 
   const isControlled = Array.isArray(records);
   const rawData = isControlled ? records : historyState.data;
-  const data = useMemo(() => normalizeAttendanceHistoryRecords(rawData), [rawData]);
+  const data = React.useMemo(() => normalizeAttendanceHistoryRecords(rawData), [rawData]);
   const loading = isControlled ? loadingProp : historyState.loading;
   const error = isControlled ? errorProp : historyState.error;
 
-  const highlights = useMemo(() => buildAttendanceHighlights(data), [data]);
+  const highlights = React.useMemo(() => buildAttendanceHighlights(data), [data]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (error) {
       showToast({
         title: "Attendance Error",
@@ -81,7 +81,7 @@ export default function AttendanceModule({
     setCurrentPage(1);
   };
 
-  const filteredAndSortedData = useMemo(() => {
+  const filteredAndSortedData = React.useMemo(() => {
     let result = data.filter(item => {
       // 1. Highlight Filtering
       if (activeHighlightFilter && activeHighlightFilter !== HIGHLIGHT_IDS.TOTAL_HOURS && activeHighlightFilter !== HIGHLIGHT_IDS.DAYS_PRESENT) {

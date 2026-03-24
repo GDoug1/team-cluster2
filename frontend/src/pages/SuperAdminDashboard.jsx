@@ -86,7 +86,7 @@ export default function SuperAdminDashboard() {
   const [scheduleModalMessage, setScheduleModalMessage] = useState("");
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
   const [scheduleForm, setScheduleForm] = useState(() => createDefaultScheduleForm());
-  const [attendanceDate, setAttendanceDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [attendanceDate, setAttendanceDate] = useState("");
   const [editingCoachAttendance, setEditingCoachAttendance] = useState(null);
   const [editForm, setEditForm] = useState({ timeInAt: "", timeOutAt: "", tag: "", note: "" });
   const [editAttendanceMessage, setEditAttendanceMessage] = useState("");
