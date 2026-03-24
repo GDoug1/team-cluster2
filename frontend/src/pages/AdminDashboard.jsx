@@ -156,7 +156,7 @@ export default function AdminDashboard() {
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
   const { confirm, showToast } = useFeedback();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const {
     canViewDashboard,
     canViewTeam,

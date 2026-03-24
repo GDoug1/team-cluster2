@@ -24,7 +24,7 @@ import { useFeedback } from "../components/FeedbackContext";
 export default function EmployeeDashboard() {
   const { user } = useCurrentUser();
   const { showToast } = useFeedback();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const {
     canViewDashboard,
     canViewTeam,
