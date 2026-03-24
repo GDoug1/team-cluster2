@@ -200,6 +200,7 @@ export default function AttendanceModule({
         title="My Attendance Logs"
         columns={columns}
         data={paginatedData}
+        totalRecords={filteredAndSortedData.length}
         loading={loading}
         error={error}
         // Pagination

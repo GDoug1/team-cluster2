@@ -106,6 +106,7 @@ export default function DataPanel({
   requestActionLoadingId = "",
   requestActions = null,
   enableRequestFilters = false,
+  showRequestActionBy = false,
   loading = false,
   error = null,
 }) {
@@ -317,8 +318,10 @@ export default function DataPanel({
         { label: "Details", key: "details", sortable: false, expandable: true },
         { label: "Schedule / Period", key: "schedule_period", sortable: false },
         { label: "Status", key: "status", sortable: true },
-        { label: "Endorsed By", key: "endorsed_by", sortable: true },
-        { label: "Approved By", key: "approved_by", sortable: true },
+        ...(showRequestActionBy ? [
+          { label: "Endorsed By", key: "endorsed_by", sortable: true },
+          { label: "Approved By", key: "approved_by", sortable: true },
+        ] : []),
       ];
     }
     return [];
@@ -484,17 +487,16 @@ export default function DataPanel({
       return `${dateCol}${timeCols}${hoursCol}${statusCol}${clusterCol}${noteCol}${personCol}${actionsCol}`;
     }
     if (type === "requests") {
-      // Columns: Date Filed, [Filed By], Request Type, Details, Schedule/Period, Status, Endorsed By, Approved By + Actions
+      // Columns: Date Filed, [Filed By], Request Type, Details, Schedule/Period, Status, [Endorsed By], [Approved By] + Actions
       const dateCol = "minmax(170px, 1.2fr) ";
       const personCol = personField ? "minmax(140px, 1fr) " : "";
       const typeCol = "minmax(160px, 1fr) ";
       const detailsCol = "minmax(180px, 1.5fr) ";
       const schedCol = "minmax(130px, 1fr) ";
       const statusCol = "minmax(120px, 1fr) ";
-      const endorsedCol = "minmax(140px, 1fr) ";
-      const approvedCol = "minmax(140px, 1fr) ";
+      const actorCols = showRequestActionBy ? "minmax(140px, 1fr) minmax(140px, 1fr) " : "";
       const actionsCol = "minmax(180px, 1fr)";
-      return `${dateCol}${personCol}${typeCol}${detailsCol}${schedCol}${statusCol}${endorsedCol}${approvedCol}${actionsCol}`;
+      return `${dateCol}${personCol}${typeCol}${detailsCol}${schedCol}${statusCol}${actorCols}${actionsCol}`;
     }
     return "";
   }, [type, personField]);
