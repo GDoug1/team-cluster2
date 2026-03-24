@@ -17,7 +17,7 @@ const getTomorrowDateInputValue = () => {
 };
 
 export default function FilingCenterPanel({ onSubmitted = null, initialTab = "leave", initialDate = "" }) {
-  const { confirm } = useFeedback();
+  const { confirm, showToast } = useFeedback();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [clusterInfo, setClusterInfo] = useState(null);
   const [disputeType, setDisputeType] = useState("Forget Time In/Out");
@@ -32,7 +32,6 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
   const [reason, setReason] = useState("");
   const [leavePhoto, setLeavePhoto] = useState(null);
   const [leavePhotoInputKey, setLeavePhotoInputKey] = useState(0);
-  const [message, setMessage] = useState("");
   const [agreementAccuracy, setAgreementAccuracy] = useState(false);
   const [agreementFraud, setAgreementFraud] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -85,7 +84,6 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
 
   const handleSubmit = async () => {
     if (submitting || !agreementAccuracy || !agreementFraud) return;
-    setMessage("");
 
     const hasConfirmedSubmission = await confirm({
       title: "Submit request?",
@@ -144,13 +142,21 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
         });
       }
 
-      setMessage("Request submitted successfully.");
+      showToast({
+        title: "Request Submitted",
+        message: "Your request has been filed successfully.",
+        type: "success"
+      });
       resetForm();
       if (typeof onSubmitted === "function") {
         onSubmitted();
       }
     } catch (error) {
-      setMessage(error?.error ?? "Unable to submit request.");
+      showToast({
+        title: "Submission Failed",
+        message: error?.error ?? error?.message ?? "Unable to submit request.",
+        type: "error"
+      });
     } finally {
       setSubmitting(false);
     }
@@ -313,7 +319,6 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
               </label>
             </div>
 
-            {message ? <div className="form-hint">{message}</div> : null}
             <button
               type="button"
               className="filing-submit-btn"

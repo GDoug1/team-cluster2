@@ -33,7 +33,7 @@ if ($userRoleColumn === 'role') {
     $coachRoleExpr = "EXISTS (SELECT 1 FROM roles r WHERE r.role_id = u.role_id AND LOWER(r.role_name) LIKE '%coach%')";
 }
 $attendanceOwnerExpr = $attendanceUserColumn === 'employee_id'
-    ? "CASE WHEN $coachRoleExpr THEN u.$userIdColumn ELSE e.employee_id END"
+    ? "COALESCE(e.employee_id, u.$userIdColumn)"
     : "u.$userIdColumn";
 
 $hasLegacyAttendance = in_array('id', $attendanceColumns, true)
@@ -53,40 +53,50 @@ $timeLogOrderColumn = $timeLogPrimaryKey
         ? 'updated_at'
         : (in_array('time_in', $timeLogColumns, true) ? 'time_in' : null));
 
+$attendanceUserColumn = in_array('employee_id', $attendanceColumns, true) ? 'employee_id' : (in_array('user_id', $attendanceColumns, true) ? 'user_id' : null);
+$attendancePrimaryKey = in_array('attendance_id', $attendanceColumns, true) ? 'attendance_id' : (in_array('id', $attendanceColumns, true) ? 'id' : null);
+
 if ($attendanceUserColumn === null || $attendancePrimaryKey === null) {
-    echo json_encode([]);
-    exit;
-}
+    // If we can't find the columns in attendance_logs, we still want to show users
+    $attendanceSelect = 'NULL AS attendance_id, NULL AS time_in_at, NULL AS time_out_at, NULL AS attendance_tag, NULL AS attendance_note, NULL AS attendance_updated_at';
+    $attendanceJoin = '';
+    $orderBy = "u.$userIdColumn DESC";
+} else {
+    $attendanceOwnerExpr = $attendanceUserColumn === 'employee_id'
+        ? "COALESCE(e.employee_id, u.$userIdColumn)"
+        : "u.$userIdColumn";
 
-$attendanceSelect = 'NULL AS attendance_id, NULL AS time_in_at, NULL AS time_out_at, NULL AS attendance_tag, NULL AS attendance_note, NULL AS attendance_updated_at';
-$attendanceJoin = '';
-$orderBy = 'employee_name ASC';
+    $hasLegacyAttendance = in_array('time_in_at', $attendanceColumns, true)
+        && in_array('time_out_at', $attendanceColumns, true);
+    
+    $hasNewAttendance = in_array('attendance_id', $attendanceColumns, true)
+        && in_array('attendance_status', $attendanceColumns, true);
 
-if ($hasLegacyAttendance) {
-    $attendanceSelect = 'al.id AS attendance_id, al.time_in_at, al.time_out_at, al.tag AS attendance_tag, al.note AS attendance_note, al.updated_at AS attendance_updated_at';
-    $attendanceJoin = "LEFT JOIN attendance_logs al
-        ON al.$attendanceUserColumn = $attendanceOwnerExpr";
-    $orderBy = 'employee_name ASC, COALESCE(al.time_in_at, al.updated_at) DESC, al.id DESC';
-} elseif ($hasNewAttendance) {
-    $attendanceTagExpr = $hasTimeLogs && $hasTimeLogTag ? 'COALESCE(tl.tag, al.attendance_status)' : 'al.attendance_status';
-    $attendanceSelect = "al.attendance_id AS attendance_id, tl.time_in AS time_in_at, tl.time_out AS time_out_at, $attendanceTagExpr AS attendance_tag, al.note AS attendance_note, al.updated_at AS attendance_updated_at";
-    $attendanceJoin = "LEFT JOIN attendance_logs al
-        ON al.$attendanceUserColumn = $attendanceOwnerExpr";
+    if ($hasLegacyAttendance) {
+        $attendanceSelect = "al.$attendancePrimaryKey AS attendance_id, al.time_in_at, al.time_out_at, al.tag AS attendance_tag, al.note AS attendance_note, al.updated_at AS attendance_updated_at";
+        $attendanceJoin = "LEFT JOIN attendance_logs al ON al.$attendanceUserColumn = $attendanceOwnerExpr";
+        $orderBy = "COALESCE(al.time_in_at, al.updated_at) DESC, al.$attendancePrimaryKey DESC";
+    } elseif ($hasNewAttendance) {
+        $attendanceTagExpr = $hasTimeLogs && $hasTimeLogTag ? 'COALESCE(tl.tag, al.attendance_status)' : 'al.attendance_status';
+        $attendanceSelect = "al.attendance_id AS attendance_id, tl.time_in AS time_in_at, tl.time_out AS time_out_at, $attendanceTagExpr AS attendance_tag, al.note AS attendance_note, al.updated_at AS attendance_updated_at";
+        $attendanceJoin = "LEFT JOIN attendance_logs al ON al.$attendanceUserColumn = $attendanceOwnerExpr";
 
-    if ($hasTimeLogs && $timeLogPrimaryKey) {
-        $attendanceJoin .= "\nLEFT JOIN time_logs tl
-            ON tl.$timeLogPrimaryKey = (
-                SELECT t2.$timeLogPrimaryKey
-                FROM time_logs t2
-                WHERE t2.attendance_id = al.attendance_id
-                " . ($timeLogOrderColumn ? "ORDER BY t2.$timeLogOrderColumn DESC" : '') . "
-                LIMIT 1
-            )";
+        if ($hasTimeLogs && $timeLogPrimaryKey) {
+            $attendanceJoin .= "\nLEFT JOIN time_logs tl
+                ON tl.$timeLogPrimaryKey = (
+                    SELECT t2.$timeLogPrimaryKey
+                    FROM time_logs t2
+                    WHERE t2.attendance_id = al.attendance_id
+                    " . ($timeLogOrderColumn ? "ORDER BY t2.$timeLogOrderColumn DESC" : '') . "
+                    LIMIT 1
+                )";
+        }
+        $orderBy = "COALESCE(al.attendance_date, al.updated_at) DESC, al.attendance_id DESC";
     } else {
-        $attendanceSelect = "al.attendance_id AS attendance_id, NULL AS time_in_at, NULL AS time_out_at, $attendanceTagExpr AS attendance_tag, al.note AS attendance_note, al.updated_at AS attendance_updated_at";
+        $attendanceSelect = 'NULL AS attendance_id, NULL AS time_in_at, NULL AS time_out_at, NULL AS attendance_tag, NULL AS attendance_note, NULL AS attendance_updated_at';
+        $attendanceJoin = '';
+        $orderBy = "u.$userIdColumn DESC";
     }
-
-    $orderBy = 'employee_name ASC, COALESCE(al.attendance_date, tl.time_in, al.updated_at) DESC, al.attendance_id DESC';
 }
 
 $sql = "SELECT u.$userIdColumn AS user_id,
@@ -98,7 +108,6 @@ $sql = "SELECT u.$userIdColumn AS user_id,
         $attendanceJoin
         LEFT JOIN clusters c ON c.$clusterIdColumn = al.cluster_id
         WHERE u.$userIdColumn <> $currentUserId
-          AND al.$attendancePrimaryKey IS NOT NULL
         ORDER BY $orderBy";
 
 $res = $conn->query($sql);

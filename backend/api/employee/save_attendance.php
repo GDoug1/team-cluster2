@@ -235,6 +235,7 @@ $hasTimeLogEmployee = in_array('employee_id', $timeLogColumns, true);
 $hasTimeLogCluster = in_array('cluster_id', $timeLogColumns, true);
 $hasTimeLogDate = in_array('log_date', $timeLogColumns, true);
 $hasTimeLogTag = in_array('tag', $timeLogColumns, true);
+$hasTimeLogTotalHours = in_array('total_hours', $timeLogColumns, true);
 
 $timeInSql = $timeInAt ? date("Y-m-d H:i:s", strtotime($timeInAt)) : null;
 $timeOutSql = $timeOutAt ? date("Y-m-d H:i:s", strtotime($timeOutAt)) : null;
@@ -254,7 +255,7 @@ $noteValue = "'" . $conn->real_escape_string($note) . "'";
 if ($hasLegacyAttendance) {
     if ($timeOutSql) {
         $lookup = $conn->query(
-            "SELECT id FROM attendance_logs
+            "SELECT id, time_in_at FROM attendance_logs
              WHERE cluster_id=$cluster_id
                AND employee_id=$employee_id
                AND time_out_at IS NULL
@@ -265,18 +266,40 @@ if ($hasLegacyAttendance) {
         if ($lookup && $lookup->num_rows > 0) {
             $row = $lookup->fetch_assoc();
             $attendanceId = (int)$row["id"];
-            $conn->query(
-                "UPDATE attendance_logs
-                 SET time_out_at=$timeOutValue,
-                     tag=$tagValue,
-                     note=$noteValue
-                 WHERE id=$attendanceId"
-            );
+            $dbTimeIn = $row['time_in_at'];
+            
+            $updateFields = ["time_out_at=$timeOutValue", "tag=$tagValue", "note=$noteValue"];
+            
+            if ($dbTimeIn && $timeOutSql) {
+                $start = strtotime($dbTimeIn);
+                $end = strtotime($timeOutSql);
+                if ($end > $start) {
+                    $totalHours = round(($end - $start) / 3600, 2);
+                    if (in_array('total_hours', $attendanceColumns, true)) {
+                        $updateFields[] = "total_hours=$totalHours";
+                    }
+                }
+            }
+
+            $conn->query("UPDATE attendance_logs SET " . implode(', ', $updateFields) . " WHERE id=$attendanceId");
         } else {
-            $conn->query(
-                "INSERT INTO attendance_logs (cluster_id, employee_id, time_in_at, time_out_at, tag, note)
-                 VALUES ($cluster_id, $employee_id, $timeInValue, $timeOutValue, $tagValue, $noteValue)"
-            );
+            $totalHoursValue = "NULL";
+            if ($timeInSql && $timeOutSql) {
+                $start = strtotime($timeInSql);
+                $end = strtotime($timeOutSql);
+                if ($end > $start) {
+                    $totalHoursValue = round(($end - $start) / 3600, 2);
+                }
+            }
+            
+            $cols = ["cluster_id", "employee_id", "time_in_at", "time_out_at", "tag", "note"];
+            $vals = [$cluster_id, $employee_id, $timeInValue, $timeOutValue, $tagValue, $noteValue];
+            if (in_array('total_hours', $attendanceColumns, true)) {
+                $cols[] = "total_hours";
+                $vals[] = $totalHoursValue;
+            }
+            
+            $conn->query("INSERT INTO attendance_logs (" . implode(', ', $cols) . ") VALUES (" . implode(', ', $vals) . ")");
         }
     } else {
         if ($timeInSql) {
@@ -333,14 +356,19 @@ if ($hasLegacyAttendance) {
     } else {
         $conn->query(
             "INSERT INTO attendance_logs (cluster_id, employee_id, note, attendance_date, attendance_status)
-             VALUES ($cluster_id, $employee_id, $noteValue, $attendanceDateEscaped, $attendanceStatusEscaped)"
+             VALUES (NULL, $employee_id, $noteValue, $attendanceDateEscaped, $attendanceStatusEscaped)"
         );
         $attendanceId = (int)$conn->insert_id;
+        
+        // Ensure cluster_id is set if column exists and NULL was used
+        if ($cluster_id > 0 && in_array('cluster_id', $attendanceColumns, true)) {
+            $conn->query("UPDATE attendance_logs SET cluster_id = $cluster_id WHERE attendance_id = $attendanceId");
+        }
     }
 
     if ($hasTimeLogs && $attendanceId > 0) {
         if ($timeOutSql) {
-            $existingTimeLogSql = "SELECT " . ($timeLogPrimaryKey ?? 'attendance_id') . " AS time_log_key
+            $existingTimeLogSql = "SELECT " . ($timeLogPrimaryKey ?? 'attendance_id') . " AS time_log_key, time_in
                  FROM time_logs
                  WHERE attendance_id = $attendanceId";
 
@@ -363,6 +391,7 @@ if ($hasLegacyAttendance) {
             if ($existingTimeLogQuery && $existingTimeLogQuery->num_rows > 0) {
                 $existingTimeLog = $existingTimeLogQuery->fetch_assoc();
                 $timeLogKey = (int)$existingTimeLog['time_log_key'];
+                $startTimeIn = $existingTimeLog['time_in'] ?? null;
 
                 $timeLogUpdates = [];
                 if ($hasTimeLogTimeOut) {
@@ -370,6 +399,17 @@ if ($hasLegacyAttendance) {
                 }
                 if ($hasTimeLogTag) {
                     $timeLogUpdates[] = "tag = $tagValue";
+                }
+
+                if ($startTimeIn && $timeOutSql) {
+                    $start = strtotime($startTimeIn);
+                    $end = strtotime($timeOutSql);
+                    if ($end > $start) {
+                        $totalHours = round(($end - $start) / 3600, 2);
+                        if ($hasTimeLogTotalHours) {
+                            $timeLogUpdates[] = "total_hours = $totalHours";
+                        }
+                    }
                 }
 
                 if (count($timeLogUpdates) > 0 && $timeLogPrimaryKey) {
@@ -380,6 +420,15 @@ if ($hasLegacyAttendance) {
                     );
                 }
             } else {
+                $totalHoursValue = "NULL";
+                if ($timeInSql && $timeOutSql) {
+                    $start = strtotime($timeInSql);
+                    $end = strtotime($timeOutSql);
+                    if ($end > $start) {
+                        $totalHoursValue = round(($end - $start) / 3600, 2);
+                    }
+                }
+
                 $insertColumns = ['attendance_id', 'time_in'];
                 $insertValues = [$attendanceId, $timeInValue];
 
@@ -402,6 +451,10 @@ if ($hasLegacyAttendance) {
                 if ($hasTimeLogTag) {
                     $insertColumns[] = 'tag';
                     $insertValues[] = $tagValue;
+                }
+                if ($hasTimeLogTotalHours) {
+                    $insertColumns[] = 'total_hours';
+                    $insertValues[] = $totalHoursValue;
                 }
 
                 $conn->query(

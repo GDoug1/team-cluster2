@@ -72,6 +72,7 @@ $hasTimeLogEmployee = in_array('employee_id', $timeLogColumns, true);
 $hasTimeLogUser = in_array('user_id', $timeLogColumns, true);
 $hasTimeLogDate = in_array('log_date', $timeLogColumns, true);
 $hasTimeLogTag = in_array('tag', $timeLogColumns, true);
+$hasTimeLogTotalHours = in_array('total_hours', $timeLogColumns, true);
 
 if (!$hasNewAttendance) {
     http_response_code(500);
@@ -118,7 +119,7 @@ if ($existingAttendanceQuery && $existingAttendanceQuery->num_rows > 0) {
 
 if ($hasTimeLogs && $attendanceId > 0) {
     if ($timeOutSql) {
-        $existingTimeLogSql = "SELECT " . ($timeLogPrimaryKey ?? 'attendance_id') . " AS time_log_key
+        $existingTimeLogSql = "SELECT " . ($timeLogPrimaryKey ?? 'attendance_id') . " AS time_log_key, time_in
              FROM time_logs
              WHERE attendance_id = $attendanceId";
         if ($hasTimeLogEmployee) {
@@ -134,7 +135,10 @@ if ($hasTimeLogs && $attendanceId > 0) {
 
         $existingTimeLogQuery = $conn->query($existingTimeLogSql);
         if ($existingTimeLogQuery && $existingTimeLogQuery->num_rows > 0) {
-            $timeLogKey = (int)$existingTimeLogQuery->fetch_assoc()['time_log_key'];
+            $existingTimeLog = $existingTimeLogQuery->fetch_assoc();
+            $timeLogKey = (int)$existingTimeLog['time_log_key'];
+            $startTimeIn = $existingTimeLog['time_in'] ?? null;
+
             $updates = [];
             if ($hasTimeLogTimeOut) {
                 $updates[] = "time_out = $timeOutValue";
@@ -142,6 +146,18 @@ if ($hasTimeLogs && $attendanceId > 0) {
             if ($hasTimeLogTag) {
                 $updates[] = "tag = $tagValue";
             }
+
+            if ($startTimeIn && $timeOutSql) {
+                $start = strtotime($startTimeIn);
+                $end = strtotime($timeOutSql);
+                if ($end > $start) {
+                    $totalHours = round(($end - $start) / 3600, 2);
+                    if ($hasTimeLogTotalHours) {
+                        $updates[] = "total_hours = $totalHours";
+                    }
+                }
+            }
+
             if (count($updates) > 0 && $timeLogPrimaryKey) {
                 $conn->query(
                     "UPDATE time_logs
@@ -149,6 +165,48 @@ if ($hasTimeLogs && $attendanceId > 0) {
                      WHERE $timeLogPrimaryKey = $timeLogKey"
                 );
             }
+        } else {
+            // Case where an admin sets a Time Out for someone without a previous Time In record
+            $totalHoursValue = "NULL";
+            if ($timeInSql && $timeOutSql) {
+                $start = strtotime($timeInSql);
+                $end = strtotime($timeOutSql);
+                if ($end > $start) {
+                    $totalHoursValue = round(($end - $start) / 3600, 2);
+                }
+            }
+
+            $insertColumns = ['attendance_id', 'time_in'];
+            $insertValues = [$attendanceId, $timeInValue];
+            if ($hasTimeLogEmployee) {
+                $insertColumns[] = 'employee_id';
+                $insertValues[] = $employeeId;
+            }
+            if ($hasTimeLogUser) {
+                $insertColumns[] = 'user_id';
+                $insertValues[] = $currentUserId;
+            }
+            if ($hasTimeLogDate) {
+                $insertColumns[] = 'log_date';
+                $insertValues[] = $attendanceDateEscaped;
+            }
+            if ($hasTimeLogTag) {
+                $insertColumns[] = 'tag';
+                $insertValues[] = $tagValue;
+            }
+            if ($hasTimeLogTimeOut) {
+                $insertColumns[] = 'time_out';
+                $insertValues[] = $timeOutValue;
+            }
+            if ($hasTimeLogTotalHours) {
+                $insertColumns[] = 'total_hours';
+                $insertValues[] = $totalHoursValue;
+            }
+
+            $conn->query(
+                "INSERT INTO time_logs (" . implode(', ', $insertColumns) . ")
+                 VALUES (" . implode(', ', $insertValues) . ")"
+            );
         }
     } elseif ($timeInSql) {
         $existingTimeInQuery = $conn->query(

@@ -30,7 +30,7 @@ $clusterIdColumn = in_array('id', $clusterColumns, true) ? 'id' : 'cluster_id';
 $userIdColumn = in_array('id', $userColumns, true) ? 'id' : 'user_id';
 $attendanceUserColumn = in_array('employee_id', $attendanceColumns, true) ? 'employee_id' : (in_array('user_id', $attendanceColumns, true) ? 'user_id' : null);
 $attendancePrimaryKey = in_array('attendance_id', $attendanceColumns, true) ? 'attendance_id' : (in_array('id', $attendanceColumns, true) ? 'id' : null);
-$attendanceOwnerExpr = $attendanceUserColumn === 'employee_id' ? 'e.employee_id' : "u.$userIdColumn";
+$attendanceOwnerExpr = $attendanceUserColumn === 'employee_id' ? 'COALESCE(e.employee_id, u.' . $userIdColumn . ')' : "u.$userIdColumn";
 
 $hasLegacyAttendance = in_array('id', $attendanceColumns, true)
     && in_array('time_in_at', $attendanceColumns, true)
@@ -101,7 +101,6 @@ $sql = "SELECT u.$userIdColumn AS user_id,
         $attendanceJoin
         LEFT JOIN clusters c ON c.$clusterIdColumn = al.cluster_id
         WHERE u.$userIdColumn <> $currentUserId
-          AND al.$attendancePrimaryKey IS NOT NULL
         ORDER BY employee_name ASC";
 
 $res = $conn->query($sql);
