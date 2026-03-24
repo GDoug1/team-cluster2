@@ -34,15 +34,13 @@ const toDateInputValue = value => {
 
 const getPersonPrimaryValue = (item, personField) => {
   if (!personField) return "—";
-  const record = item.raw ?? item;
-  return record[personField] ?? "—";
+  return item[personField] ?? "—";
 };
 
 const getPersonSecondaryValue = (item, personField) => {
   if (!personField) return null;
-  const record = item.raw ?? item;
-  if (personField === "employee_name") return record.employee_username || null;
-  if (personField === "username") return record.user_name || null;
+  if (personField === "employee_name") return item.employee_username || null;
+  if (personField === "username") return item.user_name || null;
   return null;
 };
 
@@ -142,24 +140,22 @@ export default function DataPanel({
   };
 
   const getSortValue = useCallback((item, key) => {
-    const record = item.raw ?? item;
     if (type === "attendance") {
-      const normalizedAttendance = normalizeAttendanceHistoryRecord(record);
-      if (key === "Date") return new Date(record.time_in_at ?? record.time_out_at ?? record.updated_at ?? record.attendance_updated_at ?? 0).getTime();
-      if (key === "Time In") return new Date(record.time_in_at ?? 0).getTime();
-      if (key === "Time Out") return new Date(record.time_out_at ?? 0).getTime();
-      if (key === "Total Hours") return Number(normalizedAttendance.total_hours || 0);
-      if (key === "Status") return String(record.attendance_tag ?? record.tag ?? record.status ?? "").toLowerCase();
-      if (key === "Cluster") return String(record.cluster_name ?? "").toLowerCase();
-      if (key === "person") return String(record[personField] ?? "").toLowerCase();
-      return String(record[key.toLowerCase().replace(/ /g, "_")] ?? "").toLowerCase();
+      if (key === "Date") return new Date(item.time_in_at ?? item.time_out_at ?? 0).getTime();
+      if (key === "Time In") return new Date(item.time_in_at ?? 0).getTime();
+      if (key === "Time Out") return new Date(item.time_out_at ?? 0).getTime();
+      if (key === "Total Hours") return Number(normalizeAttendanceHistoryRecord(item).total_hours || 0);
+      if (key === "Status") return String(item.attendance_tag ?? item.tag ?? "").toLowerCase();
+      if (key === "Cluster") return String(item.cluster_name ?? "").toLowerCase();
+      if (key === "person") return String(item[personField] ?? "").toLowerCase();
+      return String(item[key.toLowerCase().replace(/ /g, "_")] ?? "").toLowerCase();
     }
     if (type === "requests") {
-      if (key === "Date Filed") return new Date(record.date_filed ?? 0).getTime();
-      if (key === "person") return String(record[personField] ?? "").toLowerCase();
-      if (key === "Status") return String(record.status ?? "").toLowerCase();
-      if (key === "Request Type") return String(record.request_type ?? "").toLowerCase();
-      return String(record[key.toLowerCase().replace(/ /g, "_")] ?? "").toLowerCase();
+      if (key === "Date Filed") return new Date(item.date_filed ?? 0).getTime();
+      if (key === "person") return String(item[personField] ?? "").toLowerCase();
+      if (key === "Status") return String(item.status ?? "").toLowerCase();
+      if (key === "Request Type") return String(item.request_type ?? "").toLowerCase();
+      return String(item[key.toLowerCase().replace(/ /g, "_")] ?? "").toLowerCase();
     }
     return "";
   }, [type, personField]);
@@ -167,7 +163,6 @@ export default function DataPanel({
   const handleActionClick = async (item, action) => {
     if (!onRequestAction) return;
 
-    const record = item.raw ?? item;
     const isApproval = action.status === "Approved" || action.status === "Endorsed";
     const isDenial =
       action.status.toLowerCase().includes("reject") ||
@@ -182,7 +177,7 @@ export default function DataPanel({
     });
     if (!hasConfirmedAction) return;
 
-    onRequestAction(record, action.status);
+    onRequestAction(item, action.status);
   };
 
   const requestTypeOptions = useMemo(() => ([
@@ -244,21 +239,20 @@ export default function DataPanel({
       });
     } else if (type === "attendance") {
       result = records.filter(item => {
-        const record = item.raw ?? item;
-        const entryDate = toDateInputValue(record.time_in_at ?? record.time_out_at ?? record.updated_at ?? record.attendance_updated_at ?? record.attendance_date);
+        const entryDate = toDateInputValue(item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at);
         if (dateStartFilter && (!entryDate || entryDate < dateStartFilter)) return false;
         if (dateEndFilter && (!entryDate || entryDate > dateEndFilter)) return false;
         if (externalDateFilter && (!entryDate || entryDate !== externalDateFilter)) return false;
 
         const haystack = [
-          record.cluster_name,
-          record.attendance_tag,
-          record.tag,
-          record.attendance_note,
-          record.note,
-          record.employee_username,
-          record.username,
-          personField ? record[personField] : "",
+          item.cluster_name,
+          item.attendance_tag,
+          item.tag,
+          item.attendance_note,
+          item.note,
+          item.employee_username,
+          item.username,
+          personField ? item[personField] : "",
         ]
           .filter(Boolean)
           .join(" ")
@@ -334,16 +328,15 @@ export default function DataPanel({
   }, [type, personField, personLabel]);
 
   const renderCell = useCallback((item, key) => {
-    const record = item.raw ?? item;
     if (type === "attendance") {
-      const normalizedAttendance = normalizeAttendanceHistoryRecord(record);
-      const attendanceDateValue = record.time_in_at ?? record.time_out_at ?? record.updated_at ?? record.attendance_updated_at ?? record.attendance_date;
-      const statusText = record.attendance_tag ?? record.tag ?? record.status ?? "Pending";
+      const normalizedAttendance = normalizeAttendanceHistoryRecord(item);
+      const attendanceDateValue = item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at;
+      const statusText = item.attendance_tag ?? item.tag ?? "Pending";
 
       switch (key) {
         case 'date': return formatAttendanceDate(attendanceDateValue);
-        case 'time_in': return formatAttendanceTime(record.time_in_at);
-        case 'time_out': return formatAttendanceTime(record.time_out_at);
+        case 'time_in': return formatAttendanceTime(item.time_in_at);
+        case 'time_out': return formatAttendanceTime(item.time_out_at);
         case 'total_hours': return `${normalizedAttendance.total_hours}h`;
         case 'status':
           return (
@@ -352,8 +345,8 @@ export default function DataPanel({
               <span className="am-status-text">{statusText}</span>
             </div>
           );
-        case 'cluster': return record.cluster_name ?? "—";
-        case 'note': return record.attendance_note ?? record.note ?? "—";
+        case 'cluster': return item.cluster_name ?? "—";
+        case 'note': return item.attendance_note ?? item.note ?? "—";
         case 'person':
           return (
             <div className="team-attendance-employee-cell">
@@ -366,7 +359,7 @@ export default function DataPanel({
     }
     if (type === "requests") {
       switch (key) {
-        case 'date_filed': return formatDateTime(record.date_filed);
+        case 'date_filed': return formatDateTime(item.date_filed);
         case 'person':
           return (
             <div className="team-attendance-employee-cell">
@@ -374,12 +367,12 @@ export default function DataPanel({
               {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
             </div>
           );
-        case 'request_type': return record.request_type ?? "—";
-        case 'details': return normalizeRequestDetails(record.details);
-        case 'schedule_period': return record.schedule_period ?? "—";
-        case 'status': return record.status ?? "Pending";
-        case 'endorsed_by': return record.endorsed_by_name || "—";
-        case 'approved_by': return record.approved_by_name || "—";
+        case 'request_type': return item.request_type ?? "—";
+        case 'details': return normalizeRequestDetails(item.details);
+        case 'schedule_period': return item.schedule_period ?? "—";
+        case 'status': return item.status ?? "Pending";
+        case 'endorsed_by': return item.endorsed_by_name || "—";
+        case 'approved_by': return item.approved_by_name || "—";
         default: return "—";
       }
     }
