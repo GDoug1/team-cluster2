@@ -33,7 +33,17 @@ Found in `frontend/src/api/api.js`.
 - **Auth:** Hardcoded `credentials: "include"` for session persistence.
 - **GET Safety:** Automatically appends `_ts` timestamps to bypass browser/proxy caches.
 
-### 3. Granular RBAC (Role-Based Access Control)
+### 3. Unified Highlight System (Summaries & Filtering)
+Found in `src/components/shared/HighlightCard.jsx` and `src/components/AttendanceHistoryHighlights.jsx`.
+- **Pattern:** Highlight cards serve as both visual summaries and interactive filters for data tables.
+- **Interactivity:** Clicking a card (e.g., "Late") triggers a filter on the sibling `DataPanel` or `AttendanceModule` table.
+- **Centralized Logic:** All highlight calculations are performed in `src/utils/highlightUtils.js` to ensure consistency across roles.
+- **Schema:**
+  ```javascript
+  { key: string, label: string, value: any, subValue: string, icon: LucideIcon, accentClass: string }
+  ```
+
+### 4. Granular RBAC (Role-Based Access Control)
 - **Backend:** `backend/config/auth.php` exports `requirePermission($perm)`.
 - **Frontend:** `usePermissions()` hook fetches permission strings from `auth/my_permissions.php`.
 - **Feature Translation:** `getFeatureAccess(hasPermission)` in `utils/featureAccess.js` converts permission strings (e.g., "View Team") into boolean flags (e.g., `canViewTeam`).
