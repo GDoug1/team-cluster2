@@ -132,8 +132,8 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
           reason
         });
       } else {
-        if (disputeDate < todayDate) {
-          throw { error: "Dispute dates cannot be earlier than today." };
+        if (disputeDate > todayDate) {
+          throw { error: "Dispute dates cannot be for a future date." };
         }
 
         await submitRequest({
@@ -272,7 +272,7 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
               <div className="filing-grid-two">
                 <div className="filing-field">
                   <label htmlFor="dispute-date">Dispute Date</label>
-                  <input id="dispute-date" type="date" min={todayDate} value={disputeDate} onChange={event => setDisputeDate(event.target.value)} />
+                  <input id="dispute-date" type="date" max={todayDate} value={disputeDate} onChange={event => setDisputeDate(event.target.value)} />
                 </div>
                 <div className="filing-field">
                   <label htmlFor="dispute-type">Dispute Type</label>
