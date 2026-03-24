@@ -1020,13 +1020,18 @@ const handleOpenRejectModal = cluster => {
                     <div>Status</div>
                     <div>Action</div>
                   </div>
-                  {clusters.map(cluster => (
+                  {clusters.map(cluster => {
+                    const todayScheduleStatus = getCoachScheduleStatusForToday(cluster.coach_schedule);
+
+                    return (
                     <div key={cluster.id} className="table-row">
                       <div className="table-cell">{cluster.coach}</div>
                       <div className="table-cell">{cluster.name}</div>
                       <div className="table-cell">{cluster.members ?? 0}</div>
                       <div className="table-cell">
-                        <span className={`badge ${cluster.status}`}>{cluster.status}</span>
+                        <span className={`badge team-coach-status-badge ${todayScheduleStatus.className}`}>
+                          {todayScheduleStatus.label}
+                        </span>
                       </div>
                       <div className="table-cell team-coach-action-cell">
                         <button className="btn primary team-coach-manage-btn" type="button" onClick={() => handleOpenScheduleModal(cluster)}>
@@ -1034,7 +1039,8 @@ const handleOpenRejectModal = cluster => {
                         </button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="section-title">Team Coach Schedule by Coach</div>
