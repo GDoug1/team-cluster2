@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback } from "react";
-import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
-import { normalizeAttendanceHistoryRecord, parseSqlDateTime } from "../api/attendance";
-import { formatDateTime, formatFullDate } from "../utils/dateUtils";
+import { Loader2 } from "lucide-react";
+import { normalizeAttendanceHistoryRecord } from "../api/attendance";
+import { formatDateTime } from "../utils/dateUtils";
 import { useFeedback } from "./FeedbackContext";
 import UnifiedTable from "./shared/UnifiedTable";
 
@@ -10,18 +10,60 @@ const normalizeRequestDetails = value => {
   return text || "—";
 };
 
-const truncateRequestDetails = (value, maxLength = 72) => {
-  const details = normalizeRequestDetails(value);
-  if (details === "—" || details.length <= maxLength) return details;
-  return `${details.slice(0, maxLength).trimEnd()}…`;
-};
-
 const resolveRequestPhotoUrl = value => {
   const text = String(value ?? "").trim();
   if (!text) return "";
   if (/^https?:\/\//i.test(text)) return text;
   const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost/team-cluster2/backend").replace(/\/$/, "");
   return `${baseUrl}/${text.replace(/^\/+/, "")}`;
+};
+
+const toDateInputValue = value => {
+  if (!value) return null;
+  const str = String(value).trim();
+  if (str.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(str)) {
+    return str.slice(0, 10);
+  }
+  const parsed = new Date(str.replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return null;
+  const year = parsed.getFullYear();
+  const month = `${parsed.getMonth() + 1}`.padStart(2, "0");
+  const day = `${parsed.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getPersonPrimaryValue = (item, personField) => {
+  if (!personField) return "—";
+  return item[personField] ?? "—";
+};
+
+const getPersonSecondaryValue = (item, personField) => {
+  if (!personField) return null;
+  if (personField === "employee_name") return item.employee_username || null;
+  if (personField === "username") return item.user_name || null;
+  return null;
+};
+
+const formatAttendanceDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(String(value).replace(" ", "T"));
+  if (isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+};
+
+const formatAttendanceTime = (value) => {
+  if (!value) return "—";
+  const date = new Date(String(value).replace(" ", "T"));
+  if (isNaN(date.getTime())) return "—";
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  });
 };
 
 const panelConfig = {
@@ -430,21 +472,40 @@ export default function DataPanel({
 
   const gridTemplateColumns = useMemo(() => {
     if (type === "attendance") {
-      const colCount = columns.length + 1; // +1 for Actions
-      return `minmax(150px, 1.2fr) repeat(${colCount - 3}, minmax(120px, 1fr)) minmax(200px, 1.5fr) minmax(100px, 0.8fr)`;
+      // Columns: Date, Time In, Time Out, Total Hours, Status, Cluster, Note, [Person] + Actions
+      const dateCol = "minmax(150px, 1.2fr) ";
+      const timeCols = "minmax(110px, 1fr) minmax(110px, 1fr) ";
+      const hoursCol = "minmax(100px, 0.8fr) ";
+      const statusCol = "minmax(130px, 1fr) ";
+      const clusterCol = "minmax(140px, 1fr) ";
+      const noteCol = "minmax(200px, 1.5fr) ";
+      const personCol = personField ? "minmax(150px, 1fr) " : "";
+      const actionsCol = "minmax(100px, 0.8fr)";
+      return `${dateCol}${timeCols}${hoursCol}${statusCol}${clusterCol}${noteCol}${personCol}${actionsCol}`;
     }
     if (type === "requests") {
-      return `minmax(170px, 1.2fr) ${personField ? 'minmax(140px, 1fr) ' : ''}minmax(160px, 1fr) minmax(180px, 1.5fr) minmax(130px, 1fr) minmax(120px, 1fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(180px, 1fr)`;
+      // Columns: Date Filed, [Filed By], Request Type, Details, Schedule/Period, Status, Endorsed By, Approved By + Actions
+      const dateCol = "minmax(170px, 1.2fr) ";
+      const personCol = personField ? "minmax(140px, 1fr) " : "";
+      const typeCol = "minmax(160px, 1fr) ";
+      const detailsCol = "minmax(180px, 1.5fr) ";
+      const schedCol = "minmax(130px, 1fr) ";
+      const statusCol = "minmax(120px, 1fr) ";
+      const endorsedCol = "minmax(140px, 1fr) ";
+      const approvedCol = "minmax(140px, 1fr) ";
+      const actionsCol = "minmax(180px, 1fr)";
+      return `${dateCol}${personCol}${typeCol}${detailsCol}${schedCol}${statusCol}${endorsedCol}${approvedCol}${actionsCol}`;
     }
     return "";
-  }, [type, columns, personField]);
+  }, [type, personField]);
 
-  if (type === "attendance" || type === "requests") {
     return (
       <>
         <UnifiedTable
+          title={type === "attendance" ? "All Attendance" : (onRequestAction ? "File Requests" : "My Requests")}
           columns={columns}
           data={paginatedRecords}
+          totalRecords={filteredAndSortedRecords.length}
           loading={loading}
           error={error}
           currentPage={safeCurrentPage}
