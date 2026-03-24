@@ -1,8 +1,9 @@
 import { useMemo, useState, useCallback } from "react";
-import { CheckCircle2, XCircle, ChevronUp, ChevronDown, ArrowUpDown } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { normalizeAttendanceHistoryRecord, parseSqlDateTime } from "../api/attendance";
 import { formatDateTime, formatFullDate } from "../utils/dateUtils";
 import { useFeedback } from "./FeedbackContext";
+import UnifiedTable from "./shared/UnifiedTable";
 
 const normalizeRequestDetails = value => {
   const text = String(value ?? "").trim();
@@ -42,71 +43,13 @@ const panelConfig = {
   }
 };
 
-const formatAttendanceDate = value => {
-  return formatFullDate(value);
-};
-
-const formatAttendanceTime = value => {
-  if (!value) return "—";
-  const parsed = parseSqlDateTime(value) ?? new Date(String(value).replace(" ", "T"));
-  if (Number.isNaN(parsed.getTime())) return "—";
-  return parsed.toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit"
-  });
-};
-
-const getPersonPrimaryValue = (item, field) => {
-  const value = String(item?.[field] ?? "").trim();
-  return value || "—";
-};
-
-const getPersonSecondaryValue = (item, field) => {
-  const candidates = [
-    item?.person_secondary_name,
-    item?.employee_username,
-    item?.username,
-    item?.user_name,
-    item?.email,
-  ];
-  const secondaryValue = candidates
-    .map(value => String(value ?? "").trim())
-    .find(Boolean);
-
-  if (!secondaryValue) return "";
-  const primaryValue = getPersonPrimaryValue(item, field);
-  return secondaryValue.toLowerCase() === primaryValue.toLowerCase() ? "" : secondaryValue;
-};
-
-const toDateInputValue = value => {
-  if (!value) return null;
-  const str = String(value).trim();
-  if (str.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(str)) {
-    return str.slice(0, 10);
-  }
-  const parsed = new Date(str.replace(" ", "T"));
-  if (Number.isNaN(parsed.getTime())) return null;
-  const year = parsed.getFullYear();
-  const month = `${parsed.getMonth() + 1}`.padStart(2, "0");
-  const day = `${parsed.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const SortableHeader = ({ label, sortKey, currentSortKey, direction, onSort }) => {
-  const isActive = currentSortKey === sortKey;
-  return (
-    <button
-      type="button"
-      className={`table-sort-btn ${isActive ? "is-active" : ""}`}
-      onClick={() => onSort(sortKey)}
-      aria-label={`Sort by ${label}`}
-    >
-      <span>{label}</span>
-      <span className="table-sort-icon">
-        {!isActive ? <ArrowUpDown size={14} /> : direction === "asc" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-      </span>
-    </button>
-  );
+const getStatusColor = (status) => {
+  const s = String(status).toLowerCase();
+  if (['present', 'approved', 'on time', 'complete'].includes(s)) return '#52c41a';
+  if (['absent', 'denied', 'rejected'].includes(s)) return '#f5222d';
+  if (s === 'late') return '#faad14';
+  if (s === 'pending') return '#1890ff';
+  return '#cbd5e1';
 };
 
 export default function DataPanel({
@@ -121,15 +64,18 @@ export default function DataPanel({
   requestActionLoadingId = "",
   requestActions = null,
   enableRequestFilters = false,
+  loading = false,
+  error = null,
 }) {
   const { confirm } = useFeedback();
   const config = panelConfig[type] ?? panelConfig.attendance;
   const resolvedRequestActions = Array.isArray(requestActions) && requestActions.length > 0
     ? requestActions
     : [
-      { label: "Endorse", status: "Approved", variant: "btn", allowedStatuses: ["pending"] },
-      { label: "Reject", status: "Rejected", variant: "btn secondary", allowedStatuses: ["pending"] }
+      { label: "Endorse", status: "Approved", variant: "am-action-btn primary", allowedStatuses: ["pending"] },
+      { label: "Reject", status: "Rejected", variant: "am-action-btn secondary", allowedStatuses: ["pending"] }
     ];
+
   const [searchQuery, setSearchQuery] = useState("");
   const [dateStartFilter, setDateStartFilter] = useState("");
   const [dateEndFilter, setDateEndFilter] = useState("");
@@ -158,18 +104,18 @@ export default function DataPanel({
       if (key === "Total Hours") return Number(normalizeAttendanceHistoryRecord(item).total_hours || 0);
       if (key === "Status") return String(item.attendance_tag ?? item.tag ?? "").toLowerCase();
       if (key === "Cluster") return String(item.cluster_name ?? "").toLowerCase();
-      if (key === personLabel) return String(item[personField] ?? "").toLowerCase();
+      if (key === "person") return String(item[personField] ?? "").toLowerCase();
       return String(item[key.toLowerCase().replace(/ /g, "_")] ?? "").toLowerCase();
     }
     if (type === "requests") {
       if (key === "Date Filed") return new Date(item.date_filed ?? 0).getTime();
-      if (key === personLabel) return String(item[personField] ?? "").toLowerCase();
+      if (key === "person") return String(item[personField] ?? "").toLowerCase();
       if (key === "Status") return String(item.status ?? "").toLowerCase();
       if (key === "Request Type") return String(item.request_type ?? "").toLowerCase();
       return String(item[key.toLowerCase().replace(/ /g, "_")] ?? "").toLowerCase();
     }
     return "";
-  }, [type, personField, personLabel]);
+  }, [type, personField]);
 
   const handleActionClick = async (item, action) => {
     if (!onRequestAction) return;
@@ -211,27 +157,12 @@ export default function DataPanel({
     ...new Set(records.map(item => String(item.status ?? "").trim()).filter(Boolean))
   ]), [records]);
 
-  const parsedRowsPerPage = Number.parseInt(rowsPerPageInput, 10);
-  const rowsPerPage = Number.isFinite(parsedRowsPerPage) && parsedRowsPerPage > 0 ? parsedRowsPerPage : 10;
-
-  const handleRowsPerPageChange = event => {
-    const nextValue = event.target.value.replace(/[^0-9]/g, "");
-    setRowsPerPageInput(nextValue);
-    setCurrentPage(1);
-  };
-
-  const handleRowsPerPageBlur = () => {
-    const normalizedValue = Number.parseInt(rowsPerPageInput, 10);
-    setRowsPerPageInput(String(Number.isFinite(normalizedValue) && normalizedValue > 0 ? normalizedValue : 10));
-  };
-
   const filteredAndSortedRecords = useMemo(() => {
     let result = [];
     if (type === "requests") {
       result = records.filter(item => {
         const entryDate = toDateInputValue(item.date_filed);
         
-        // Prioritize external filter if present, otherwise use range
         if (externalDateFilter) {
           if (!entryDate || entryDate !== externalDateFilter) return false;
         } else {
@@ -305,12 +236,11 @@ export default function DataPanel({
     return result;
   }, [type, records, dateStartFilter, dateEndFilter, externalDateFilter, searchQuery, personField, enableRequestFilters, requestTypeFilter, requestStatusFilter, sortKey, sortDirection, getSortValue]);
 
+  const rowsPerPage = parseInt(rowsPerPageInput) || 10;
   const totalPages = Math.max(1, Math.ceil(filteredAndSortedRecords.length / rowsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStartIndex = (safeCurrentPage - 1) * rowsPerPage;
   const paginatedRecords = filteredAndSortedRecords.slice(pageStartIndex, pageStartIndex + rowsPerPage);
-  const visibleStart = filteredAndSortedRecords.length === 0 ? 0 : pageStartIndex + 1;
-  const visibleEnd = Math.min(pageStartIndex + rowsPerPage, filteredAndSortedRecords.length);
 
   const handleClearFilters = () => {
     setSearchQuery("");
@@ -324,342 +254,219 @@ export default function DataPanel({
     setCurrentPage(1);
   };
 
-  if (type === "attendance") {
-    const attendanceColumnCount = 7 + (personField ? 1 : 0) + (onEditRow ? 1 : 0);
-    const attendanceGridStyle = {
-      gridTemplateColumns: `repeat(${attendanceColumnCount}, minmax(140px, 1fr))`,
-      minWidth: `${attendanceColumnCount * 140}px`
-    };
+  const columns = useMemo(() => {
+    if (type === "attendance") {
+      return [
+        { label: "Date", key: "date", sortable: true },
+        { label: "Time In", key: "time_in", sortable: true },
+        { label: "Time Out", key: "time_out", sortable: true },
+        { label: "Total Hours", key: "total_hours", sortable: true },
+        { label: "Status", key: "status", sortable: true },
+        { label: "Cluster", key: "cluster", sortable: true },
+        { label: "Note", key: "note", sortable: false, expandable: true },
+        ...(personField ? [{ label: personLabel, key: "person", sortable: true }] : []),
+      ];
+    }
+    if (type === "requests") {
+      return [
+        { label: "Date Filed", key: "date_filed", sortable: true },
+        ...(personField ? [{ label: "Filed By", key: "person", sortable: true }] : []),
+        { label: "Request Type", key: "request_type", sortable: true },
+        { label: "Details", key: "details", sortable: false, expandable: true },
+        { label: "Schedule / Period", key: "schedule_period", sortable: false },
+        { label: "Status", key: "status", sortable: true },
+        { label: "Endorsed By", key: "endorsed_by", sortable: true },
+        { label: "Approved By", key: "approved_by", sortable: true },
+      ];
+    }
+    return [];
+  }, [type, personField, personLabel]);
 
-    return (
-      <div className="employee-attendance-history-table" role="table" aria-label={config.title}>
-        <div className="attendance-history-range-filter" role="group" aria-label="Filter attendance history">
-          <label className="employee-search-field" htmlFor="att-from">
-            <span className="employee-control-label">From</span>
-            <input id="att-from" type="date" value={dateStartFilter} onChange={event => { setDateStartFilter(event.target.value); setCurrentPage(1); }} />
-          </label>
-          <label className="employee-search-field" htmlFor="att-to">
-            <span className="employee-control-label">To</span>
-            <input id="att-to" type="date" value={dateEndFilter} onChange={event => { setDateEndFilter(event.target.value); setCurrentPage(1); }} />
-          </label>
-          {typeof onExternalDateFilterChange === "function" && (
-            <label className="employee-search-field" htmlFor="att-ext-date">
-              <span className="employee-control-label">Single Date</span>
-              <input id="att-ext-date" type="date" value={externalDateFilter ?? ""} onChange={event => { onExternalDateFilterChange(event.target.value); setCurrentPage(1); }} />
-            </label>
-          )}
-          <label className="employee-search-field" htmlFor="att-search" style={{ flex: "1 1 260px" }}>
-            <span className="employee-control-label">Search</span>
-            <input id="att-search" type="text" value={searchQuery} placeholder={config.searchPlaceholder} onChange={event => { setSearchQuery(event.target.value); setCurrentPage(1); }} />
-          </label>
-          <label className="employee-rows-field" htmlFor="att-rows">
-            <span className="employee-control-label">Rows per page</span>
-            <input id="att-rows" type="text" inputMode="numeric" placeholder="10" value={rowsPerPageInput} onChange={handleRowsPerPageChange} onBlur={handleRowsPerPageBlur} />
-          </label>
-          <div className="employee-filter-actions">
-            <button className="btn secondary" type="button" onClick={handleClearFilters}>
-              Clear
-            </button>
-          </div>
-        </div>
+  const renderCell = useCallback((item, key) => {
+    if (type === "attendance") {
+      const normalizedAttendance = normalizeAttendanceHistoryRecord(item);
+      const attendanceDateValue = item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at;
+      const statusText = item.attendance_tag ?? item.tag ?? "Pending";
 
-        <div className="employee-attendance-history-scroll">
-          <div className="employee-attendance-history-header" role="row" style={attendanceGridStyle}>
-            <span role="columnheader">
-              <SortableHeader label="Date" sortKey="Date" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
-            </span>
-            <span role="columnheader">
-              <SortableHeader label="Time In" sortKey="Time In" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
-            </span>
-            <span role="columnheader">
-              <SortableHeader label="Time Out" sortKey="Time Out" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
-            </span>
-            <span role="columnheader">
-              <SortableHeader label="Total Hours" sortKey="Total Hours" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
-            </span>
-            <span role="columnheader">
-              <SortableHeader label="Status" sortKey="Status" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
-            </span>
-            <span role="columnheader">
-              <SortableHeader label="Cluster" sortKey="Cluster" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
-            </span>
-            <span role="columnheader">Note</span>
-            {personField && (
-              <span role="columnheader">
-                <SortableHeader label={personLabel} sortKey={personLabel} currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
-              </span>
-            )}
-            {onEditRow && <span role="columnheader">Action</span>}
-          </div>
-          {filteredAndSortedRecords.length > 0 ? paginatedRecords.map(item => {
-            const normalizedAttendance = normalizeAttendanceHistoryRecord(item);
-            const attendanceDateValue = item.time_in_at ?? item.time_out_at ?? item.updated_at ?? item.attendance_updated_at;
+      switch (key) {
+        case 'date': return formatAttendanceDate(attendanceDateValue);
+        case 'time_in': return formatAttendanceTime(item.time_in_at);
+        case 'time_out': return formatAttendanceTime(item.time_out_at);
+        case 'total_hours': return `${normalizedAttendance.total_hours}h`;
+        case 'status':
+          return (
+            <div className="am-status-cell">
+              <div className="am-status-dot" style={{ backgroundColor: getStatusColor(statusText) }} />
+              <span className="am-status-text">{statusText}</span>
+            </div>
+          );
+        case 'cluster': return item.cluster_name ?? "—";
+        case 'note': return item.attendance_note ?? item.note ?? "—";
+        case 'person':
+          return (
+            <div className="team-attendance-employee-cell">
+              <span>{getPersonPrimaryValue(item, personField)}</span>
+              {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
+            </div>
+          );
+        default: return "—";
+      }
+    }
+    if (type === "requests") {
+      switch (key) {
+        case 'date_filed': return formatDateTime(item.date_filed);
+        case 'person':
+          return (
+            <div className="team-attendance-employee-cell">
+              <span>{getPersonPrimaryValue(item, personField)}</span>
+              {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
+            </div>
+          );
+        case 'request_type': return item.request_type ?? "—";
+        case 'details': return normalizeRequestDetails(item.details);
+        case 'schedule_period': return item.schedule_period ?? "—";
+        case 'status': return item.status ?? "Pending";
+        case 'endorsed_by': return item.endorsed_by_name || "—";
+        case 'approved_by': return item.approved_by_name || "—";
+        default: return "—";
+      }
+    }
+    return "—";
+  }, [type, personField]);
 
-            return (
-              <div
-                key={`${item.id ?? item.attendance_id}-${item.updated_at ?? item.attendance_updated_at ?? item.time_in_at ?? "entry"}`}
-                className="employee-attendance-history-row"
-                role="row"
-                style={attendanceGridStyle}
-              >
-                <span role="cell">{formatAttendanceDate(attendanceDateValue)}</span>
-                <span role="cell">{formatAttendanceTime(item.time_in_at)}</span>
-                <span role="cell">{formatAttendanceTime(item.time_out_at)}</span>
-                <span role="cell" className="employee-attendance-total-hours-cell">{normalizedAttendance.total_hours}h</span>
-                <span role="cell">{item.attendance_tag ?? item.tag ?? "Pending"}</span>
-                <span role="cell">{item.cluster_name ?? "—"}</span>
-                <span role="cell">{item.attendance_note ?? item.note ?? "—"}</span>
-                {personField && (
-                  <span role="cell" className="team-attendance-employee-cell">
-                    <span>{getPersonPrimaryValue(item, personField)}</span>
-                    {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
-                  </span>
-                )}
-                {onEditRow && (
-                  <span role="cell">
-                    <button
-                      className="btn"
-                      type="button"
-                      aria-label={`Edit attendance for ${formatAttendanceDate(attendanceDateValue)}`}
-                      onClick={() => onEditRow(item)}
-                    >
-                      Edit
-                    </button>
-                  </span>
-                )}
-              </div>
-            );
-          }) : (
-            <div className="empty-state">No attendance records match the selected filters.</div>
-          )}
-        </div>
-
-        <div className="employee-table-pagination employee-attendance-pagination">
-          <div className="employee-pagination-summary">
-            Showing {visibleStart}-{visibleEnd} of {filteredAndSortedRecords.length}
-          </div>
-          <div className="employee-pagination-actions">
-            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={safeCurrentPage === 1}>
-              Previous
-            </button>
-            <div className="employee-pagination-page">Page {safeCurrentPage} of {totalPages}</div>
-            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))} disabled={safeCurrentPage === totalPages}>
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (type === "requests") {
-    const requestColumnCount = 7 + (personField ? 1 : 0) + (onRequestAction ? 1 : 0);
-    const requestGridStyle = {
-      gridTemplateColumns: `minmax(170px, 1.2fr) ${personField ? 'minmax(140px, 1fr) ' : ''}minmax(180px, 1fr) minmax(180px, 1.5fr) minmax(130px, 1fr) minmax(150px, 1fr) minmax(140px, 1fr) minmax(140px, 1fr)${onRequestAction ? ' minmax(190px, 1fr)' : ''}`,
-      minWidth: `${requestColumnCount * 160}px`
-    };
-
-    return (
-      <div className="employee-attendance-history-table" role="table" aria-label={config.title}>
-        <div className="attendance-history-range-filter" role="group" aria-label="Filter requests">
-          <label className="employee-search-field" htmlFor="req-from">
-            <span className="employee-control-label">From</span>
-            <input id="req-from" type="date" value={dateStartFilter} onChange={event => { setDateStartFilter(event.target.value); setCurrentPage(1); }} />
-          </label>
-          <label className="employee-search-field" htmlFor="req-to">
-            <span className="employee-control-label">To</span>
-            <input id="req-to" type="date" value={dateEndFilter} onChange={event => { setDateEndFilter(event.target.value); setCurrentPage(1); }} />
-          </label>
-          {enableRequestFilters && (
-            <>
-              <label className="employee-search-field" htmlFor="req-type">
-                <span className="employee-control-label">Request Type</span>
-                <select id="req-type" value={requestTypeFilter} onChange={event => { setRequestTypeFilter(event.target.value); setCurrentPage(1); }}>
-                  {requestTypeOptions.map(option => (
-                    <option key={option} value={option}>
-                      {option === "all" ? "All request types" : option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="employee-search-field" htmlFor="req-status">
-                <span className="employee-control-label">Status</span>
-                <select id="req-status" value={requestStatusFilter} onChange={event => { setRequestStatusFilter(event.target.value); setCurrentPage(1); }}>
-                  {requestStatusOptions.map(option => (
-                    <option key={option} value={option}>
-                      {option === "all" ? "All statuses" : option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </>
-          )}
-          <label className="employee-search-field" htmlFor="req-search" style={{ flex: "1 1 280px" }}>
-            <span className="employee-control-label">Search</span>
-            <input
-              id="req-search"
-              type="text"
-              value={searchQuery}
-              placeholder={config.searchPlaceholder}
-              onChange={event => { setSearchQuery(event.target.value); setCurrentPage(1); }}
-            />
-          </label>
-          <label className="employee-rows-field" htmlFor="req-rows">
-            <span className="employee-control-label">Rows per page</span>
-            <input id="req-rows" type="text" inputMode="numeric" placeholder="10" value={rowsPerPageInput} onChange={handleRowsPerPageChange} onBlur={handleRowsPerPageBlur} />
-          </label>
-          <div className="employee-filter-actions">
-            <button className="btn secondary" type="button" onClick={handleClearFilters}>
-              Clear
-            </button>
-          </div>
-        </div>
-
-        <div className="employee-attendance-history-scroll">
-          <div
-            className={`employee-attendance-history-header ${personField ? "employee-attendance-history-header-person" : ""} ${onRequestAction ? "employee-attendance-history-header-actions" : ""}`.trim()}
-            role="row"
-            style={requestGridStyle}
+  const renderActions = useCallback((item) => {
+    if (type === "attendance") {
+      if (!onEditRow) return null;
+      return (
+        <button
+          className="am-action-btn primary"
+          type="button"
+          onClick={() => onEditRow(item)}
+        >
+          Edit
+        </button>
+      );
+    }
+    if (type === "requests") {
+      return (
+        <div className="am-table-actions-cell">
+          <button
+            className="am-action-btn primary"
+            type="button"
+            onClick={() => setSelectedRequest(item)}
           >
-            <span role="columnheader">
-              <SortableHeader label="Date Filed" sortKey="Date Filed" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
-            </span>
-            {personField && (
-              <span role="columnheader">
-                <SortableHeader label="Filed By" sortKey={personLabel} currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
-              </span>
-            )}
-            <span role="columnheader">
-              <SortableHeader label="Request Type" sortKey="Request Type" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
-            </span>
-            <span role="columnheader">Details</span>
-            <span role="columnheader">Schedule / Period</span>
-            <span role="columnheader">
-              <SortableHeader label="Status" sortKey="Status" currentSortKey={sortKey} direction={sortDirection} onSort={handleSort} />
-            </span>
-            <span role="columnheader">Endorsed By</span>
-            <span role="columnheader">Approved By</span>
-            {onRequestAction && <span role="columnheader">Actions</span>}
-          </div>
+            View
+          </button>
+          {onRequestAction && resolvedRequestActions.map(action => {
+            const currentStatus = String(item.status ?? "").toLowerCase();
+            const allowedStatuses = Array.isArray(action.allowedStatuses)
+              ? action.allowedStatuses.map(value => String(value).toLowerCase())
+              : ["pending"];
+            const canReview = item.can_review !== false;
+            const isVisible = typeof action.isVisible === "function" ? action.isVisible(item) : true;
+            const isEnabled = isVisible && canReview && allowedStatuses.some(status => currentStatus.includes(status));
 
-          {filteredAndSortedRecords.length > 0 ? paginatedRecords.map(item => {
-            const photoUrl = resolveRequestPhotoUrl(item.photo_url ?? item.photo_path);
+            if (!isVisible) return null;
 
             return (
-              <div
-                key={item.id}
-                className={`employee-attendance-history-row ${personField ? "employee-attendance-history-row-person" : ""} ${onRequestAction ? "employee-attendance-history-row-actions" : ""}`.trim()}
-                role="row"
-                style={requestGridStyle}
+              <button
+                key={`${item.id}-${action.status}`}
+                className={action.variant ?? "am-action-btn primary"}
+                type="button"
+                disabled={requestActionLoadingId === item.id || !isEnabled}
+                onClick={() => handleActionClick(item, action)}
               >
-                <span role="cell">{formatDateTime(item.date_filed)}</span>
-                {personField && (
-                  <span role="cell" className="team-attendance-employee-cell">
-                    <span>{getPersonPrimaryValue(item, personField)}</span>
-                    {getPersonSecondaryValue(item, personField) && <small>{getPersonSecondaryValue(item, personField)}</small>}
-                  </span>
-                )}
-                <span role="cell">{item.request_type ?? "—"}</span>
-                <span role="cell">
-                  <div className="employee-request-details-cell">
-                    <span className="employee-request-details-text" title={normalizeRequestDetails(item.details)}>{truncateRequestDetails(item.details)}</span>
-                    <button
-                      className="btn secondary"
-                      type="button"
-                      aria-label={`View details for ${item.request_type || "request"} filed on ${formatDateTime(item.date_filed)}`}
-                      onClick={() => setSelectedRequest(item)}
-                    >
-                      View
-                    </button>
-                  </div>
-                </span>
-                <span role="cell">{item.schedule_period ?? "—"}</span>
-                <span role="cell">
-                  <div className="employee-request-status-cell">
-                    <span>{item.status ?? "Pending"}</span>
-                    {photoUrl ? (
-                      <button
-                        className="btn secondary employee-request-photo-btn"
-                        type="button"
-                        aria-label={`View supporting photo for ${item.request_type || "request"}`}
-                        onClick={() => setSelectedRequest(item)}
-                      >
-                        View Photo
-                      </button>
-                    ) : (
-                      <span className="employee-request-photo-empty">No photo</span>
-                    )}
-                  </div>
-                </span>
-                <span role="cell">
-                  {item.endorsed_by_name || "—"}
-                </span>
-                <span role="cell">
-                  {item.approved_by_name || "—"}
-                </span>
-                {onRequestAction && (
-                  <span role="cell" className="employee-request-actions-cell">
-                    <div className="employee-request-actions" role="group" aria-label={`Actions for request ${item.id}`}>
-                      {resolvedRequestActions.map(action => {
-                        const currentStatus = String(item.status ?? "").toLowerCase();
-                        const allowedStatuses = Array.isArray(action.allowedStatuses)
-                          ? action.allowedStatuses.map(value => String(value).toLowerCase())
-                          : ["pending"];
-                        const canReview = item.can_review !== false;
-                        const isVisible = typeof action.isVisible === "function" ? action.isVisible(item) : true;
-                        const isEnabled = isVisible && canReview && allowedStatuses.some(status => currentStatus.includes(status));
-
-                        if (!isVisible) {
-                          return null;
-                        }
-
-                        const personName = getPersonPrimaryValue(item, personField);
-                        const descriptiveLabel = `${action.label} request by ${personName !== "—" ? personName : "this employee"}`;
-
-                        return (
-                          <button
-                            key={`${item.id}-${action.status}`}
-                            className={`${action.variant ?? "btn"} action-icon-btn`}
-                            type="button"
-                            title={action.label}
-                            aria-label={descriptiveLabel}
-                            disabled={requestActionLoadingId === item.id || !isEnabled}
-                            onClick={() => handleActionClick(item, action)}
-                          >
-                            {requestActionLoadingId === item.id ? (
-                              "…"
-                            ) : (action.status === "Approved" || action.status === "Endorsed") ? (
-                              <CheckCircle2 size={18} aria-hidden="true" />
-                            ) : (
-                              <XCircle size={18} aria-hidden="true" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </span>
-                )}
-              </div>
+                {requestActionLoadingId === item.id ? "…" : action.label}
+              </button>
             );
-          }) : (
-            <div className="empty-state">No requests found.</div>
-          )}
+          })}
         </div>
+      );
+    }
+    return null;
+  }, [type, onEditRow, onRequestAction, resolvedRequestActions, requestActionLoadingId, handleActionClick]);
 
-        <div className="employee-table-pagination employee-attendance-pagination">
-          <div className="employee-pagination-summary">
-            Showing {visibleStart}-{visibleEnd} of {filteredAndSortedRecords.length}
-          </div>
-          <div className="employee-pagination-actions">
-            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={safeCurrentPage === 1}>
-              Previous
-            </button>
-            <div className="employee-pagination-page">Page {safeCurrentPage} of {totalPages}</div>
-            <button className="btn secondary" type="button" onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))} disabled={safeCurrentPage === totalPages}>
-              Next
-            </button>
-          </div>
-        </div>
+  const extraFilters = useMemo(() => {
+    if (type === "requests" && enableRequestFilters) {
+      return (
+        <>
+          <label className="am-filter-field">
+            <span className="am-filter-label">Type</span>
+            <select
+              style={{ padding: '6px', fontSize: '13px', borderRadius: '2px', border: '1px solid #d9d9d9', height: '36px' }}
+              value={requestTypeFilter}
+              onChange={e => { setRequestTypeFilter(e.target.value); setCurrentPage(1); }}
+            >
+              {requestTypeOptions.map(opt => <option key={opt} value={opt}>{opt === 'all' ? 'All Types' : opt}</option>)}
+            </select>
+          </label>
+          <label className="am-filter-field">
+            <span className="am-filter-label">Status</span>
+            <select
+              style={{ padding: '6px', fontSize: '13px', borderRadius: '2px', border: '1px solid #d9d9d9', height: '36px' }}
+              value={requestStatusFilter}
+              onChange={e => { setRequestStatusFilter(e.target.value); setCurrentPage(1); }}
+            >
+              {requestStatusOptions.map(opt => <option key={opt} value={opt}>{opt === 'all' ? 'All Status' : opt}</option>)}
+            </select>
+          </label>
+        </>
+      );
+    }
+    if (type === "attendance" && typeof onExternalDateFilterChange === "function") {
+       return (
+        <label className="am-filter-field">
+          <span className="am-filter-label">Single Date</span>
+          <input 
+            type="date" 
+            value={externalDateFilter ?? ""} 
+            onChange={e => { onExternalDateFilterChange(e.target.value); setCurrentPage(1); }} 
+          />
+        </label>
+       );
+    }
+    return null;
+  }, [type, enableRequestFilters, requestTypeFilter, requestTypeOptions, requestStatusFilter, requestStatusOptions, externalDateFilter, onExternalDateFilterChange]);
+
+  const gridTemplateColumns = useMemo(() => {
+    if (type === "attendance") {
+      const colCount = columns.length + 1; // +1 for Actions
+      return `minmax(150px, 1.2fr) repeat(${colCount - 3}, minmax(120px, 1fr)) minmax(200px, 1.5fr) minmax(100px, 0.8fr)`;
+    }
+    if (type === "requests") {
+      return `minmax(170px, 1.2fr) ${personField ? 'minmax(140px, 1fr) ' : ''}minmax(160px, 1fr) minmax(180px, 1.5fr) minmax(130px, 1fr) minmax(120px, 1fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(180px, 1fr)`;
+    }
+    return "";
+  }, [type, columns, personField]);
+
+  if (type === "attendance" || type === "requests") {
+    return (
+      <>
+        <UnifiedTable
+          columns={columns}
+          data={paginatedRecords}
+          loading={loading}
+          error={error}
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          rowsPerPage={rowsPerPageInput}
+          onRowsPerPageChange={val => { setRowsPerPageInput(val); setCurrentPage(1); }}
+          searchQuery={searchQuery}
+          onSearchChange={val => { setSearchQuery(val); setCurrentPage(1); }}
+          dateStart={dateStartFilter}
+          onDateStartChange={val => { setDateStartFilter(val); setCurrentPage(1); }}
+          dateEnd={dateEndFilter}
+          onDateEndChange={val => { setDateEndFilter(val); setCurrentPage(1); }}
+          onClearFilters={handleClearFilters}
+          extraFilters={extraFilters}
+          sortKey={sortKey}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+          renderCell={renderCell}
+          renderActions={renderActions}
+          gridTemplateColumns={gridTemplateColumns}
+        />
 
         {selectedRequest && (
           <div className="modal-overlay request-details-overlay" role="presentation" onClick={() => setSelectedRequest(null)}>
@@ -715,7 +522,7 @@ export default function DataPanel({
             </div>
           </div>
         )}
-      </div>
+      </>
     );
   }
 
