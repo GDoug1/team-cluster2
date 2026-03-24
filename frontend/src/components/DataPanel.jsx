@@ -193,8 +193,18 @@ export default function DataPanel({
 
   const requestTypeOptions = useMemo(() => ([
     "all",
-    ...new Set(records.map(item => String(item.request_type ?? "").trim()).filter(Boolean))
-  ]), [records]);
+    "Forget Time In/Out",
+    "System Error",
+    "Official Business",
+    "Incorrect Status",
+    "Breaktime/Lunch",
+    "Sick Leave",
+    "Emergency Leave",
+    "Vacation Leave",
+    "Regular Overtime",
+    "Duty on Rest Day",
+    "Duty on Rest Day OT"
+  ]), []);
 
   const requestStatusOptions = useMemo(() => ([
     "all",

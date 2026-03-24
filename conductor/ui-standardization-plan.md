@@ -54,31 +54,35 @@ Standardize the control bar above lists and tables.
 ### C. The "Data Grid" Pattern (Tables)
 Adopt the sortable table pattern from `AttendanceModule.jsx`.
 - **Header:** `SortableHeader` component with `ArrowUpDown` / `Chevron` icons.
-- **Content Wrapping & Expansion:** Balance row consistency with data visibility.
-  - **Default:** Use `white-space: nowrap`, `overflow: hidden`, and `text-overflow: ellipsis` for long content to maintain uniform row heights in dense tables.
-  - **Hover Interaction:** On `:hover`, transition to `white-space: normal`, `overflow: visible`, and `height: auto`. 
-  - **Fallback:** Use `overflow-wrap: break-word` and `word-break: break-word` within the expanded state to ensure text stays within the container.
-  - **Visual Hint:** Ensure clipped cells have a subtle visual indicator (like a tooltip or shadow) or use the standard browser `title` attribute as a low-cost accessibility fallback.
-- **Row Interactivity:** 
+- **Dynamic Cell Scaling & Expansion:** 
+  - **Rest State (Default):** Use `white-space: nowrap`, `overflow: hidden`, and `text-overflow: ellipsis` for long content (like Notes or Details) to maintain uniform row heights in dense tables.
+  - **Active State (Expansion):** On `:hover` (or `:focus-within`), transition to `white-space: normal`, `overflow: visible`, and `height: auto` to reveal full content.
+  - **Spacing Hygiene:** Maintain internal padding (`padding: 12px 16px`) and `line-height: 1.5` during expansion to ensure readability and prevent text from touching cell borders.
+  - **Container Integrity (No Clipping):** Strictly enforce that no content clips or overflows outside its respective container. 
+    - Use `overflow-wrap: break-word` and `word-break: break-word` within the expanded state.
+    - Ensure `min-width: 0` is applied to flex/grid items to allow proper truncation and prevent horizontal container "blowout".
+- **Row Interactivity & Actions:** 
   - Background change on hover (`#f5f5f5`).
-  - Inline actions revealed via `.am-actions-hover` (for Logs).
-  - Explicit action buttons (`btn-action-soft`) for Management/CRUD.
+  - **Actions Grouping:** All row-level actions must be consolidated within a dedicated **"Actions"** column cell to prevent UI clutter and maintain a predictable interaction point.
 
-### E. The "Action-First" Button Pattern
-Ensure button labels are concise and functional.
-- **Labeling:** Use **singular action verbs** (e.g., "Save", "Edit", "View", "Delete", "Create", "Approve", "Deny").
-- **Clarity:** Avoid multi-word labels (e.g., "Add Member" -> "Add", "Edit Details" -> "Edit") unless the context is ambiguous.
-- **Visuals:** Maintain consistent `btn` class variants (primary, secondary, danger, action-soft) to reinforce the weight of the action.
+### E. The "Action-First" Button Pattern (Standardized Labels & Layout)
+Ensure all interactive elements, particularly within tables, prioritize immediate clarity through text and consistent grouping.
+
+- **Labeling (Action-First):** Use **singular action verbs** (e.g., "Save", "Edit", "View", "Delete", "Create", "Approve", "Deny").
+  - *Refinement:* Avoid multi-word labels (e.g., "Add Member" -> "Add", "Edit Details" -> "Edit") and **NEVER** use icons alone for row actions.
+- **Grouping:** All row-level actions must be consolidated within a dedicated **"Actions"** column cell.
+- **De-duplication:** Remove redundant secondary action buttons. 
+  - *Example:* In the Attendance/Requests logs, the "View Photo" button is removed. Supporting photos must be accessed directly through the primary "View" details modal.
 
 ---
 
-## 🔄 4. Functional Variation Handling
+## 🔄 4. Functional Variation Handling (Attendance Focus)
 
 | Feature Type | UX Strategy | Reference Component |
 | :--- | :--- | :--- |
-| **Historical Logs** | Read-only rows with "Dispute" or "View" hover actions. | `AttendanceModule.jsx` |
-| **Active Management** | CRUD-heavy tables with "Edit/Archive" buttons. | `EmployeesSection.jsx` |
-| **Request Filing** | Step-by-step or tabbed forms in a centered panel. | `FilingCenterPanel.jsx` |
+| **Attendance Logs** | Read-only rows with a "Dispute" text button in the Actions column. | `AttendanceModule.jsx` |
+| **Request Management** | Rows with "View", "Approve", and "Reject" text buttons grouped in the Actions column. | `DataPanel.jsx` |
+| **Request Filing** | Step-by-step or tabbed forms in a centered panel with singular "Submit" action. | `FilingCenterPanel.jsx` |
 | **Dashboard Overviews** | Large numbers and visual "Big Values" for metrics. | `MainDashboard.jsx` |
 
 ---

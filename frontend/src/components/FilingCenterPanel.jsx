@@ -20,7 +20,7 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
   const { confirm } = useFeedback();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [clusterInfo, setClusterInfo] = useState(null);
-  const [disputeType, setDisputeType] = useState("Forget time in/out");
+  const [disputeType, setDisputeType] = useState("Forget Time In/Out");
   const [leaveType, setLeaveType] = useState("Sick Leave");
   const [leaveStartDate, setLeaveStartDate] = useState("");
   const [leaveEndDate, setLeaveEndDate] = useState("");
@@ -281,8 +281,7 @@ export default function FilingCenterPanel({ onSubmitted = null, initialTab = "le
                     <option>System Error</option>
                     <option>Official Business</option>
                     <option>Incorrect Status</option>
-                    <option>Break Time</option>
-                    <option>Lunch Break</option>
+                    <option>Breaktime/Lunch</option>
                   </select>
                 </div>
               </div>
