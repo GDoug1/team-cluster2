@@ -501,6 +501,7 @@ export default function DataPanel({
     return "";
   }, [type, personField]);
 
+  if (!error) {
     return (
       <>
         <UnifiedTable
