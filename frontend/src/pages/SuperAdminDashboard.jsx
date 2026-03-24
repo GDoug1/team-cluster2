@@ -302,6 +302,18 @@ export default function SuperAdminDashboard() {
     };
   };
 
+  const getCoachScheduleStatusForToday = coachSchedule => {
+    const dayIndexToLabel = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const todayLabel = dayIndexToLabel[new Date().getDay()];
+    const assignedDays = Array.isArray(coachSchedule?.days) ? coachSchedule.days : [];
+    const isScheduledToday = assignedDays.includes(todayLabel);
+
+    return {
+      label: isScheduledToday ? "Scheduled" : "Not Scheduled",
+      className: isScheduledToday ? "is-scheduled" : "is-not-scheduled"
+    };
+  };
+
   const getAutomaticShiftType = (startTime, startPeriod) => {
     const startMinutes = toMinutes(startTime, startPeriod);
     if (startMinutes === null) return "Morning Shift";
@@ -1041,32 +1053,38 @@ const handleOpenRejectModal = cluster => {
                   <div className="active-members-schedule-body" role="rowgroup">
                     {[...clusters]
                       .sort((a, b) => (a.coach ?? "").localeCompare(b.coach ?? ""))
-                      .map(cluster => (
-                        <div key={`coach-schedule-${cluster.id}`} className="active-members-schedule-row" role="row">
-                          <div className="active-members-owner" role="cell">{cluster.coach || "—"}</div>
-                          {dayOptions.map(day => {
-                            const daySchedule = formatCoachDaySchedule(cluster.coach_schedule, day);
+                      .map(cluster => {
+                        const todayScheduleStatus = getCoachScheduleStatusForToday(cluster.coach_schedule);
 
-                            if (typeof daySchedule === "string") {
+                        return (
+                          <div key={`coach-schedule-${cluster.id}`} className="active-members-schedule-row team-coach-schedule-row" role="row">
+                            <div className="active-members-owner" role="cell">{cluster.coach || "—"}</div>
+                            {dayOptions.map(day => {
+                              const daySchedule = formatCoachDaySchedule(cluster.coach_schedule, day);
+
+                              if (typeof daySchedule === "string") {
+                                return (
+                                  <div key={`${cluster.id}-${day}`} role="cell">{daySchedule}</div>
+                                );
+                              }
+
                               return (
-                                <div key={`${cluster.id}-${day}`} role="cell">{daySchedule}</div>
+                                <div key={`${cluster.id}-${day}`} role="cell" className="active-day-cell">
+                                  <div>{daySchedule.shift}</div>
+                                  <span className="active-day-tag break-tag">
+                                    Break time: {daySchedule.breakTime}
+                                  </span>
+                                </div>
                               );
-                            }
-
-                            return (
-                              <div key={`${cluster.id}-${day}`} role="cell" className="active-day-cell">
-                                <div>{daySchedule.shift}</div>
-                                <span className="active-day-tag break-tag">
-                                  Break time: {daySchedule.breakTime}
-                                </span>
-                              </div>
-                            );
-                          })}
-                          <div role="cell" className="member-status-and-tags-cell">
-                            <span className={`badge ${cluster.status}`}>{cluster.status}</span>
+                            })}
+                            <div role="cell" className="member-status-and-tags-cell">
+                              <span className={`badge team-coach-status-badge ${todayScheduleStatus.className}`}>
+                                {todayScheduleStatus.label}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 </div>
               </>
