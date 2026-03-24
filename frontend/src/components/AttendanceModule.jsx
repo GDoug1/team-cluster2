@@ -6,6 +6,7 @@ import { formatFullDate } from '../utils/dateUtils';
 import AttendanceHistoryHighlights from './AttendanceHistoryHighlights';
 import { buildAttendanceHighlights, HIGHLIGHT_IDS } from '../utils/highlightUtils';
 import UnifiedTable from './shared/UnifiedTable';
+import { useFeedback } from './FeedbackContext';
 import '../styles/AttendanceModule.css';
 
 const getStatusColor = (status) => {
@@ -37,6 +38,7 @@ export default function AttendanceModule({
   error: errorProp = null,
   onDisputeClick = null,
 }) {
+  const { showToast } = useFeedback();
   const historyState = useAttendanceHistory();
   const [searchQuery, setSearchQuery] = useState('');
   const [dateStartFilter, setDateStartFilter] = useState("");
@@ -54,6 +56,16 @@ export default function AttendanceModule({
   const error = isControlled ? errorProp : historyState.error;
 
   const highlights = useMemo(() => buildAttendanceHighlights(data), [data]);
+
+  useEffect(() => {
+    if (error) {
+      showToast({
+        title: "Attendance Error",
+        message: error,
+        type: "error"
+      });
+    }
+  }, [error, showToast]);
 
   const handleSort = key => {
     if (sortKey === key) {
@@ -184,12 +196,6 @@ export default function AttendanceModule({
 
   return (
     <div className="am-container">
-      {error && (
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-           <div className="am-offline-banner">Offline: {error}</div>
-        </div>
-      )}
-
       <AttendanceHistoryHighlights
         highlights={highlights}
         activeFilter={activeHighlightFilter}

@@ -174,7 +174,7 @@ export default function CoachDashboard() {
   });
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
-  const { confirm } = useFeedback();
+  const { confirm, showToast } = useFeedback();
   const { hasPermission } = usePermissions();
   const {
     canViewDashboard,
@@ -726,24 +726,38 @@ export default function CoachDashboard() {
     loadCoachAttendance();
   }, [canViewAttendance]);
 
-  const persistAttendance = async nextAttendance => {
+  const persistAttendance = async (nextAttendance, actionType) => {
     if (!dashboardCluster?.id) return;
 
-    const savedAttendance = await saveDashboardAttendance({
-      clusterId: dashboardCluster.id,
-      nextAttendance
-    });
+    try {
+      const savedAttendance = await saveDashboardAttendance({
+        clusterId: dashboardCluster.id,
+        nextAttendance
+      });
 
-    setAttendanceLog(savedAttendance);
-    if (canViewAttendance) {
-      const history = await apiFetch("api/coach/coach_attendance_history.php");
-      setCoachAttendanceHistory(Array.isArray(history) ? history : []);
+      setAttendanceLog(savedAttendance);
+      showToast({
+        title: actionType === "in" ? "Clock-In Successful" : "Clock-Out Successful",
+        message: `You have successfully clocked ${actionType === "in" ? "in" : "out"} for today.`,
+        type: "success"
+      });
+
+      if (canViewAttendance) {
+        const history = await apiFetch("api/coach/coach_attendance_history.php");
+        setCoachAttendanceHistory(Array.isArray(history) ? history : []);
+      }
+    } catch (error) {
+      showToast({
+        title: actionType === "in" ? "Clock-In Failed" : "Clock-Out Failed",
+        message: error?.error ?? error?.message ?? `Unable to process clock-${actionType}.`,
+        type: "error"
+      });
     }
   };
 
   const handleCoachTimeIn = async () => {
     if (!canSetAttendance || !dashboardCluster?.id || !todayCoachSchedule || (attendanceLog.timeInAt && !attendanceLog.timeOutAt)) return;
-    await persistAttendance({ timeInAt: new Date(), timeOutAt: null, tag: "On Time" });
+    await persistAttendance({ timeInAt: new Date(), timeOutAt: null, tag: "On Time" }, "in");
   };
 
   const handleCoachTimeOut = async () => {
@@ -755,7 +769,7 @@ export default function CoachDashboard() {
       variant: "primary"
     });
     if (!hasConfirmed) return;
-    await persistAttendance({ ...attendanceLog, timeOutAt: new Date() });
+    await persistAttendance({ ...attendanceLog, timeOutAt: new Date() }, "out");
   };
 
   const hasActiveTimeIn = Boolean(attendanceLog.timeInAt && !attendanceLog.timeOutAt);
@@ -929,6 +943,11 @@ export default function CoachDashboard() {
         body: JSON.stringify({ cluster_id: cluster.id })
       });
       setClusters(prev => prev.filter(item => item.id !== cluster.id));
+      showToast({
+        title: "Cluster Disbanded",
+        message: `Cluster "${cluster.name}" has been disbanded.`,
+        type: "success"
+      });
       if (activeCluster?.id === cluster.id) {
         handleCloseModal();
       }
@@ -1184,6 +1203,11 @@ export default function CoachDashboard() {
       setScheduleMember(prev =>
         prev ? { ...prev, schedule: scheduleForm } : prev
       );
+      showToast({
+        title: "Schedule Saved",
+        message: `Schedule for ${scheduleMember.fullname} updated successfully.`,
+        type: "success"
+      });
       handleCloseSchedule();
     } catch (err) {
       setScheduleError(err?.error ?? "Unable to save schedule.");
@@ -1219,6 +1243,11 @@ export default function CoachDashboard() {
       setSelectedEmployees([]);
       setEmployeeSearchQuery("");
       setShowMemberForm(false);
+      showToast({
+        title: "Members Added",
+        message: `${added?.added_count ?? 0} member(s) successfully added to the cluster.`,
+        type: "success"
+      });
       setClusters(prev =>
         prev.map(cluster =>
           cluster.id === activeCluster.id
@@ -1575,8 +1604,17 @@ export default function CoachDashboard() {
       });
 
       setTeamRequests(prev => prev.map(item => (item.id === request.id ? { ...item, status } : item)));
+      showToast({
+        title: "Status Updated",
+        message: `Request for ${request.employee_name} has been ${status.toLowerCase()} successfully.`,
+        type: "success"
+      });
     } catch (error) {
-      setTeamRequestsError(error?.error ?? "Unable to update file request status.");
+      showToast({
+        title: "Action Failed",
+        message: error?.error ?? error?.message ?? "Unable to update file request status.",
+        type: "error"
+      });
     } finally {
       setRequestActionLoadingId("");
     }

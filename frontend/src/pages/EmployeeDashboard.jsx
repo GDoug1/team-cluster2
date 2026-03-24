@@ -19,9 +19,11 @@ import { resolveAttendanceMainTag } from "../utils/attendanceTags";
 import { getFeatureAccess } from "../utils/featureAccess";
 import { logout } from "../utils/logout";
 import { HIGHLIGHT_IDS, buildRequestHighlights } from "../utils/highlightUtils";
+import { useFeedback } from "../components/FeedbackContext";
 
 export default function EmployeeDashboard() {
   const { user } = useCurrentUser();
+  const { showToast } = useFeedback();
   const { hasPermission } = usePermissions();
   const {
     canViewDashboard,
@@ -319,7 +321,7 @@ export default function EmployeeDashboard() {
     );
   };
 
-  const persistAttendance = async nextAttendance => {
+  const persistAttendance = async (nextAttendance, actionType) => {
     if (!activeCluster?.cluster_id) {
       setAttendanceLog(nextAttendance);
       return nextAttendance;
@@ -334,7 +336,19 @@ export default function EmployeeDashboard() {
       });
 
       setAttendanceLog(savedAttendance);
+      showToast({
+        title: actionType === "in" ? "Clock-In Successful" : "Clock-Out Successful",
+        message: `You have successfully clocked ${actionType === "in" ? "in" : "out"} for today.`,
+        type: "success"
+      });
       return savedAttendance;
+    } catch (error) {
+      showToast({
+        title: actionType === "in" ? "Clock-In Failed" : "Clock-Out Failed",
+        message: error?.error ?? error?.message ?? `Unable to process clock-${actionType}.`,
+        type: "error"
+      });
+      throw error;
     } finally {
       setIsSavingAttendance(false);
     }
@@ -364,7 +378,7 @@ export default function EmployeeDashboard() {
       timeInAt: now,
       timeOutAt: null,
       tag
-    });
+    }, "in");
   };
 
   const handleTimeOut = async () => {
@@ -375,7 +389,7 @@ export default function EmployeeDashboard() {
       ...attendanceLog,
       timeOutAt: new Date()
     };
-    await persistAttendance(nextAttendance);
+    await persistAttendance(nextAttendance, "out");
   };
 
   const getStatusTag = (statusLabel, isScheduledToday) => {
