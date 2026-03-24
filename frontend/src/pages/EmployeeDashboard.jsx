@@ -22,7 +22,7 @@ import { HIGHLIGHT_IDS, buildRequestHighlights } from "../utils/highlightUtils";
 
 export default function EmployeeDashboard() {
   const { user } = useCurrentUser();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const {
     canViewDashboard,
     canViewTeam,
@@ -98,6 +98,10 @@ export default function EmployeeDashboard() {
 
 
   useEffect(() => {
+    if (permissionsLoading) {
+      return;
+    }
+
     const canAccessActiveNav = (
       (activeNav === "Dashboard" && canViewDashboard)
       || ((activeNav === "Team" || activeNav === "Schedule") && canViewTeam)
@@ -137,7 +141,7 @@ export default function EmployeeDashboard() {
     }
 
     setActiveNav("Profile");
-  }, [activeNav, attendanceNavItems, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
+  }, [activeNav, attendanceNavItems, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam, permissionsLoading]);
 
   const normalizeSchedule = schedule => {
     if (!schedule) return schedule;

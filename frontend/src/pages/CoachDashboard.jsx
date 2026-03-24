@@ -175,7 +175,7 @@ export default function CoachDashboard() {
   const dateTimeLabel = useLiveDateTime();
   const { user } = useCurrentUser();
   const { confirm } = useFeedback();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const {
     canViewDashboard,
     canViewTeam,
@@ -213,6 +213,10 @@ export default function CoachDashboard() {
 
 
   useEffect(() => {
+    if (permissionsLoading) {
+      return;
+    }
+
     const canAccessActiveNav = (
       (activeNav === "Dashboard" && canViewDashboard)
       || activeNav === "Profile"
@@ -252,7 +256,7 @@ export default function CoachDashboard() {
     }
 
     setActiveNav("Profile");
-  }, [activeNav, attendanceNavItems, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam]);
+  }, [activeNav, attendanceNavItems, canAccessControlPanel, canAccessEmployeesTab, canViewAttendance, canViewDashboard, canViewTeam, permissionsLoading]);
 
   useEffect(() => {
     if (window.location.pathname === "/coach/attendance") {
