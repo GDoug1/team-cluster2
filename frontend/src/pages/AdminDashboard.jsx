@@ -1054,7 +1054,7 @@ const handleOpenRejectModal = cluster => {
             )}
           </section>
         ) : canAccessControlPanel && activeNav === "Control Panel" ? (
-          <section className="content">
+          <section className="content control-panel-shell">
             <ControlPanelSection />
           </section>
         ) : null}

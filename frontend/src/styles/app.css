@@ -3106,6 +3106,17 @@ body {
 .control-panel-content {
   display: grid;
   gap: 16px;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  align-content: start;
+}
+
+.control-panel-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .control-panel-header h2 {
@@ -3382,6 +3393,16 @@ body {
 }
 
 @media (max-width: 900px) {
+  .control-panel-shell {
+    height: auto;
+    overflow: visible;
+  }
+
+  .control-panel-content {
+    height: auto;
+    overflow: visible;
+  }
+
   .permission-card-grid {
     grid-template-columns: 1fr;
   }
